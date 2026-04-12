@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Satsang Portal — Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/login.css" />
+</head>
+<body class="login-body">
+
+  <div class="login-bg">
+    <div class="login-bg-circle c1"></div>
+    <div class="login-bg-circle c2"></div>
+    <div class="login-bg-circle c3"></div>
+  </div>
+
+  <div class="login-wrapper">
+    <div class="login-card">
+
+      <div class="login-brand">
+        <div class="brand-icon">✦</div>
+        <h1 class="brand-title">Satsang Portal</h1>
+        <p class="brand-sub">Member Management System</p>
+      </div>
+
+      <!-- Toggle -->
+      <div class="login-toggle">
+        <button class="toggle-btn active" id="btnAdmin" onclick="switchRole('admin')">Admin</button>
+        <button class="toggle-btn" id="btnMember" onclick="switchRole('member')">Member</button>
+        <span class="toggle-slider" id="toggleSlider"></span>
+      </div>
+
+      <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="loginId">
+            <span id="loginLabel">Username / Email</span>
+          </label>
+          <div class="input-wrap">
+            <span class="input-icon">◎</span>
+            <input type="text" id="loginId" placeholder="Enter your username" required autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="loginPass">Password</label>
+          <div class="input-wrap">
+            <span class="input-icon">◉</span>
+            <input type="password" id="loginPass" placeholder="Enter your password" required />
+            <button type="button" class="pass-toggle" onclick="togglePass()">👁</button>
+          </div>
+        </div>
+
+        <div id="loginError" class="login-error" style="display:none;"></div>
+
+        <button type="submit" class="login-btn" id="loginBtn">
+          <span class="btn-text">Sign In</span>
+          <span class="btn-arrow">→</span>
+        </button>
+      </form>
+
+      <div class="login-hint">
+        <p id="loginHint">Admin: <strong>admin</strong> / <strong>admin123</strong></p>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/js/auth.js"></script>
+</body>
+</html>
