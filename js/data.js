@@ -123,6 +123,11 @@ const SEVA_CATEGORIES = [
 ];
 
 // ── Utility helpers ───────────────────────
+function isAdmin() {
+  const u = getCurrentUser();
+  return u && u.role === 'admin';
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);

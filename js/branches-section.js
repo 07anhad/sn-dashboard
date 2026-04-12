@@ -6,6 +6,7 @@
 
 function renderBranches() {
   const container = document.getElementById('branchesContent');
+  if (!isAdmin()) { container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">⛔ Access Denied — Admin only.</div>'; return; }
   container.innerHTML = `
     <div class="table-wrap">
       <div class="table-toolbar">
@@ -13,7 +14,7 @@ function renderBranches() {
           <span class="table-title">Branch Codes</span>
           <span class="table-count">${BRANCHES.length} branches</span>
         </div>
-        <button class="toolbar-btn toolbar-btn-saffron" onclick="openAddBranchModal()">+ Add Branch</button>
+        ${isAdmin() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddBranchModal()">+ Add Branch</button>' : ''}
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:var(--sp-md);padding:var(--sp-lg);border-bottom:1px solid var(--border)">
@@ -63,9 +64,9 @@ function branchesRows() {
       <td>${b.active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>'}</td>
       <td>
         <div class="td-actions">
-          <button class="tbl-btn tbl-btn-edit"   onclick="editBranch(${b.id})">Edit</button>
-          <button class="tbl-btn ${b.active ? 'tbl-btn-delete' : 'tbl-btn-view'}" onclick="toggleBranch(${b.id})">
-            ${b.active ? 'Deactivate' : 'Activate'}
+          ${isAdmin() ? `<button class="tbl-btn tbl-btn-edit"   onclick="editBranch(${b.id})">Edit</button>` : ''}
+          ${isAdmin() ? `<button class="tbl-btn ${b.active ? 'tbl-btn-delete' : 'tbl-btn-view'}" onclick="toggleBranch(${b.id})">
+            ${b.active ? 'Deactivate' : 'Activate'}` : ''}
           </button>
         </div>
       </td>

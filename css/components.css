@@ -2,6 +2,26 @@
    COMPONENTS.CSS — Cards, Tables, Stats, Filters, etc.
    ============================================================ */
 
+/* ── Attendance Tabs ─────────────────────── */
+.att-tab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--txt-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.att-tab:hover { color: var(--txt-primary); }
+.att-tab.active {
+  color: var(--clr-saffron);
+  border-bottom-color: var(--clr-saffron);
+}
+
 /* ── Stat Cards ──────────────────────────── */
 .stats-grid {
   display: grid;

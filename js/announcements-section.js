@@ -11,7 +11,7 @@ function renderAnnouncements() {
 
   container.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:var(--sp-lg)">
-      <button class="toolbar-btn toolbar-btn-saffron" onclick="openAddAnnouncementModal()">+ New Announcement</button>
+      ${isAdmin() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddAnnouncementModal()">+ New Announcement</button>' : ''}
     </div>
 
     <div class="sub-heading">Active Announcements</div>
@@ -49,12 +49,12 @@ function announcementCard(a) {
             By <strong>${a.author}</strong> &nbsp;·&nbsp; ${formatDate(a.date)}
           </div>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0">
+        ${isAdmin() ? `<div style="display:flex;gap:6px;flex-shrink:0">
           <button class="tbl-btn tbl-btn-edit"   onclick="editAnnouncement(${a.id})">Edit</button>
           <button class="tbl-btn ${a.active ? 'tbl-btn-delete' : 'tbl-btn-view'}" onclick="toggleAnnouncement(${a.id})">
             ${a.active ? 'Archive' : 'Restore'}
           </button>
-        </div>
+        </div>` : ''}
       </div>
     </div>
   `;

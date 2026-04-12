@@ -41,31 +41,31 @@
             <span>Change Password</span>
           </a>
         </li>
-        <li>
+        <li class="admin-only-nav" style="display:none;">
           <a href="#" class="nav-item" data-section="members">
             <span class="nav-icon">👥</span>
             <span>Members</span>
           </a>
         </li>
-        <li>
+        <li class="admin-only-nav" style="display:none;">
           <a href="#" class="nav-item" data-section="zones">
             <span class="nav-icon">🗺</span>
             <span>Zone Management</span>
           </a>
         </li>
-        <li>
+        <li class="admin-only-nav" style="display:none;">
           <a href="#" class="nav-item" data-section="branches">
             <span class="nav-icon">🏷</span>
             <span>Branch Code Management</span>
           </a>
         </li>
-        <li>
+        <li class="admin-only-nav" style="display:none;">
           <a href="#" class="nav-item" data-section="registration">
             <span class="nav-icon">🔗</span>
             <span>Registration Links</span>
           </a>
         </li>
-        <li>
+        <li class="admin-only-nav" style="display:none;">
           <a href="#" class="nav-item" data-section="contributions">
             <span class="nav-icon">💛</span>
             <span>Contributions</span>
@@ -83,10 +83,16 @@
             <span>Announcements</span>
           </a>
         </li>
-        <li>
+        <li class="admin-only-nav" style="display:none;">
           <a href="#" class="nav-item" data-section="seva">
             <span class="nav-icon">🙏</span>
             <span>Seva Category Master</span>
+          </a>
+        </li>
+        <li class="admin-only-nav" style="display:none;">
+          <a href="#" class="nav-item" data-section="attendance">
+            <span class="nav-icon">📋</span>
+            <span>Attendance / Haazri</span>
           </a>
         </li>
       </ul>
@@ -208,6 +214,15 @@
         <div id="sevaContent"></div>
       </section>
 
+      <!-- ===== ATTENDANCE / HAAZRI SECTION ===== -->
+      <section id="section-attendance" class="section">
+        <div class="section-header">
+          <h2>Attendance / Haazri</h2>
+          <p>eSatsang attendance log, branch summary, and CSV import.</p>
+        </div>
+        <div id="attendanceContent"></div>
+      </section>
+
     </main>
   </div>
 
@@ -229,6 +244,7 @@
   <script src="/js/events-section.js"></script>
   <script src="/js/announcements-section.js"></script>
   <script src="/js/seva-section.js"></script>
+  <script src="/js/attendance-section.js"></script>
   <script src="/js/router.js"></script>
 </body>
 </html>

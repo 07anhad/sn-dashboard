@@ -1,0 +1,10 @@
+ATTENDANCE_DATE,MEMBER_ID,EVENT_NAME,FIRST_NAME,MIDDLE_NAME,LAST_NAME,MEMBER_UID,BRANCH_NAME,LOCATION,ATTENDANCE_TYPE
+03-Mar-2026,MEM001,Daily Morning Satsang (3 AM till 7 AM),Rajesh,,Kumar,UID00101,Soami Nagar(Delhi),NA,AUDIO
+03-Mar-2026,MEM002,Daily Morning Satsang (3 AM till 7 AM),Sunita,,Devi,UID00102,Soami Nagar(Delhi),NA,VIDEO
+03-Mar-2026,MEM003,Daily Morning Satsang (3 AM till 7 AM),Arun,,Sharma,UID00103,Soami Nagar(Delhi),Vasant Kunj,AUDIO
+03-Mar-2026,MEM004,Daily Evening Satsang (3 PM till 7 PM),Priya,,Verma,UID00104,Soami Nagar(Delhi),NA,AUDIO
+03-Mar-2026,MEM005,Daily Evening Satsang (3 PM till 7 PM),Mohan,,Lal,UID00105,Soami Nagar(Delhi),NA,VIDEO
+03-Mar-2026,MEM006,Daily Evening Satsang (3 PM till 7 PM),Kavitha,,Rajan,UID00106,Soami Nagar(Delhi),NA,AUDIO
+03-Mar-2026,MEM001,Daily Evening Satsang (3 PM till 7 PM),Rajesh,,Kumar,UID00101,Soami Nagar(Delhi),NA,AUDIO
+03-Mar-2026,MEM007,Daily Morning Satsang 2 (7 AM till 11 AM),Deepak,,Nair,UID00107,Soami Nagar(Delhi),NA,AUDIO
+03-Mar-2026,MEM008,Morning Khet,Anita,,Singh,UID00108,Soami Nagar(Delhi),Vasant Kunj,NA

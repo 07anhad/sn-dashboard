@@ -6,6 +6,7 @@
 
 function renderRegistration() {
   const container = document.getElementById('registrationContent');
+  if (!isAdmin()) { container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">⛔ Access Denied — Admin only.</div>'; return; }
   const active    = REG_LINKS.filter(l => l.active);
   const inactive  = REG_LINKS.filter(l => !l.active);
 
@@ -21,7 +22,7 @@ function renderRegistration() {
           <div class="amount" style="color:var(--clr-red)">${inactive.length}</div>
         </div>
       </div>
-      <button class="toolbar-btn toolbar-btn-saffron" onclick="openAddLinkModal()">+ Create Link</button>
+      ${isAdmin() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddLinkModal()">+ Create Link</button>' : ''}
     </div>
 
     <div class="sub-heading">Active Registration Links</div>
@@ -61,8 +62,8 @@ function regLinkCard(l) {
       </div>
       <div style="display:flex;gap:6px;margin-top:8px">
         <button class="tbl-btn tbl-btn-view" onclick="copyLink('${l.url}')">Copy URL</button>
-        <button class="tbl-btn tbl-btn-edit" onclick="editLink(${l.id})">Edit</button>
-        <button class="tbl-btn tbl-btn-delete" onclick="toggleLink(${l.id})">${l.active ? 'Deactivate' : 'Activate'}</button>
+        ${isAdmin() ? `<button class="tbl-btn tbl-btn-edit" onclick="editLink(${l.id})">Edit</button>` : ''}
+        ${isAdmin() ? `<button class="tbl-btn tbl-btn-delete" onclick="toggleLink(${l.id})">${l.active ? 'Deactivate' : 'Activate'}</button>` : ''}
       </div>
     </div>
   `;

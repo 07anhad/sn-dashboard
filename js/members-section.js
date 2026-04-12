@@ -10,6 +10,7 @@ const MEMBERS_PER_PAGE = 8;
 
 function renderMembers() {
   const container = document.getElementById('membersContent');
+  if (!isAdmin()) { container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">⛔ Access Denied — Admin only.</div>'; return; }
   container.innerHTML = `
     <!-- Filter Bar -->
     <div class="filters-bar">
@@ -62,7 +63,7 @@ function renderMembers() {
           <span class="table-count" id="memberCount">0</span>
         </div>
         <div class="table-actions">
-          <button class="toolbar-btn toolbar-btn-saffron" onclick="openAddMemberModal()">+ Add Member</button>
+          ${isAdmin() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddMemberModal()">+ Add Member</button>' : ''}
           <button class="toolbar-btn" onclick="exportMembers()">↓ Export</button>
         </div>
       </div>
@@ -198,8 +199,8 @@ function memberRow(m) {
       <td>
         <div class="td-actions">
           <button class="tbl-btn tbl-btn-view"   onclick="viewMember('${m.uid}')">View</button>
-          <button class="tbl-btn tbl-btn-edit"   onclick="editMember('${m.uid}')">Edit</button>
-          <button class="tbl-btn tbl-btn-delete" onclick="deleteMember('${m.uid}')">Delete</button>
+          ${isAdmin() ? `<button class="tbl-btn tbl-btn-edit"   onclick="editMember('${m.uid}')">Edit</button>` : ''}
+          ${isAdmin() ? `<button class="tbl-btn tbl-btn-delete" onclick="deleteMember('${m.uid}')">Delete</button>` : ''}
         </div>
       </td>
     </tr>

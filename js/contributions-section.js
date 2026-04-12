@@ -6,6 +6,7 @@
 
 function renderContributions() {
   const container = document.getElementById('contributionsContent');
+  if (!isAdmin()) { container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">⛔ Access Denied — Admin only.</div>'; return; }
   const total     = CONTRIBUTIONS.reduce((a, c) => a + c.amount, 0);
   const received  = CONTRIBUTIONS.filter(c => c.status === 'Received').reduce((a, c) => a + c.amount, 0);
   const pending   = CONTRIBUTIONS.filter(c => c.status === 'Pending').reduce((a, c) => a + c.amount, 0);
@@ -53,7 +54,7 @@ function renderContributions() {
           <span class="table-title">All Contributions</span>
           <span class="table-count">${CONTRIBUTIONS.length} records</span>
         </div>
-        <button class="toolbar-btn toolbar-btn-saffron" onclick="openAddContribModal()">+ Add Contribution</button>
+        ${isAdmin() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddContribModal()">+ Add Contribution</button>' : ''}
       </div>
       <div class="table-scroll">
         <table>
@@ -77,7 +78,7 @@ function renderContributions() {
                 <td>
                   <div class="td-actions">
                     <button class="tbl-btn tbl-btn-view" onclick="viewContrib(${c.id})">View</button>
-                    <button class="tbl-btn tbl-btn-delete" onclick="deleteContrib(${c.id})">Delete</button>
+                    ${isAdmin() ? `<button class="tbl-btn tbl-btn-delete" onclick="deleteContrib(${c.id})">Delete</button>` : ''}
                   </div>
                 </td>
               </tr>

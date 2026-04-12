@@ -15,7 +15,8 @@ const SECTION_RENDERERS = {
   'contributions':   renderContributions,
   'events':          renderEvents,
   'announcements':   renderAnnouncements,
-  'seva':            renderSeva
+  'seva':            renderSeva,
+  'attendance':      renderAttendance
 };
 
 const SECTION_TITLES = {
@@ -28,7 +29,8 @@ const SECTION_TITLES = {
   'contributions':   'Contributions',
   'events':          'All Events',
   'announcements':   'Announcements',
-  'seva':            'Seva Category Master'
+  'seva':            'Seva Category Master',
+  'attendance':      'Attendance / Haazri'
 };
 
 let currentSection = 'dashboard';
@@ -45,6 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
       // Close sidebar on mobile
       if (window.innerWidth <= 900) closeSidebar();
     });
+  });
+
+  // Show admin-only nav items for admins
+  document.querySelectorAll('.admin-only-nav').forEach(el => {
+    el.style.display = isAdmin() ? '' : 'none';
   });
 
   // Render initial section

@@ -135,8 +135,11 @@ input, select, textarea { font-family: var(--font-body); }
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(13,27,62,0.55);
   backdrop-filter: blur(4px); z-index: 8000;
-  display: flex !important; align-items: center; justify-content: center;
+  display: none; align-items: center; justify-content: center;
   padding: var(--sp-lg);
+}
+.modal-overlay.open {
+  display: flex;
 }
 .modal-box {
   background: var(--bg-card); border-radius: var(--radius-lg);

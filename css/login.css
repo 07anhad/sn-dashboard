@@ -212,3 +212,33 @@
   color: rgba(255,255,255,0.3);
 }
 .login-hint strong { color: rgba(255,255,255,0.55); }
+
+/* Links under form */
+.login-links {
+  text-align: center;
+  margin-top: var(--sp-md);
+  font-size: 0.85rem;
+}
+.login-links a {
+  color: var(--clr-saffron);
+  text-decoration: none;
+  transition: color var(--t-fast);
+}
+.login-links a:hover {
+  color: var(--clr-gold);
+  text-decoration: underline;
+}
+.link-sep {
+  color: rgba(255,255,255,0.2);
+  margin: 0 8px;
+}
+
+/* Success message */
+.login-success {
+  background: rgba(52,199,89,0.15);
+  border: 1px solid rgba(52,199,89,0.4);
+  color: #6ee7a0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}

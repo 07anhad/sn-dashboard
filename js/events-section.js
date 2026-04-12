@@ -12,7 +12,7 @@ function renderEvents() {
 
   container.innerHTML = `
     <div style="display:flex;justify-content:flex-end;margin-bottom:var(--sp-lg)">
-      <button class="toolbar-btn toolbar-btn-saffron" onclick="openAddEventModal()">+ Create Event</button>
+      ${isAdmin() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddEventModal()">+ Create Event</button>' : ''}
     </div>
 
     <div class="sub-heading">Upcoming Events <span class="badge badge-info" style="font-size:0.78rem">${upcoming.length}</span></div>
@@ -54,9 +54,9 @@ function eventCard(e) {
         </div>
       </div>
       <div class="event-card-footer">
-        <button class="tbl-btn tbl-btn-edit" onclick="editEvent(${e.id})">Edit</button>
-        <button class="tbl-btn tbl-btn-delete" onclick="deleteEvent(${e.id})">Delete</button>
-        ${e.status === 'Upcoming' ? `<button class="tbl-btn tbl-btn-view" onclick="markCompleted(${e.id})">Mark Done</button>` : ''}
+        ${isAdmin() ? `<button class="tbl-btn tbl-btn-edit" onclick="editEvent(${e.id})">Edit</button>` : ''}
+        ${isAdmin() ? `<button class="tbl-btn tbl-btn-delete" onclick="deleteEvent(${e.id})">Delete</button>` : ''}
+        ${isAdmin() && e.status === 'Upcoming' ? `<button class="tbl-btn tbl-btn-view" onclick="markCompleted(${e.id})">Mark Done</button>` : ''}
       </div>
     </div>
   `;
