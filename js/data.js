@@ -172,9 +172,24 @@ async function reloadAnnouncements() { const a = await apiGet('/api/announcement
 async function reloadDashStats()     { DASH_STATS = await apiGet('/api/dashboard/stats'); }
 
 // ── Utility helpers ───────────────────────
-function isAdmin() {
+function getCurrentUserRole() {
   const u = getCurrentUser();
-  return u && u.role === 'admin';
+  return u ? u.role : null;
+}
+
+function isSuperAdmin() {
+  return getCurrentUserRole() === 'superadmin';
+}
+
+function isAdmin() {
+  // Both superadmin and admin can VIEW everything
+  const r = getCurrentUserRole();
+  return r === 'admin' || r === 'superadmin';
+}
+
+function canWrite() {
+  // Only superadmin can add / edit / delete / upload
+  return isSuperAdmin();
 }
 
 function formatDate(dateStr) {

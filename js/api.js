@@ -8,9 +8,11 @@ const API_BASE = '';  // same origin
 
 async function api(path, opts = {}) {
   const { body, headers, ...rest } = opts;
+  const u = getCurrentUser();
+  const actor = u ? `${u.username}(${u.role})` : 'anonymous';
   const res = await fetch(API_BASE + path, {
     ...rest,
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { 'Content-Type': 'application/json', 'X-User': actor, ...headers },
     body: body ? JSON.stringify(body) : undefined
   });
   const text = await res.text();

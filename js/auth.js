@@ -115,7 +115,7 @@ if (document.getElementById('userName')) {
   const user = requireAuth();
   if (user) {
     document.getElementById('userName').textContent  = user.name;
-    document.getElementById('userRole').textContent  = user.role === 'admin' ? 'Administrator' : 'Member';
+    document.getElementById('userRole').textContent  = user.role === 'superadmin' ? 'Super Administrator' : user.role === 'admin' ? 'Administrator' : 'Member';
     document.getElementById('userAvatar').textContent = user.name.charAt(0).toUpperCase();
     document.getElementById('topbarUser').textContent = user.name;
   }

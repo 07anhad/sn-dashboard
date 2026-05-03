@@ -1,7 +1,8 @@
 """
 app.py — Flask server: serves static frontend + REST API
 """
-import os, sys
+import os, sys, logging
+from logging.handlers import TimedRotatingFileHandler
 sys.path.insert(0, os.path.dirname(__file__))
 
 from flask import Flask, send_from_directory, jsonify, request
@@ -13,6 +14,32 @@ CORS(app)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB upload limit
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
+
+# ═══════════════════════════════════════════
+# Audit logger — writes to logs/audit_YYYY-MM-DD.log
+# ═══════════════════════════════════════════
+_LOG_DIR = os.path.join(ROOT, 'logs')
+os.makedirs(_LOG_DIR, exist_ok=True)
+
+_audit_logger = logging.getLogger('audit')
+_audit_logger.setLevel(logging.INFO)
+_audit_logger.propagate = False
+_handler = TimedRotatingFileHandler(
+    os.path.join(_LOG_DIR, 'audit.log'),
+    when='midnight', backupCount=90, encoding='utf-8'
+)
+_handler.suffix = '%Y-%m-%d'
+_handler.setFormatter(logging.Formatter('%(asctime)s | %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+_audit_logger.addHandler(_handler)
+
+def audit(action: str, detail: str = ''):
+    """Log a user action. Reads actor info from the X-User header sent by the frontend."""
+    actor = request.headers.get('X-User', 'unknown')
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown')
+    msg = f"actor={actor} | ip={ip} | action={action}"
+    if detail:
+        msg += f" | detail={detail}"
+    _audit_logger.info(msg)
 
 # ═══════════════════════════════════════════
 # Static file serving
@@ -52,13 +79,23 @@ def login():
     password = data.get('password') or ''
     role = (data.get('role') or '').strip()
 
-    user = query(
-        "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role=%s",
-        (username, username, password, role),
-        one=True
-    )
+    # 'admin' toggle on login page covers both admin and superadmin
+    if role == 'admin':
+        user = query(
+            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role IN ('admin','superadmin')",
+            (username, username, password),
+            one=True
+        )
+    else:
+        user = query(
+            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role=%s",
+            (username, username, password, role),
+            one=True
+        )
     if user:
+        audit('LOGIN_SUCCESS', f"username={username} role={user['role']}")
         return jsonify({'ok': True, 'user': user})
+    audit('LOGIN_FAILED', f"username={username} attempted_role={role}")
     return jsonify({'ok': False, 'error': 'Invalid credentials'}), 401
 
 @app.route('/api/auth/signup', methods=['POST'])
@@ -86,6 +123,7 @@ def signup():
         (username, password, name, email, member_id),
         returning=True
     )
+    audit('SIGNUP', f"new_user={username} email={email}")
     return jsonify({'ok': True, 'user': user}), 201
 
 @app.route('/api/auth/reset-password', methods=['POST'])
@@ -102,6 +140,7 @@ def reset_password():
         return jsonify({'ok': False, 'error': 'Username not found.'}), 404
 
     execute("UPDATE users SET password=%s WHERE username=%s", (new_password, username))
+    audit('RESET_PASSWORD', f"target_user={username}")
     return jsonify({'ok': True})
 
 # ═══════════════════════════════════════════
@@ -119,6 +158,7 @@ def add_zone():
         (d['name'], d['code'], d.get('active', True), d.get('member_count', 0), d.get('incharge',''), d.get('phone','')),
         returning=True
     )
+    audit('ADD_ZONE', f"name={d['name']} code={d['code']}")
     return jsonify(row), 201
 
 @app.route('/api/zones/<int:id>', methods=['PUT'])
@@ -128,11 +168,13 @@ def update_zone(id):
         "UPDATE zones SET name=%s,code=%s,active=%s,member_count=%s,incharge=%s,phone=%s WHERE id=%s",
         (d['name'], d['code'], d.get('active', True), d.get('member_count', 0), d.get('incharge',''), d.get('phone',''), id)
     )
+    audit('EDIT_ZONE', f"id={id} name={d['name']}")
     return jsonify({'ok': True})
 
 @app.route('/api/zones/<int:id>', methods=['DELETE'])
 def delete_zone(id):
     execute("DELETE FROM zones WHERE id=%s", (id,))
+    audit('DELETE_ZONE', f"id={id}")
     return jsonify({'ok': True})
 
 # ═══════════════════════════════════════════
@@ -166,6 +208,7 @@ def add_member():
              d.get('email',''), d.get('city',''), d.get('state',''),
              d.get('status','Activated'))
         )
+        audit('ADD_MEMBER', f"uid={uid} name={d.get('name','')}")
         return jsonify({'ok': True, 'uid': uid}), 201
     except psycopg2.errors.UniqueViolation:
         return jsonify({'ok': False, 'error': f"A member with UID '{uid}' already exists."}), 409
@@ -180,6 +223,7 @@ def update_member(uid):
     if set(d.keys()) <= {'status'}:
         execute("UPDATE member_details SET record_status=%s WHERE uid=%s",
                 (d.get('status', 'Activated'), uid))
+        audit('UPDATE_MEMBER_STATUS', f"uid={uid} status={d.get('status','Activated')}")
         return jsonify({'ok': True})
 
     # Full field update
@@ -260,11 +304,13 @@ def update_member(uid):
         or_none('dateOfExpire'),
         uid
     ))
+    audit('EDIT_MEMBER', f"uid={uid} name={d.get('name','')}")
     return jsonify({'ok': True})
 
 @app.route('/api/members/<uid>', methods=['DELETE'])
 def delete_member(uid):
     execute("DELETE FROM members WHERE uid=%s", (uid,))
+    audit('DELETE_MEMBER', f"uid={uid}")
     return jsonify({'ok': True})
 
 # ═══════════════════════════════════════════
@@ -282,6 +328,7 @@ def add_reg_link():
         (d['title'], d['code'], d.get('url',''), d.get('active',True), d.get('maxUses',0), d.get('usedCount',0), d.get('expiry'), d.get('createdOn')),
         returning=True
     )
+    audit('ADD_REG_LINK', f"title={d['title']} code={d['code']}")
     return jsonify(row), 201
 
 @app.route('/api/reg-links/<int:id>', methods=['PUT'])
@@ -291,11 +338,13 @@ def update_reg_link(id):
         "UPDATE reg_links SET title=%s,code=%s,url=%s,active=%s,max_uses=%s,used_count=%s,expiry=%s WHERE id=%s",
         (d['title'], d['code'], d.get('url',''), d.get('active',True), d.get('maxUses',0), d.get('usedCount',0), d.get('expiry'), id)
     )
+    audit('EDIT_REG_LINK', f"id={id} title={d['title']}")
     return jsonify({'ok': True})
 
 @app.route('/api/reg-links/<int:id>', methods=['DELETE'])
 def delete_reg_link(id):
     execute("DELETE FROM reg_links WHERE id=%s", (id,))
+    audit('DELETE_REG_LINK', f"id={id}")
     return jsonify({'ok': True})
 
 # ═══════════════════════════════════════════
@@ -313,6 +362,7 @@ def add_announcement():
         (d['title'], d.get('content',''), d.get('date'), d.get('author','Admin'), d.get('priority','medium'), d.get('active',True)),
         returning=True
     )
+    audit('ADD_ANNOUNCEMENT', f"title={d['title']}")
     return jsonify(row), 201
 
 @app.route('/api/announcements/<int:id>', methods=['PUT'])
@@ -322,11 +372,13 @@ def update_announcement(id):
         "UPDATE announcements SET title=%s,content=%s,date=%s,author=%s,priority=%s,active=%s WHERE id=%s",
         (d['title'], d.get('content',''), d.get('date'), d.get('author','Admin'), d.get('priority','medium'), d.get('active',True), id)
     )
+    audit('EDIT_ANNOUNCEMENT', f"id={id} title={d['title']} active={d.get('active',True)}")
     return jsonify({'ok': True})
 
 @app.route('/api/announcements/<int:id>', methods=['DELETE'])
 def delete_announcement(id):
     execute("DELETE FROM announcements WHERE id=%s", (id,))
+    audit('DELETE_ANNOUNCEMENT', f"id={id}")
     return jsonify({'ok': True})
 
 # ═══════════════════════════════════════════
@@ -439,6 +491,7 @@ def upload_esatsang_attendance():
                 after = cur.fetchone()[0]
             conn.commit()
             inserted = after - before
+            audit('UPLOAD_ESATSANG_ATTENDANCE', f"file={f.filename} inserted={inserted} skipped={len(parsed)-inserted}")
             return jsonify({'ok': True, 'count': inserted, 'skipped': len(parsed) - inserted}), 201
         except Exception as e:
             conn.rollback()
@@ -531,6 +584,7 @@ def upload_branch_attendance():
                 "INSERT INTO branch_attendance (member_id, member_name, events_attended, total_branch_events, branch_name) VALUES (%s,%s,%s,%s,%s)",
                 (r['memberId'], r['memberName'], r['eventsAttended'], r['totalEvents'], r['branch'])
             )
+        audit('UPLOAD_BRANCH_ATTENDANCE', f"file={f.filename} rows={len(parsed)}")
         return jsonify({'ok': True, 'count': len(parsed)}), 201
 
     except Exception as e:

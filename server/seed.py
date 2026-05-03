@@ -15,8 +15,9 @@ def seed():
         cur.executemany(
             "INSERT INTO users (username,password,role,name,email,member_id) VALUES (%s,%s,%s,%s,%s,%s)",
             [
-                ('admin','admin123','admin','Admin User','admin@satsang.org', None),
-                ('anhad.parashar','member123','member','Anhad Parashar','anhad.parashar@email.com','M-00101'),
+                ('superadmin', 'super123',  'superadmin', 'Super Admin',    'superadmin@satsang.org', None),
+                ('admin',      'admin123',  'admin',      'Admin User',     'admin@satsang.org',      None),
+                ('anhad.parashar','member123','member',   'Anhad Parashar', 'anhad.parashar@email.com','M-00101'),
             ]
         )
 

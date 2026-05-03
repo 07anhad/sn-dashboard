@@ -86,10 +86,10 @@ function renderAttUI() {
           </div>
         </div>
       </div>
-      <label class="btn btn-primary" style="cursor:pointer;white-space:nowrap">
+      ${canWrite() ? `<label class="btn btn-primary" style="cursor:pointer;white-space:nowrap">
         \u2191 Upload Excel / CSV
         <input type="file" accept=".csv,.xlsx,.xlsm,.xls" style="display:none" onchange="handleAttUpload(event)">
-      </label>
+      </label>` : '<span class="text-muted" style="font-size:0.85em">View-only access — contact a Super Admin to upload.</span>'}
     </div>
 
     ${total > 0 ? `
@@ -248,7 +248,7 @@ function renderAttTable() {
       <td><code style="font-size:0.78rem">${r.uid || '\u2014'}</code></td>
       <td><strong>${r.name}</strong></td>
       <td style="font-size:0.82rem">${r.event || '\u2014'}</td>
-      <td><span class="badge badge-info" style="font-size:0.75rem">${r.branch || '\u2014'}</span></td>
+      <td><span class="badge badge-info" style="font-size:0.75rem;white-space:nowrap">${r.branch || '—'}</span></td>
       <td style="font-size:0.82rem">${r.location || '\u2014'}</td>
       <td>${typeBadge(r.type)}</td>
     </tr>
@@ -350,6 +350,8 @@ function handleAttUpload(event) {
   };
 
   xhr.open('POST', '/api/attendance/esatsang/upload');
+  const u = getCurrentUser();
+  if (u) xhr.setRequestHeader('X-User', `${u.username}(${u.role})`);
   xhr.send(formData);
 }
 

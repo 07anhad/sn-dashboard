@@ -42,7 +42,7 @@ function renderMembers() {
           <span class="table-count" id="memberCount">0</span>
         </div>
         <div class="table-actions">
-          ${isAdmin() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddMemberModal()">+ Add Member</button>' : ''}
+          ${canWrite() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddMemberModal()">+ Add Member</button>' : ''}
           <button class="toolbar-btn" onclick="exportMembers()">↓ Export</button>
         </div>
       </div>
@@ -170,11 +170,11 @@ function filterMembers() {
   const type     = (document.getElementById('filterType')?.value     || '');
 
   membersData = MEMBERS.filter(m => {
-    if (name   && !m.name.toLowerCase().includes(name))         return false;
-    if (mobile && !m.mobile.includes(mobile))                    return false;
-    if (zone   && m.zone !== zone)                               return false;
-    if (approval && m.approvalStatus !== approval)               return false;
-    if (type   && m.type !== type)                               return false;
+    if (name   && !(m.name   || '').toLowerCase().includes(name))   return false;
+    if (mobile && !(m.mobile || '').includes(mobile))                return false;
+    if (zone   && m.zone !== zone)                                   return false;
+    if (approval && m.approvalStatus !== approval)                   return false;
+    if (type   && m.type !== type)                                   return false;
     return true;
   }).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
   membersData.forEach((m, i) => { m.sl = i + 1; });
@@ -238,8 +238,8 @@ function memberRow(m) {
       <td style="position:sticky;left:0;z-index:1;background:var(--bg-card);white-space:nowrap">
         <div class="td-actions">
           <button class="tbl-btn tbl-btn-view" onclick="viewMember('${m.uid}')">View</button>
-          ${isAdmin() ? `<button class="tbl-btn tbl-btn-edit" onclick="editMember('${m.uid}')">Edit</button>` : ''}
-          ${isAdmin() ? deactivateBtn : ''}
+          ${canWrite() ? `<button class="tbl-btn tbl-btn-edit" onclick="editMember('${m.uid}')">Edit</button>` : ''}
+          ${canWrite() ? deactivateBtn : ''}
         </div>
       </td>
       <td>${v(m.sl)}</td>
@@ -842,9 +842,10 @@ async function saveNewMember() {
   if (!mobile) { showToast('Mobile is required!', 'error'); return; }
 
   try {
+    const u = getCurrentUser();
     const res = await fetch('/api/members', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-User': u ? `${u.username}(${u.role})` : 'anonymous' },
       body: JSON.stringify({
         uid,
         bslno:  document.getElementById('am_bslno').value.trim(),
