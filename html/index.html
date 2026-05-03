@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Satsang Portal — Login</title>
+  <title>Soaminagar Branch Delhi — Login</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/style.css" />
@@ -21,9 +21,7 @@
     <div class="login-card">
 
       <div class="login-brand">
-        <div class="brand-icon">✦</div>
-        <h1 class="brand-title">Satsang Portal</h1>
-        <p class="brand-sub">Member Management System</p>
+        <h1 class="brand-title">Soaminagar Branch Delhi</h1>
       </div>
 
       <!-- Toggle -->
@@ -108,6 +106,13 @@
         <div id="signupError" class="login-error" style="display:none;"></div>
         <div id="signupSuccess" class="login-success" style="display:none;"></div>
 
+        <div class="form-group">
+          <label class="consent-label" for="signupConsent" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;color:rgba(255,255,255,0.55);font-size:0.82rem;text-transform:none;letter-spacing:0;font-weight:400;line-height:1.5;">
+            <input type="checkbox" id="signupConsent" required style="margin-top:3px;flex-shrink:0;accent-color:var(--clr-saffron);width:15px;height:15px;" />
+            <span>I give my consent for my personal data to be stored and used by Soaminagar Branch Delhi for administrative and community purposes only.</span>
+          </label>
+        </div>
+
         <button type="submit" class="login-btn" id="signupBtn">
           <span class="btn-text">Create Account</span>
           <span class="btn-arrow">→</span>
@@ -155,13 +160,14 @@
         </div>
       </form>
 
-      <div class="login-hint">
-        <p id="loginHint">Admin: <strong>admin</strong> / <strong>admin123</strong></p>
+      <div class="login-hint" style="display:none;">
+        <p id="loginHint"></p>
       </div>
 
     </div>
   </div>
 
+  <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>
 </body>
 </html>

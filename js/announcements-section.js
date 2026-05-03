@@ -84,22 +84,24 @@ function openAddAnnouncementModal() {
   `);
 }
 
-function saveNewAnnouncement() {
+async function saveNewAnnouncement() {
   const title   = document.getElementById('aa_title').value.trim();
   const content = document.getElementById('aa_content').value.trim();
   if (!title || !content) { showToast('Title and content required!', 'error'); return; }
-  ANNOUNCEMENTS.unshift({
-    id:       ANNOUNCEMENTS.length + 1,
-    title, content,
-    date:     new Date().toISOString().split('T')[0],
-    author:   document.getElementById('aa_author').value || 'Admin',
-    priority: document.getElementById('aa_priority').value,
-    active:   true
-  });
-  closeForcedModal();
-  renderCache.delete('announcements');
-  renderAnnouncements();
-  showToast('Announcement posted!', 'success');
+  try {
+    await apiPost('/api/announcements', {
+      title, content,
+      date:     new Date().toISOString().split('T')[0],
+      author:   document.getElementById('aa_author').value || 'Admin',
+      priority: document.getElementById('aa_priority').value,
+      active:   true
+    });
+    await reloadAnnouncements();
+    closeForcedModal();
+    renderCache.delete('announcements');
+    renderAnnouncements();
+    showToast('Announcement posted!', 'success');
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
 function editAnnouncement(id) {
@@ -127,23 +129,32 @@ function editAnnouncement(id) {
   `);
 }
 
-function saveAnnouncementEdit(id) {
+async function saveAnnouncementEdit(id) {
   const a = ANNOUNCEMENTS.find(x => x.id === id);
   if (!a) return;
-  a.title    = document.getElementById('ea_title').value;
-  a.content  = document.getElementById('ea_content').value;
-  a.priority = document.getElementById('ea_priority').value;
-  closeForcedModal();
-  renderCache.delete('announcements');
-  renderAnnouncements();
-  showToast('Announcement updated!', 'success');
+  try {
+    await apiPut('/api/announcements/' + id, {
+      ...a,
+      title:    document.getElementById('ea_title').value,
+      content:  document.getElementById('ea_content').value,
+      priority: document.getElementById('ea_priority').value
+    });
+    await reloadAnnouncements();
+    closeForcedModal();
+    renderCache.delete('announcements');
+    renderAnnouncements();
+    showToast('Announcement updated!', 'success');
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
-function toggleAnnouncement(id) {
+async function toggleAnnouncement(id) {
   const a = ANNOUNCEMENTS.find(x => x.id === id);
   if (!a) return;
-  a.active = !a.active;
-  renderCache.delete('announcements');
-  renderAnnouncements();
-  showToast(`Announcement ${a.active ? 'restored' : 'archived'}!`);
+  try {
+    await apiPut('/api/announcements/' + id, { ...a, active: !a.active });
+    await reloadAnnouncements();
+    renderCache.delete('announcements');
+    renderAnnouncements();
+    showToast(`Announcement ${!a.active ? 'restored' : 'archived'}!`);
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }

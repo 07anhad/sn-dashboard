@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Satsang Portal — Dashboard</title>
+  <title>Soaminagar Branch Delhi — Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/style.css" />
@@ -12,11 +12,27 @@
 </head>
 <body class="dash-body">
 
+  <!-- ===== GLOBAL LOADER ===== -->
+  <div id="appLoader" style="
+    position:fixed;inset:0;z-index:9999;
+    background:var(--bg-body, #f4f6fb);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:20px;transition:opacity 0.35s ease;
+  ">
+    <div style="
+      width:48px;height:48px;border-radius:50%;
+      border:4px solid var(--border,#e0e4ef);
+      border-top-color:var(--clr-saffron,#e07b29);
+      animation:spin 0.75s linear infinite;
+    "></div>
+    <div style="font-family:Outfit,sans-serif;font-size:0.9rem;color:var(--txt-muted,#7a82a0);letter-spacing:.04em">Loading data…</div>
+  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-      <div class="brand-icon-sm">✦</div>
-      <span>Satsang Portal</span>
+      <span>Soaminagar Branch Delhi</span>
     </div>
 
     <div class="sidebar-user" id="sidebarUser">
@@ -48,15 +64,9 @@
           </a>
         </li>
         <li class="admin-only-nav" style="display:none;">
-          <a href="#" class="nav-item" data-section="zones">
-            <span class="nav-icon">🗺</span>
-            <span>Zone Management</span>
-          </a>
-        </li>
-        <li class="admin-only-nav" style="display:none;">
-          <a href="#" class="nav-item" data-section="branches">
-            <span class="nav-icon">🏷</span>
-            <span>Branch Code Management</span>
+          <a href="#" class="nav-item" data-section="attendance">
+            <span class="nav-icon">📋</span>
+            <span>Attendance / Haazri</span>
           </a>
         </li>
         <li class="admin-only-nav" style="display:none;">
@@ -65,34 +75,10 @@
             <span>Registration Links</span>
           </a>
         </li>
-        <li class="admin-only-nav" style="display:none;">
-          <a href="#" class="nav-item" data-section="contributions">
-            <span class="nav-icon">💛</span>
-            <span>Contributions</span>
-          </a>
-        </li>
-        <li>
-          <a href="#" class="nav-item" data-section="events">
-            <span class="nav-icon">📅</span>
-            <span>All Events</span>
-          </a>
-        </li>
         <li>
           <a href="#" class="nav-item" data-section="announcements">
             <span class="nav-icon">📢</span>
             <span>Announcements</span>
-          </a>
-        </li>
-        <li class="admin-only-nav" style="display:none;">
-          <a href="#" class="nav-item" data-section="seva">
-            <span class="nav-icon">🙏</span>
-            <span>Seva Category Master</span>
-          </a>
-        </li>
-        <li class="admin-only-nav" style="display:none;">
-          <a href="#" class="nav-item" data-section="attendance">
-            <span class="nav-icon">📋</span>
-            <span>Attendance / Haazri</span>
           </a>
         </li>
       </ul>
@@ -116,6 +102,7 @@
       <button class="hamburger" onclick="toggleSidebar()">☰</button>
       <div class="topbar-title" id="topbarTitle">Dashboard</div>
       <div class="topbar-right">
+        <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
         <span class="topbar-user" id="topbarUser">Admin</span>
         <button class="topbar-logout" onclick="logout()">Logout</button>
       </div>
@@ -151,24 +138,6 @@
         <div id="membersContent"></div>
       </section>
 
-      <!-- ===== ZONES SECTION ===== -->
-      <section id="section-zones" class="section">
-        <div class="section-header">
-          <h2>Zone Management</h2>
-          <p>Manage geographic zones.</p>
-        </div>
-        <div id="zonesContent"></div>
-      </section>
-
-      <!-- ===== BRANCHES SECTION ===== -->
-      <section id="section-branches" class="section">
-        <div class="section-header">
-          <h2>Branch Code Management</h2>
-          <p>Manage branch codes and assignments.</p>
-        </div>
-        <div id="branchesContent"></div>
-      </section>
-
       <!-- ===== REGISTRATION SECTION ===== -->
       <section id="section-registration" class="section">
         <div class="section-header">
@@ -178,24 +147,6 @@
         <div id="registrationContent"></div>
       </section>
 
-      <!-- ===== CONTRIBUTIONS SECTION ===== -->
-      <section id="section-contributions" class="section">
-        <div class="section-header">
-          <h2>Contributions</h2>
-          <p>Track member contributions and donations.</p>
-        </div>
-        <div id="contributionsContent"></div>
-      </section>
-
-      <!-- ===== EVENTS SECTION ===== -->
-      <section id="section-events" class="section">
-        <div class="section-header">
-          <h2>All Events</h2>
-          <p>Upcoming and past Satsang events.</p>
-        </div>
-        <div id="eventsContent"></div>
-      </section>
-
       <!-- ===== ANNOUNCEMENTS SECTION ===== -->
       <section id="section-announcements" class="section">
         <div class="section-header">
@@ -203,15 +154,6 @@
           <p>Post and manage announcements.</p>
         </div>
         <div id="announcementsContent"></div>
-      </section>
-
-      <!-- ===== SEVA SECTION ===== -->
-      <section id="section-seva" class="section">
-        <div class="section-header">
-          <h2>Seva Category Master</h2>
-          <p>Define and manage seva categories.</p>
-        </div>
-        <div id="sevaContent"></div>
       </section>
 
       <!-- ===== ATTENDANCE / HAAZRI SECTION ===== -->
@@ -232,18 +174,14 @@
   </div>
 
   <!-- Scripts — order matters -->
+  <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/data.js"></script>
   <script src="/js/dashboard-section.js"></script>
   <script src="/js/password-section.js"></script>
   <script src="/js/members-section.js"></script>
-  <script src="/js/zones-section.js"></script>
-  <script src="/js/branches-section.js"></script>
   <script src="/js/registration-section.js"></script>
-  <script src="/js/contributions-section.js"></script>
-  <script src="/js/events-section.js"></script>
   <script src="/js/announcements-section.js"></script>
-  <script src="/js/seva-section.js"></script>
   <script src="/js/attendance-section.js"></script>
   <script src="/js/router.js"></script>
 </body>

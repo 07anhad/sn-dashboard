@@ -64,22 +64,6 @@ function renderDashboard() {
       ${statCard(s.activeRegLinks,   'Active Reg. Links',  'More info',    'accent-teal',    'registration')}
     </div>
 
-    <!-- Zone stats -->
-    <div class="sub-heading">Zone Statistics</div>
-    <div class="info-grid">
-      ${infoCard(s.activeZones,      'Active Zones',         'View All',       'zones')}
-      ${infoCard(s.inactiveZones,    'Inactive Zones',       'Manage',         'zones')}
-      ${infoCard(s.membersWithZone,  'Members with Zone',    'View Members',   'members')}
-    </div>
-
-    <!-- Branch stats -->
-    <div class="sub-heading">Branch Code Statistics</div>
-    <div class="info-grid">
-      ${infoCard(s.activeBranchCodes,   'Active Branch Codes',     'View All',     'branches')}
-      ${infoCard(s.inactiveBranchCodes, 'Inactive Branch Codes',   'Manage',       'branches')}
-      ${infoCard(s.membersWithBranch,   'Members with Branch Code','View Members', 'members')}
-    </div>
-
     <!-- Attendance stats (admin only) -->
     ${isAdmin() ? `
     <div class="sub-heading">Attendance / Haazri Overview</div>
@@ -113,7 +97,7 @@ function renderDashboard() {
     el.addEventListener('click', () => navigateTo(el.dataset.goto));
   });
 
-  // Load attendance stats from CSVs (admin only)
+  // Load attendance stats from API (admin only)
   if (isAdmin()) loadDashAttendanceStats();
 }
 
@@ -121,40 +105,13 @@ async function loadDashAttendanceStats() {
   const el = document.getElementById('dashAttendanceStats');
   if (!el) return;
   try {
-    const [esatsangText, branchText] = await Promise.all([
-      fetch('/dataset/esatsang_attendance.csv').then(r => r.ok ? r.text() : ''),
-      fetch('/dataset/branch_attendance.csv').then(r => r.ok ? r.text() : '')
-    ]);
-
-    // Parse eSatsang
-    let totalRecords = 0, audioCount = 0, videoCount = 0, dateLabel = '—';
-    if (esatsangText) {
-      const lines = esatsangText.split('\n').map(l => l.trim()).filter(l => l);
-      const dates = new Set();
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',');
-        if (cols.length < 10) continue;
-        totalRecords++;
-        const type = (cols[9] || '').trim();
-        if (type === 'AUDIO') audioCount++;
-        else if (type === 'VIDEO') videoCount++;
-        const d = (cols[0] || '').trim();
-        if (d) dates.add(d);
-      }
-      dateLabel = dates.size === 1 ? [...dates][0] : dates.size + ' dates';
-    }
-
-    // Parse branch summary
-    let branchTotal = 0, branchAttended = 0;
-    if (branchText) {
-      const lines = branchText.split('\n').map(l => l.trim()).filter(l => l);
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',');
-        if (cols.length < 4) continue;
-        branchTotal++;
-        if (parseInt(cols[2]) > 0) branchAttended++;
-      }
-    }
+    const data = await apiGet('/api/dashboard/attendance-stats');
+    const totalRecords = data.esatsangCount || 0;
+    const audioCount = data.audioCount || 0;
+    const videoCount = data.videoCount || 0;
+    const branchTotal = data.branchTotal || 0;
+    const branchAttended = data.branchAttended || 0;
+    const dateLabel = data.latestDate || '—';
 
     el.innerHTML = `
       ${statCard(totalRecords, 'eSatsang Records', dateLabel, 'accent-saffron', 'attendance')}
@@ -166,7 +123,7 @@ async function loadDashAttendanceStats() {
       c.addEventListener('click', () => navigateTo(c.dataset.goto));
     });
   } catch {
-    el.innerHTML = '<p class="text-muted" style="padding:var(--sp-md)">Could not load attendance CSVs.</p>';
+    el.innerHTML = '<p class="text-muted" style="padding:var(--sp-md)">Could not load attendance stats.</p>';
   }
 }
 
@@ -174,7 +131,7 @@ function statCard(value, label, linkText, accent, goto) {
   return `
     <div class="stat-card ${accent}" data-goto="${goto}">
       <div class="stat-label">${label}</div>
-      <div class="stat-value">${value.toLocaleString()}</div>
+      <div class="stat-value">${(value ?? 0).toLocaleString()}</div>
       <div class="stat-link">${linkText} →</div>
     </div>
   `;
@@ -184,7 +141,7 @@ function infoCard(value, label, action, goto) {
   return `
     <div class="info-card">
       <h4>${label}</h4>
-      <div class="info-num">${value.toLocaleString()}</div>
+      <div class="info-num">${(value ?? 0).toLocaleString()}</div>
       <span class="info-action" data-goto="${goto}">${action}</span>
     </div>
   `;

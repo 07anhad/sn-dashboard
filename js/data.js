@@ -1,126 +1,175 @@
 /* ============================================================
-   DATA.JS — All Mock Data
+   DATA.JS — Data Layer (loads from PostgreSQL via API)
    ============================================================ */
 
 'use strict';
 
-// ── Dashboard Stats ───────────────────────
-const DASH_STATS = {
-  totalMembers:       1604,
-  activeMembers:      1602,
-  transferIn:         0,
-  transferOut:        2,
-  expired:            0,
-  pendingApprovals:   3,
-  activeRegLinks:     12,
-  activeZones:        1,
-  inactiveZones:      0,
-  membersWithZone:    1,
-  activeBranchCodes:  3,
-  inactiveBranchCodes:0,
-  membersWithBranch:  1600
-};
+// ── Global data stores (populated by loadAllData) ─
+let DASH_STATS = {};
+let ZONES = [];
+let MEMBER_TYPES = [];
+let MEMBERS = [];
+let REG_LINKS = [];
+let EVENTS = [];
+let ANNOUNCEMENTS = [];
 
-// ── Zones ─────────────────────────────────
-const ZONES = [
-  { id: 1, name: 'Vasant Kunj',  code: 'VK',  active: true,  memberCount: 1, incharge: 'Ramesh Kumar',  phone: '9810012345' },
-  { id: 2, name: 'Dwarka',       code: 'DW',  active: false, memberCount: 0, incharge: 'Sunita Arora',  phone: '9811098765' },
-  { id: 3, name: 'Rohini',       code: 'RH',  active: false, memberCount: 0, incharge: 'Mahesh Singh',  phone: '9812034567' }
-];
+let dataLoaded = false;
 
-// ── Branch Codes ──────────────────────────
-const BRANCHES = [
-  { id: 1, code: 'BR-001', name: 'Main Branch Delhi',    zone: 'Vasant Kunj', active: true,  memberCount: 850 },
-  { id: 2, code: 'BR-002', name: 'South Delhi Branch',   zone: 'Vasant Kunj', active: true,  memberCount: 450 },
-  { id: 3, code: 'BR-003', name: 'West Delhi Branch',    zone: 'Dwarka',      active: true,  memberCount: 300 },
-  { id: 4, code: 'BR-004', name: 'North Delhi Branch',   zone: 'Rohini',      active: false, memberCount: 0   }
-];
+// ── Load all data from backend ────────────
+async function loadAllData() {
+  try {
+    const [stats, zones, memberTypes, members, regLinks, announcements] = await Promise.all([
+      apiGet('/api/dashboard/stats'),
+      apiGet('/api/zones'),
+      apiGet('/api/member-types'),
+      apiGet('/api/members'),
+      apiGet('/api/reg-links'),
+      apiGet('/api/announcements'),
+    ]);
 
-// ── Member Types ──────────────────────────
-const MEMBER_TYPES = [
-  'Sant Su Ph-I', 'Sant Su Ph-II', 'Sant Su P-I', 'Sant Su P-II',
-  'Satsangi Children', 'Jr. Pre Initiate', 'Sr. Pre Initiate',
-  'CCA', 'CRC', 'Associate', 'YA Member', 'YA Member MA Member',
-  'Initiated Gents Member', 'Initiated Ladies Member',
-  'Jigyasu Member', 'Children', 'Others', 'Visitors(Long Term)'
-];
+    DASH_STATS = stats;
+    ZONES = zones;
+    MEMBER_TYPES = memberTypes;
+    MEMBERS = members.map((m, i) => ({
+      // identity
+      sl: i + 1, uid: m.uid, bslno: m.bsl, name: m.name,
+      // initiation dates
+      dateOfInitiation: m.date_of_initiation,
+      dateOfBirth: m.date_of_birth,
+      dateOfRegistration: m.date_of_registration_jigyasu,
+      dateOfFirstInitiation: m.date_of_first_initiation,
+      dateOfSecondInitiation: m.date_of_second_initiation,
+      // contact
+      mobile: m.mobile1, mobile2: m.mobile2,
+      landline: m.landline, officePhone: m.office_phone,
+      email: m.email1, email2: m.email2,
+      // address
+      addressLine1: m.address_line1, addressLine2: m.address_line2, addressLine3: m.address_line3,
+      city: m.city, pincode: m.pincode, state: m.state, country: m.country,
+      // personal
+      snExt: m.sn_ext, ashram: m.ashram,
+      bloodGroup: m.blood_group, branchIdCard: m.branch_id_card_received,
+      caste: m.caste, nationality: m.nationality,
+      qualification: m.qualification, occupation: m.occupation,
+      designation: m.designation, organization: m.organization,
+      profession: m.profession, professionCode: m.profession_code,
+      commGridCode: m.communication_grid_code,
+      // membership flags
+      mahila: m.mahila_association_member, youth: m.youth_member,
+      assocYouth: m.associate_youth_member,
+      jrPreInit: m.junior_pre_initiate_member, srPreInit: m.senior_pre_initiate_member,
+      crc: m.crc_member, cca: m.cca_member, santSu: m.sant_su_member,
+      // nee
+      neeFirst: m.nee_first_name, neeMiddle: m.nee_middle_name, neeLast: m.nee_last_name,
+      // father
+      fatherTitle: m.father_title,
+      fatherFirstName: m.father_first_name, fatherMiddleName: m.father_middle_name, fatherLastName: m.father_last_name,
+      fatherBranch: m.father_branch, fatherBslno: m.father_bslno, fatherUid: m.father_uid,
+      fatherDoi: m.father_doi, fatherPhone: m.father_phone, fatherCity: m.father_city, fatherState: m.father_state,
+      // mother
+      motherTitle: m.mother_title,
+      motherFirstName: m.mother_first_name, motherMiddleName: m.mother_middle_name, motherLastName: m.mother_last_name,
+      motherBranch: m.mother_branch, motherBslno: m.mother_bslno, motherUid: m.mother_uid,
+      motherDoi: m.mother_doi, motherPhone: m.mother_phone, motherCity: m.mother_city, motherState: m.mother_state,
+      // spouse
+      spouseTitle: m.spouse_title,
+      spouseFirstName: m.spouse_first_name, spouseMiddleName: m.spouse_middle_name, spouseLastName: m.spouse_last_name,
+      spouseBranch: m.spouse_branch, spouseBslno: m.spouse_bslno, spouseUid: m.spouse_uid,
+      spouseDoi: m.spouse_doi, spousePhone: m.spouse_phone, spouseCity: m.spouse_city, spouseState: m.spouse_state,
+      // ref-1
+      ref1Name: m.ref1_name, ref1Address: m.ref1_address, ref1Email: m.ref1_email,
+      ref1Phone: m.ref1_phone, ref1Branch: m.ref1_branch, ref1Relation: m.ref1_relation,
+      // ref-2
+      ref2Name: m.ref2_name, ref2Address: m.ref2_address, ref2Email: m.ref2_email,
+      ref2Phone: m.ref2_phone, ref2Branch: m.ref2_branch, ref2Relation: m.ref2_relation,
+      // transfer / history
+      dorYouth: m.dor_youth, dateOfInitiationNew: m.date_of_initiation_new,
+      dateTransferIn: m.date_transfer_in, transferFromBranch: m.transfer_from_branch,
+      dateTransferOut: m.date_transfer_out, transferToBranch: m.transfer_to_branch,
+      dateOfExpire: m.date_of_expire,
+      // status (kept for existing filter/badge compat)
+      status: m.record_status || 'Active',
+      approvalStatus: 'Approved',
+      joinDate: m.date_of_initiation,
+      zone: m.city,
+      type: (m.sant_su_member === 'Y' ? 'Sant Su' :
+             m.mahila_association_member === 'Y' ? 'Initiated Ladies Member' :
+             m.youth_member === 'Y' ? 'YA Member' :
+             m.crc_member === 'Y' ? 'CRC' :
+             m.cca_member === 'Y' ? 'CCA' :
+             m.junior_pre_initiate_member === 'Y' ? 'Jr. Pre Initiate' :
+             m.senior_pre_initiate_member === 'Y' ? 'Sr. Pre Initiate' :
+             'Initiated Gents Member'),
+    }));
+    REG_LINKS = regLinks.map(r => ({
+      id: r.id, title: r.title, code: r.code, url: r.url,
+      active: r.active, maxUses: r.max_uses, usedCount: r.used_count,
+      expiry: r.expiry, createdOn: r.created_on
+    }));
+    ANNOUNCEMENTS = announcements.map(a => ({
+      id: a.id, title: a.title, content: a.content, date: a.date,
+      author: a.author, priority: a.priority, active: a.active
+    }));
 
-// ── Members ───────────────────────────────
-const MEMBERS = [
-  { uid: 'UID001', bslno: 'BSL-0001', name: 'Rajesh Kumar',       email: 'rajesh.k@email.com',    mobile: '9810011111', zone: 'Vasant Kunj', type: 'Initiated Gents Member', status: 'Active', approvalStatus: 'Approved', joinDate: '2018-03-15' },
-  { uid: 'UID002', bslno: 'BSL-0002', name: 'Sunita Devi',        email: 'sunita.d@email.com',    mobile: '9810022222', zone: 'Vasant Kunj', type: 'Initiated Ladies Member', status: 'Active', approvalStatus: 'Approved', joinDate: '2018-05-20' },
-  { uid: 'UID003', bslno: 'BSL-0003', name: 'Arun Sharma',        email: 'arun.s@email.com',      mobile: '9810033333', zone: 'Vasant Kunj', type: 'Satsangi Children',        status: 'Active', approvalStatus: 'Approved', joinDate: '2019-01-10' },
-  { uid: 'UID004', bslno: 'BSL-0004', name: 'Priya Verma',        email: 'priya.v@email.com',     mobile: '9810044444', zone: 'Vasant Kunj', type: 'Sr. Pre Initiate',          status: 'Active', approvalStatus: 'Approved', joinDate: '2019-07-22' },
-  { uid: 'UID005', bslno: 'BSL-0005', name: 'Mohan Lal',          email: 'mohan.l@email.com',     mobile: '9810055555', zone: 'Vasant Kunj', type: 'CCA',                       status: 'Active', approvalStatus: 'Pending',  joinDate: '2024-10-01' },
-  { uid: 'UID006', bslno: 'BSL-0006', name: 'Kavitha Rajan',      email: 'kavitha.r@email.com',   mobile: '9810066666', zone: 'Vasant Kunj', type: 'Associate',                 status: 'Active', approvalStatus: 'Approved', joinDate: '2020-03-12' },
-  { uid: 'UID007', bslno: 'BSL-0007', name: 'Deepak Nair',        email: 'deepak.n@email.com',    mobile: '9810077777', zone: 'Vasant Kunj', type: 'Jr. Pre Initiate',           status: 'Active', approvalStatus: 'Pending',  joinDate: '2024-11-05' },
-  { uid: 'UID008', bslno: 'BSL-0008', name: 'Anita Singh',        email: 'anita.s@email.com',     mobile: '9810088888', zone: 'Vasant Kunj', type: 'YA Member',                 status: 'Active', approvalStatus: 'Approved', joinDate: '2021-08-30' },
-  { uid: 'UID009', bslno: 'BSL-0009', name: 'Vikram Mishra',      email: 'vikram.m@email.com',    mobile: '9810099999', zone: 'Vasant Kunj', type: 'Initiated Gents Member',    status: 'Active', approvalStatus: 'Approved', joinDate: '2017-12-01' },
-  { uid: 'UID010', bslno: 'BSL-0010', name: 'Rekha Pandey',       email: 'rekha.p@email.com',     mobile: '9810010101', zone: 'Vasant Kunj', type: 'Initiated Ladies Member',   status: 'Active', approvalStatus: 'Approved', joinDate: '2017-12-15' },
-  { uid: 'UID011', bslno: 'BSL-0011', name: 'Suresh Gupta',       email: 'suresh.g@email.com',    mobile: '9810011011', zone: 'Vasant Kunj', type: 'CRC',                       status: 'Active', approvalStatus: 'Pending',  joinDate: '2024-12-01' },
-  { uid: 'UID012', bslno: 'BSL-0012', name: 'Meena Tripathi',     email: 'meena.t@email.com',     mobile: '9810012012', zone: 'Vasant Kunj', type: 'Jigyasu Member',            status: 'Active', approvalStatus: 'Approved', joinDate: '2022-04-18' },
-  { uid: 'UID013', bslno: 'BSL-0013', name: 'Harish Chandra',     email: 'harish.c@email.com',    mobile: '9810013013', zone: 'Vasant Kunj', type: 'Sant Su Ph-I',              status: 'Active', approvalStatus: 'Approved', joinDate: '2016-06-01' },
-  { uid: 'UID014', bslno: 'BSL-0014', name: 'Geeta Bose',         email: 'geeta.b@email.com',     mobile: '9810014014', zone: 'Vasant Kunj', type: 'Initiated Ladies Member',   status: 'Expired',approvalStatus: 'Expired',  joinDate: '2015-01-10' },
-  { uid: 'UID015', bslno: 'BSL-0015', name: 'Naresh Yadav',       email: 'naresh.y@email.com',    mobile: '9810015015', zone: 'Vasant Kunj', type: 'Others',                    status: 'Active', approvalStatus: 'Rejected', joinDate: '2024-09-14' },
-  { uid: 'UID016', bslno: 'BSL-0016', name: 'Shanti Devi',        email: 'shanti.d@email.com',    mobile: '9810016016', zone: 'Vasant Kunj', type: 'Sant Su Ph-II',             status: 'Active', approvalStatus: 'Approved', joinDate: '2018-11-20' },
-  { uid: 'UID017', bslno: 'BSL-0017', name: 'Alok Saxena',        email: 'alok.s@email.com',      mobile: '9810017017', zone: 'Vasant Kunj', type: 'Visitors(Long Term)',       status: 'Active', approvalStatus: 'Approved', joinDate: '2023-03-05' },
-  { uid: 'UID018', bslno: 'BSL-0018', name: 'Pooja Malhotra',     email: 'pooja.m@email.com',     mobile: '9810018018', zone: 'Vasant Kunj', type: 'YA Member MA Member',       status: 'Active', approvalStatus: 'Approved', joinDate: '2022-07-19' },
-  { uid: 'UID019', bslno: 'BSL-0019', name: 'Ravi Kumar',         email: 'ravi.k@email.com',      mobile: '9810019019', zone: 'Vasant Kunj', type: 'Initiated Gents Member',    status: 'Active', approvalStatus: 'Approved', joinDate: '2019-09-09' },
-  { uid: 'UID020', bslno: 'BSL-0020', name: 'Lata Joshi',         email: 'lata.j@email.com',      mobile: '9810020020', zone: 'Vasant Kunj', type: 'Children',                  status: 'Active', approvalStatus: 'Approved', joinDate: '2021-02-28' }
-];
+    dataLoaded = true;
+  } catch (err) {
+    console.error('Failed to load data from API:', err);
+  }
+}
 
-// ── Registration Links ────────────────────
-const REG_LINKS = [
-  { id: 1, title: 'General Membership 2025',       code: 'GEN2025',  url: 'https://satsang.org/register/GEN2025',  active: true,  maxUses: 500, usedCount: 234, expiry: '2025-12-31', createdOn: '2025-01-01' },
-  { id: 2, title: 'Youth Registration Q1',         code: 'YA-Q1',    url: 'https://satsang.org/register/YA-Q1',   active: true,  maxUses: 100, usedCount: 67,  expiry: '2025-03-31', createdOn: '2025-01-01' },
-  { id: 3, title: 'Vasant Kunj Zone Sign-up',      code: 'VK-ZONE',  url: 'https://satsang.org/register/VK-ZONE', active: true,  maxUses: 200, usedCount: 180, expiry: '2025-06-30', createdOn: '2024-12-01' },
-  { id: 4, title: 'New Satsangi Onboarding',       code: 'NEW-SAT',  url: 'https://satsang.org/register/NEW-SAT', active: true,  maxUses: 300, usedCount: 89,  expiry: '2025-09-30', createdOn: '2025-01-15' },
-  { id: 5, title: 'Initiation Batch Mar 2025',     code: 'INIT-MAR', url: 'https://satsang.org/register/INIT-MAR',active: true,  maxUses: 50,  usedCount: 12,  expiry: '2025-03-20', createdOn: '2025-02-01' },
-  { id: 6, title: 'Expired Link 2024',             code: 'EXP2024',  url: 'https://satsang.org/register/EXP2024', active: false, maxUses: 100, usedCount: 100, expiry: '2024-12-31', createdOn: '2024-01-01' }
-];
-
-// ── Contributions ─────────────────────────
-const CONTRIBUTIONS = [
-  { id: 1, memberName: 'Rajesh Kumar',   memberId: 'UID001', amount: 5000,  category: 'Monthly Seva',     date: '2025-01-05', status: 'Received', mode: 'Online Transfer' },
-  { id: 2, memberName: 'Sunita Devi',    memberId: 'UID002', amount: 2500,  category: 'Langar Fund',      date: '2025-01-10', status: 'Received', mode: 'Cash'           },
-  { id: 3, memberName: 'Vikram Mishra',  memberId: 'UID009', amount: 10000, category: 'Building Fund',    date: '2025-01-12', status: 'Received', mode: 'Cheque'         },
-  { id: 4, memberName: 'Rekha Pandey',   memberId: 'UID010', amount: 1100,  category: 'Monthly Seva',     date: '2025-01-15', status: 'Received', mode: 'Online Transfer' },
-  { id: 5, memberName: 'Harish Chandra', memberId: 'UID013', amount: 7500,  category: 'Special Donation', date: '2025-01-20', status: 'Received', mode: 'Cheque'         },
-  { id: 6, memberName: 'Kavitha Rajan',  memberId: 'UID006', amount: 3000,  category: 'Monthly Seva',     date: '2025-02-01', status: 'Pending',  mode: 'Online Transfer' },
-  { id: 7, memberName: 'Anita Singh',    memberId: 'UID008', amount: 500,   category: 'Langar Fund',      date: '2025-02-05', status: 'Received', mode: 'Cash'           },
-  { id: 8, memberName: 'Shanti Devi',    memberId: 'UID016', amount: 2000,  category: 'Building Fund',    date: '2025-02-08', status: 'Received', mode: 'Online Transfer' }
-];
-
-// ── Events ────────────────────────────────
-const EVENTS = [
-  { id: 1, title: 'Monthly Satsang — March',    date: '2025-03-15', time: '06:00 AM', venue: 'Main Hall, Vasant Kunj', type: 'Satsang',     status: 'Upcoming',    attendees: 0,   maxAttendees: 500 },
-  { id: 2, title: 'Holi Satsang 2025',          date: '2025-03-14', time: '07:00 AM', venue: 'Garden Area, VK',        type: 'Festival',    status: 'Upcoming',    attendees: 0,   maxAttendees: 800 },
-  { id: 3, title: 'Weekly Satsang 9 Mar',       date: '2025-03-09', time: '06:30 AM', venue: 'Main Hall, Vasant Kunj', type: 'Satsang',     status: 'Completed',   attendees: 320, maxAttendees: 500 },
-  { id: 4, title: 'Initiation Ceremony Feb',    date: '2025-02-23', time: '09:00 AM', venue: 'Prayer Hall',            type: 'Ceremony',    status: 'Completed',   attendees: 45,  maxAttendees: 60  },
-  { id: 5, title: 'New Member Orientation',     date: '2025-02-16', time: '10:00 AM', venue: 'Conference Room',        type: 'Orientation', status: 'Completed',   attendees: 28,  maxAttendees: 40  },
-  { id: 6, title: 'Annual Meditation Camp',     date: '2025-04-10', time: '05:00 AM', venue: 'Retreat Center',         type: 'Camp',        status: 'Upcoming',    attendees: 0,   maxAttendees: 200 }
-];
-
-// ── Announcements ─────────────────────────
-const ANNOUNCEMENTS = [
-  { id: 1, title: 'Holi Satsang Notice',         content: 'The Holi Satsang on 14th March will begin at 7 AM sharp. All members are requested to be present by 6:45 AM. Prasad distribution after the programme.',           date: '2025-03-05', author: 'Admin',         priority: 'high',   active: true  },
-  { id: 2, title: 'New Registration Process',    content: 'Effective April 1st, all new member registrations must go through the online portal. Physical forms will no longer be accepted. Existing members are unaffected.',  date: '2025-02-28', author: 'Admin',         priority: 'medium', active: true  },
-  { id: 3, title: 'Meditation Schedule Update',  content: 'Weekly meditation sessions will now be held every Sunday at 6 AM instead of 6:30 AM. Please update your schedules accordingly.',                                       date: '2025-02-20', author: 'Zone Incharge', priority: 'low',    active: true  },
-  { id: 4, title: 'Building Fund Drive',         content: 'We are conducting a building fund collection drive for the new meditation hall. Your generous contributions are welcome. Contact the office for more information.',     date: '2025-02-10', author: 'Admin',         priority: 'medium', active: true  },
-  { id: 5, title: 'Website Maintenance',         content: 'The member portal will be down for maintenance on March 12 from 12 AM to 4 AM. Please plan accordingly.',                                                              date: '2025-03-08', author: 'Tech Team',     priority: 'low',    active: false }
-];
-
-// ── Seva Categories ───────────────────────
-const SEVA_CATEGORIES = [
-  { id: 1, name: 'Monthly Seva',       description: 'Regular monthly spiritual service contribution',     active: true,  sortOrder: 1 },
-  { id: 2, name: 'Langar Fund',        description: 'Contribution towards community kitchen and food',    active: true,  sortOrder: 2 },
-  { id: 3, name: 'Building Fund',      description: 'Donation for construction and maintenance',          active: true,  sortOrder: 3 },
-  { id: 4, name: 'Special Donation',   description: 'One-time special contributions and donations',       active: true,  sortOrder: 4 },
-  { id: 5, name: 'Youth Seva',         description: 'Service activities for YA members',                  active: true,  sortOrder: 5 },
-  { id: 6, name: 'Medical Seva',       description: 'Contribution towards health and medical services',   active: false, sortOrder: 6 },
-  { id: 7, name: 'Education Seva',     description: 'Support for educational programmes and scholarships',active: true,  sortOrder: 7 },
-  { id: 8, name: 'Event Management',   description: 'Seva for organising Satsang events and gatherings',  active: true,  sortOrder: 8 }
-];
+// ── Reload a single collection ────────────
+async function reloadZones()         { ZONES = await apiGet('/api/zones'); }
+async function reloadMembers() {
+  const members = await apiGet('/api/members');
+  MEMBERS = members.map((m, i) => ({
+    sl: i + 1, uid: m.uid, bslno: m.bsl, name: m.name,
+    dateOfInitiation: m.date_of_initiation, dateOfBirth: m.date_of_birth,
+    dateOfRegistration: m.date_of_registration_jigyasu,
+    dateOfFirstInitiation: m.date_of_first_initiation,
+    dateOfSecondInitiation: m.date_of_second_initiation,
+    mobile: m.mobile1, mobile2: m.mobile2, landline: m.landline, officePhone: m.office_phone,
+    email: m.email1, email2: m.email2,
+    addressLine1: m.address_line1, addressLine2: m.address_line2, addressLine3: m.address_line3,
+    city: m.city, pincode: m.pincode, state: m.state, country: m.country,
+    snExt: m.sn_ext, ashram: m.ashram, bloodGroup: m.blood_group, branchIdCard: m.branch_id_card_received,
+    caste: m.caste, nationality: m.nationality,
+    qualification: m.qualification, occupation: m.occupation,
+    designation: m.designation, organization: m.organization,
+    profession: m.profession, professionCode: m.profession_code, commGridCode: m.communication_grid_code,
+    mahila: m.mahila_association_member, youth: m.youth_member, assocYouth: m.associate_youth_member,
+    jrPreInit: m.junior_pre_initiate_member, srPreInit: m.senior_pre_initiate_member,
+    crc: m.crc_member, cca: m.cca_member, santSu: m.sant_su_member,
+    neeFirst: m.nee_first_name, neeMiddle: m.nee_middle_name, neeLast: m.nee_last_name,
+    fatherTitle: m.father_title, fatherFirstName: m.father_first_name, fatherMiddleName: m.father_middle_name, fatherLastName: m.father_last_name,
+    fatherBranch: m.father_branch, fatherBslno: m.father_bslno, fatherUid: m.father_uid,
+    fatherDoi: m.father_doi, fatherPhone: m.father_phone, fatherCity: m.father_city, fatherState: m.father_state,
+    motherTitle: m.mother_title, motherFirstName: m.mother_first_name, motherMiddleName: m.mother_middle_name, motherLastName: m.mother_last_name,
+    motherBranch: m.mother_branch, motherBslno: m.mother_bslno, motherUid: m.mother_uid,
+    motherDoi: m.mother_doi, motherPhone: m.mother_phone, motherCity: m.mother_city, motherState: m.mother_state,
+    spouseTitle: m.spouse_title, spouseFirstName: m.spouse_first_name, spouseMiddleName: m.spouse_middle_name, spouseLastName: m.spouse_last_name,
+    spouseBranch: m.spouse_branch, spouseBslno: m.spouse_bslno, spouseUid: m.spouse_uid,
+    spouseDoi: m.spouse_doi, spousePhone: m.spouse_phone, spouseCity: m.spouse_city, spouseState: m.spouse_state,
+    ref1Name: m.ref1_name, ref1Address: m.ref1_address, ref1Email: m.ref1_email,
+    ref1Phone: m.ref1_phone, ref1Branch: m.ref1_branch, ref1Relation: m.ref1_relation,
+    ref2Name: m.ref2_name, ref2Address: m.ref2_address, ref2Email: m.ref2_email,
+    ref2Phone: m.ref2_phone, ref2Branch: m.ref2_branch, ref2Relation: m.ref2_relation,
+    dorYouth: m.dor_youth, dateOfInitiationNew: m.date_of_initiation_new,
+    dateTransferIn: m.date_transfer_in, transferFromBranch: m.transfer_from_branch,
+    dateTransferOut: m.date_transfer_out, transferToBranch: m.transfer_to_branch,
+    dateOfExpire: m.date_of_expire,
+    status: m.record_status || 'Activated',
+    approvalStatus: 'Approved', joinDate: m.date_of_initiation, zone: m.city,
+    type: (m.sant_su_member === 'Y' ? 'Sant Su' :
+           m.mahila_association_member === 'Y' ? 'Initiated Ladies Member' :
+           m.youth_member === 'Y' ? 'YA Member' :
+           m.crc_member === 'Y' ? 'CRC' : m.cca_member === 'Y' ? 'CCA' :
+           m.junior_pre_initiate_member === 'Y' ? 'Jr. Pre Initiate' :
+           m.senior_pre_initiate_member === 'Y' ? 'Sr. Pre Initiate' : 'Initiated Gents Member'),
+  }));
+}
+async function reloadRegLinks()      { const r = await apiGet('/api/reg-links'); REG_LINKS = r.map(x => ({ id:x.id, title:x.title, code:x.code, url:x.url, active:x.active, maxUses:x.max_uses, usedCount:x.used_count, expiry:x.expiry, createdOn:x.created_on })); }
+async function reloadAnnouncements() { const a = await apiGet('/api/announcements'); ANNOUNCEMENTS = a.map(x => ({ id:x.id, title:x.title, content:x.content, date:x.date, author:x.author, priority:x.priority, active:x.active })); }
+async function reloadDashStats()     { DASH_STATS = await apiGet('/api/dashboard/stats'); }
 
 // ── Utility helpers ───────────────────────
 function isAdmin() {
@@ -152,10 +201,11 @@ function showToast(message, type = '') {
   setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-function openModal(html) {
+function openModal(html, wide = false) {
   const overlay = document.getElementById('modal-overlay');
   const box     = document.getElementById('modalBox');
   box.innerHTML = html;
+  box.style.maxWidth = wide ? '960px' : '';
   overlay.style.display = 'flex';
 }
 

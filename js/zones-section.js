@@ -111,7 +111,7 @@ function showZoneModal(title, z) {
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 
-function saveZone(id) {
+async function saveZone(id) {
   const name     = document.getElementById('zoneName').value.trim();
   const code     = document.getElementById('zoneCode').value.trim();
   const incharge = document.getElementById('zoneIncharge').value.trim();
@@ -120,24 +120,26 @@ function saveZone(id) {
 
   if (!name || !code) return alert('Zone name and code are required.');
 
-  if (id) {
-    const z = ZONES.find(x => x.id === id);
-    if (z) {
-      z.name = name; z.code = code; z.incharge = incharge; z.phone = phone; z.active = active;
+  try {
+    if (id) {
+      const z = ZONES.find(x => x.id === id);
+      await apiPut('/api/zones/' + id, { name, code, active, member_count: z ? z.memberCount : 0, incharge, phone });
+    } else {
+      await apiPost('/api/zones', { name, code, active, member_count: 0, incharge, phone });
     }
-  } else {
-    const newId = ZONES.length ? Math.max(...ZONES.map(x => x.id)) + 1 : 1;
-    ZONES.push({ id: newId, name, code, active, memberCount: 0, incharge, phone });
-  }
-
-  document.getElementById('modal-overlay').style.display = 'none';
-  reRenderSection('zones');
+    await reloadZones();
+    document.getElementById('modal-overlay').style.display = 'none';
+    reRenderSection('zones');
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
-function toggleZoneStatus(id) {
+async function toggleZoneStatus(id) {
   const z = ZONES.find(x => x.id === id);
   if (z) {
-    z.active = !z.active;
-    reRenderSection('zones');
+    try {
+      await apiPut('/api/zones/' + id, { name: z.name, code: z.code, active: !z.active, member_count: z.memberCount, incharge: z.incharge, phone: z.phone });
+      await reloadZones();
+      reRenderSection('zones');
+    } catch(e) { showToast('Failed: ' + e.message, 'error'); }
   }
 }

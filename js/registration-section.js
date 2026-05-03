@@ -80,7 +80,7 @@ function openAddLinkModal() {
       <h3>🔗 Create Registration Link</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
-    <div class="form-field"><label>Link Title *</label><input id="al_title" placeholder="e.g. General Membership 2025" /></div>
+    <div class="form-field"><label>Link Title *</label><input id="al_title" placeholder="e.g. General" /></div>
     <div class="form-field"><label>Link Code *</label><input id="al_code" placeholder="Short unique code, e.g. GEN2025" /></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md)">
       <div class="form-field"><label>Max Uses</label><input id="al_max" type="number" placeholder="e.g. 200" value="100" /></div>
@@ -93,23 +93,26 @@ function openAddLinkModal() {
   `);
 }
 
-function saveNewLink() {
+async function saveNewLink() {
   const title = document.getElementById('al_title').value.trim();
   const code  = document.getElementById('al_code').value.trim();
   if (!title || !code) { showToast('Title and code required!', 'error'); return; }
-  REG_LINKS.push({
-    id: REG_LINKS.length + 1, title, code,
-    url: 'https://satsang.org/register/' + code,
-    active: true,
-    maxUses:  parseInt(document.getElementById('al_max').value) || 100,
-    usedCount: 0,
-    expiry:   document.getElementById('al_expiry').value || '2025-12-31',
-    createdOn: new Date().toISOString().split('T')[0]
-  });
-  closeForcedModal();
-  renderCache.delete('registration');
-  renderRegistration();
-  showToast('Registration link created!', 'success');
+  try {
+    await apiPost('/api/reg-links', {
+      title, code,
+      url: 'https://satsang.org/register/' + code,
+      active: true,
+      maxUses:  parseInt(document.getElementById('al_max').value) || 100,
+      usedCount: 0,
+      expiry:   document.getElementById('al_expiry').value || '2025-12-31',
+      createdOn: new Date().toISOString().split('T')[0]
+    });
+    await reloadRegLinks();
+    closeForcedModal();
+    renderCache.delete('registration');
+    renderRegistration();
+    showToast('Registration link created!', 'success');
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
 function editLink(id) {
@@ -130,23 +133,39 @@ function editLink(id) {
   `);
 }
 
-function saveLinkEdit(id) {
+async function saveLinkEdit(id) {
   const l = REG_LINKS.find(x => x.id === id);
   if (!l) return;
-  l.title   = document.getElementById('el_title').value;
-  l.maxUses = parseInt(document.getElementById('el_max').value);
-  l.expiry  = document.getElementById('el_expiry').value;
-  closeForcedModal();
-  renderCache.delete('registration');
-  renderRegistration();
-  showToast('Link updated!', 'success');
+  try {
+    await apiPut('/api/reg-links/' + id, {
+      title:   document.getElementById('el_title').value,
+      code:    l.code,
+      url:     l.url,
+      active:  l.active,
+      maxUses: parseInt(document.getElementById('el_max').value),
+      usedCount: l.usedCount,
+      expiry:  document.getElementById('el_expiry').value
+    });
+    await reloadRegLinks();
+    closeForcedModal();
+    renderCache.delete('registration');
+    renderRegistration();
+    showToast('Link updated!', 'success');
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
-function toggleLink(id) {
+async function toggleLink(id) {
   const l = REG_LINKS.find(x => x.id === id);
   if (!l) return;
-  l.active = !l.active;
-  renderCache.delete('registration');
-  renderRegistration();
-  showToast(`Link ${l.active ? 'activated' : 'deactivated'}!`);
+  try {
+    await apiPut('/api/reg-links/' + id, {
+      title: l.title, code: l.code, url: l.url,
+      active: !l.active, maxUses: l.maxUses,
+      usedCount: l.usedCount, expiry: l.expiry
+    });
+    await reloadRegLinks();
+    renderCache.delete('registration');
+    renderRegistration();
+    showToast(`Link ${!l.active ? 'activated' : 'deactivated'}!`);
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }

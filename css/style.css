@@ -82,6 +82,23 @@ ul { list-style: none; }
 button { cursor: pointer; font-family: var(--font-body); }
 input, select, textarea { font-family: var(--font-body); }
 
+/* ── Dark Theme ─────────────────────────── */
+[data-theme="dark"] {
+  --bg-body:        #141720;
+  --bg-card:        #1e2130;
+  --bg-sidebar:     #0f1219;
+  --txt-primary:    #e8eaf2;
+  --txt-secondary:  #a8b0c8;
+  --txt-muted:      #7880a0;
+  --txt-light:      #50587a;
+  --border:         #2c3050;
+  --border-dark:    #3a4060;
+  --shadow-sm:   0 1px 4px rgba(0,0,0,0.4);
+  --shadow-md:   0 4px 20px rgba(0,0,0,0.5);
+  --shadow-lg:   0 8px 36px rgba(0,0,0,0.65);
+  --shadow-card: 0 2px 14px rgba(0,0,0,0.45);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -116,6 +133,8 @@ input, select, textarea { font-family: var(--font-body); }
 .badge-info     { background: #dbeafe; color: #1e40af; }
 .badge-purple   { background: #ede9fe; color: #5b21b6; }
 .badge-gray     { background: #f3f4f6; color: #374151; }
+.badge-gold     { background: #fef3c7; color: #78350f; }
+.badge-red      { background: #fee2e2; color: #991b1b; }
 
 /* Toast notification */
 .toast {

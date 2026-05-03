@@ -9,13 +9,8 @@ const SECTION_RENDERERS = {
   'dashboard':       renderDashboard,
   'change-password': renderChangePassword,
   'members':         renderMembers,
-  'zones':           renderZones,
-  'branches':        renderBranches,
   'registration':    renderRegistration,
-  'contributions':   renderContributions,
-  'events':          renderEvents,
   'announcements':   renderAnnouncements,
-  'seva':            renderSeva,
   'attendance':      renderAttendance
 };
 
@@ -23,13 +18,8 @@ const SECTION_TITLES = {
   'dashboard':       'Dashboard',
   'change-password': 'Change Password',
   'members':         'Members',
-  'zones':           'Zone Management',
-  'branches':        'Branch Code Management',
   'registration':    'Registration Links',
-  'contributions':   'Contributions',
-  'events':          'All Events',
   'announcements':   'Announcements',
-  'seva':            'Seva Category Master',
   'attendance':      'Attendance / Haazri'
 };
 
@@ -37,7 +27,7 @@ let currentSection = 'dashboard';
 let renderCache    = new Set();
 
 // ── Init router on DOM ready ───────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Wire nav items
   document.querySelectorAll('.nav-item').forEach(el => {
     el.addEventListener('click', e => {
@@ -48,6 +38,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (window.innerWidth <= 900) closeSidebar();
     });
   });
+
+  // Load all data from API before rendering
+  await loadAllData();
+
+  // Hide loader
+  const loader = document.getElementById('appLoader');
+  if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.style.display = 'none', 350); }
 
   // Show admin-only nav items for admins
   document.querySelectorAll('.admin-only-nav').forEach(el => {
@@ -94,6 +91,26 @@ function toggleSidebar() {
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+// ── Dark / Light Theme ─────────────────────
+(function initTheme() {
+  const saved = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  // Button icon updated after DOM ready
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+  });
+})();
+
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const next   = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = next === 'dark' ? '☀️' : '🌙';
 }
 
 // ── Re-render a section (e.g. after data change) ─

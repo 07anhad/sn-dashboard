@@ -1,59 +1,9 @@
 /* ============================================================
    AUTH.JS — Login, Logout, Session, Signup, Forgot Password
+   All auth calls go to the backend PostgreSQL via API.
    ============================================================ */
 
 'use strict';
-
-// ── Default users (built-in) ──────────────
-const DEFAULT_USERS = {
-  admin: {
-    username: 'admin',
-    password: 'admin123',
-    role: 'admin',
-    name: 'Admin User',
-    email: 'admin@satsang.org'
-  },
-  member_anhad: {
-    username: 'anhad.parashar',
-    password: 'member123',
-    role: 'member',
-    name: 'Anhad Parashar',
-    email: 'anhad.parashar@email.com',
-    memberId: 'M-00101'
-  }
-};
-
-// ── localStorage user helpers ─────────────
-function getStoredUsers() {
-  try { return JSON.parse(localStorage.getItem('sn_users') || '{}'); }
-  catch { return {}; }
-}
-function saveStoredUsers(users) {
-  localStorage.setItem('sn_users', JSON.stringify(users));
-}
-function getPasswordOverrides() {
-  try { return JSON.parse(localStorage.getItem('sn_pass_overrides') || '{}'); }
-  catch { return {}; }
-}
-function savePasswordOverrides(overrides) {
-  localStorage.setItem('sn_pass_overrides', JSON.stringify(overrides));
-}
-
-// ── Merged user lookup (built-in + signups) ─
-function getAllUsers() {
-  const merged = {};
-  const overrides = getPasswordOverrides();
-  for (const key in DEFAULT_USERS) {
-    const u = { ...DEFAULT_USERS[key] };
-    if (overrides[u.username]) u.password = overrides[u.username];
-    merged[key] = u;
-  }
-  const stored = getStoredUsers();
-  for (const key in stored) {
-    merged[key] = stored[key];
-  }
-  return merged;
-}
 
 // Current selected role on login page
 let currentRole = 'admin';
@@ -71,13 +21,13 @@ function switchRole(role) {
     btnAdmin.classList.add('active');
     btnMember.classList.remove('active');
     slider.style.transform = 'translateX(0)';
-    hint.innerHTML = 'Admin: <strong>admin</strong> / <strong>admin123</strong>';
+    if (hint) hint.style.display = 'none';
     label.textContent = 'Username / Email';
   } else {
     btnMember.classList.add('active');
     btnAdmin.classList.remove('active');
     slider.style.transform = 'translateX(100%)';
-    hint.innerHTML = 'Member: <strong>anhad.parashar</strong> / <strong>member123</strong>';
+    if (hint) hint.style.display = 'none';
     label.textContent = 'Member Username';
   }
   // Clear error
@@ -102,10 +52,21 @@ function handleLogin(e) {
   btn.disabled = true;
   btn.querySelector('.btn-text').textContent = 'Signing in…';
 
-  setTimeout(() => {
-    const user = authenticateUser(id, pass, currentRole);
-    if (user) {
-      sessionStorage.setItem('currentUser', JSON.stringify(user));
+  fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: id, password: pass, role: currentRole })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      sessionStorage.setItem('currentUser', JSON.stringify({
+        username: data.user.username,
+        name: data.user.name,
+        role: data.user.role,
+        email: data.user.email,
+        memberId: data.user.member_id || null
+      }));
       window.location.href = 'dashboard.html';
     } else {
       err.textContent = currentRole === 'admin'
@@ -115,18 +76,13 @@ function handleLogin(e) {
       btn.disabled = false;
       btn.querySelector('.btn-text').textContent = 'Sign In';
     }
-  }, 600);
-}
-
-function authenticateUser(id, pass, role) {
-  const allUsers = getAllUsers();
-  for (const key in allUsers) {
-    const u = allUsers[key];
-    if (u.role === role && (u.username === id || u.email === id) && u.password === pass) {
-      return { username: u.username, name: u.name, role: u.role, email: u.email, memberId: u.memberId || null };
-    }
-  }
-  return null;
+  })
+  .catch(() => {
+    err.textContent = 'Server error. Please try again later.';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Sign In';
+  });
 }
 
 // ── Logout ────────────────────────────────
@@ -195,7 +151,8 @@ function showLoginForm(e) {
   document.getElementById('loginForm').style.display = 'flex';
   document.getElementById('signupForm').style.display = 'none';
   document.getElementById('forgotForm').style.display = 'none';
-  document.getElementById('loginHint').style.display = 'block';
+  const hint = document.getElementById('loginHint');
+  if (hint) hint.style.display = 'none';
   document.querySelector('.login-toggle').style.display = 'flex';
   // Clear messages
   ['signupError','signupSuccess','forgotError','forgotSuccess'].forEach(id => {
@@ -212,13 +169,19 @@ function handleSignup(e) {
   const email    = document.getElementById('signupEmail').value.trim().toLowerCase();
   const pass     = document.getElementById('signupPass').value;
   const confirm  = document.getElementById('signupConfirm').value;
+  const consent  = document.getElementById('signupConsent')?.checked;
   const errEl    = document.getElementById('signupError');
   const succEl   = document.getElementById('signupSuccess');
 
   errEl.style.display = 'none';
   succEl.style.display = 'none';
 
-  // Validate
+  if (!consent) {
+    errEl.textContent = 'You must give your data consent to create an account.';
+    errEl.style.display = 'block';
+    return;
+  }
+
   if (pass !== confirm) {
     errEl.textContent = 'Passwords do not match.';
     errEl.style.display = 'block';
@@ -235,42 +198,26 @@ function handleSignup(e) {
     return;
   }
 
-  // Check for duplicates
-  const allUsers = getAllUsers();
-  for (const key in allUsers) {
-    if (allUsers[key].username === username) {
-      errEl.textContent = 'Username already taken.';
+  fetch('/api/auth/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, username, email, password: pass })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      succEl.textContent = 'Account created! You can now sign in as "' + username + '".';
+      succEl.style.display = 'block';
+      document.getElementById('signupForm').reset();
+    } else {
+      errEl.textContent = data.error || 'Signup failed.';
       errEl.style.display = 'block';
-      return;
     }
-    if (allUsers[key].email === email) {
-      errEl.textContent = 'Email already registered.';
-      errEl.style.display = 'block';
-      return;
-    }
-  }
-
-  // Generate member ID
-  const stored = getStoredUsers();
-  const count = Object.keys(stored).length;
-  const memberId = 'M-' + String(10000 + count + 1).padStart(5, '0');
-
-  // Save
-  const userKey = 'signup_' + username;
-  stored[userKey] = {
-    username: username,
-    password: pass,
-    role: 'member',
-    name: name,
-    email: email,
-    memberId: memberId
-  };
-  saveStoredUsers(stored);
-
-  // Show success
-  succEl.textContent = 'Account created! You can now sign in as "' + username + '".';
-  succEl.style.display = 'block';
-  document.getElementById('signupForm').reset();
+  })
+  .catch(() => {
+    errEl.textContent = 'Server error. Please try again later.';
+    errEl.style.display = 'block';
+  });
 }
 
 // ── Forgot password handler ───────────────
@@ -296,46 +243,24 @@ function handleForgotPassword(e) {
     return;
   }
 
-  // Find the user
-  const allUsers = getAllUsers();
-  let found = false;
-  let isBuiltIn = false;
-
-  for (const key in DEFAULT_USERS) {
-    if (DEFAULT_USERS[key].username === username) {
-      found = true;
-      isBuiltIn = true;
-      break;
+  fetch('/api/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, newPassword: newPass })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      succEl.textContent = 'Password updated! You can now sign in with your new password.';
+      succEl.style.display = 'block';
+      document.getElementById('forgotForm').reset();
+    } else {
+      errEl.textContent = data.error || 'Reset failed.';
+      errEl.style.display = 'block';
     }
-  }
-
-  if (!found) {
-    const stored = getStoredUsers();
-    for (const key in stored) {
-      if (stored[key].username === username) {
-        found = true;
-        // Update password in stored users
-        stored[key].password = newPass;
-        saveStoredUsers(stored);
-        break;
-      }
-    }
-  }
-
-  if (!found) {
-    errEl.textContent = 'Username not found.';
+  })
+  .catch(() => {
+    errEl.textContent = 'Server error. Please try again later.';
     errEl.style.display = 'block';
-    return;
-  }
-
-  if (isBuiltIn) {
-    // Store password override for built-in users
-    const overrides = getPasswordOverrides();
-    overrides[username] = newPass;
-    savePasswordOverrides(overrides);
-  }
-
-  succEl.textContent = 'Password updated! You can now sign in with your new password.';
-  succEl.style.display = 'block';
-  document.getElementById('forgotForm').reset();
+  });
 }
