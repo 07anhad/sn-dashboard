@@ -1,9 +1,20 @@
 """
 app.py — Flask server: serves static frontend + REST API
 """
-import os, sys, logging
+import os, sys, logging, shutil
 from logging.handlers import TimedRotatingFileHandler
 sys.path.insert(0, os.path.dirname(__file__))
+
+
+class _WinSafeRotatingHandler(TimedRotatingFileHandler):
+    """TimedRotatingFileHandler that works on Windows by copy+truncate instead of rename."""
+    def rotate(self, source, dest):
+        try:
+            shutil.copy2(source, dest)
+            with open(source, 'w', encoding='utf-8'):
+                pass  # truncate original
+        except Exception:
+            pass  # never crash the server over a log rotation failure
 
 from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
@@ -24,7 +35,7 @@ os.makedirs(_LOG_DIR, exist_ok=True)
 _audit_logger = logging.getLogger('audit')
 _audit_logger.setLevel(logging.INFO)
 _audit_logger.propagate = False
-_handler = TimedRotatingFileHandler(
+_handler = _WinSafeRotatingHandler(
     os.path.join(_LOG_DIR, 'audit.log'),
     when='midnight', backupCount=90, encoding='utf-8'
 )
@@ -72,6 +83,14 @@ def dataset_files(filename):
 # ═══════════════════════════════════════════
 # AUTH API
 # ═══════════════════════════════════════════
+@app.route('/api/debug/email-lookup')
+def debug_email_lookup():
+    email = (request.args.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'error': 'Pass ?email=...'})
+    exact = query("SELECT uid, email1, email2 FROM member_details WHERE email1=%s OR email2=%s", (email, email))
+    ilike = query("SELECT uid, email1, email2 FROM member_details WHERE LOWER(TRIM(email1))=%s OR LOWER(TRIM(email2))=%s", (email, email))
+    return jsonify({'exact_match': exact, 'ilike_match': ilike})
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.json or {}
@@ -93,8 +112,24 @@ def login():
             one=True
         )
     if user:
-        audit('LOGIN_SUCCESS', f"username={username} role={user['role']}")
-        return jsonify({'ok': True, 'user': user})
+        user_dict = dict(user)
+        if user_dict['role'] == 'member' and user_dict.get('email'):
+            email_lower = user_dict['email'].strip().lower()
+            # Prefer email1 match first, only use email2 as fallback
+            md = query(
+                "SELECT uid FROM member_details WHERE LOWER(TRIM(email1))=%s",
+                (email_lower,), one=True
+            )
+            if not md:
+                md = query(
+                    "SELECT uid FROM member_details WHERE LOWER(TRIM(email2))=%s",
+                    (email_lower,), one=True
+                )
+            user_dict['member_uid'] = md['uid'] if md else None
+        else:
+            user_dict['member_uid'] = None
+        audit('LOGIN_SUCCESS', f"username={username} role={user_dict['role']} member_uid={user_dict.get('member_uid')}")
+        return jsonify({'ok': True, 'user': user_dict})
     audit('LOGIN_FAILED', f"username={username} attempted_role={role}")
     return jsonify({'ok': False, 'error': 'Invalid credentials'}), 401
 
@@ -216,7 +251,41 @@ def add_member():
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/members/<uid>', methods=['PUT'])
+@app.route('/api/members/<uid>/self', methods=['PUT'])
 def update_member(uid):
+    import re
+    d = request.json or {}
+    is_self_edit = request.path.endswith('/self')
+
+    if is_self_edit:
+        # Member self-edit: only allowed contact/address/professional fields
+        allowed = {
+            'mobile1':        d.get('mobile'),
+            'mobile2':        d.get('mobile2'),
+            'landline':       d.get('landline'),
+            'office_phone':   d.get('officePhone'),
+            'email1':         d.get('email'),
+            'email2':         d.get('email2'),
+            'address_line1':  d.get('addressLine1'),
+            'address_line2':  d.get('addressLine2'),
+            'address_line3':  d.get('addressLine3'),
+            'city':           d.get('city'),
+            'pincode':        d.get('pincode'),
+            'state':          d.get('state'),
+            'country':        d.get('country'),
+            'qualification':  d.get('qualification'),
+            'occupation':     d.get('occupation'),
+            'designation':    d.get('designation'),
+            'organization':   d.get('organization'),
+            'profession':     d.get('profession'),
+        }
+        set_clause = ', '.join(f"{col}=%s" for col in allowed)
+        values = list(allowed.values()) + [uid]
+        execute(f"UPDATE member_details SET {set_clause} WHERE uid=%s", values)
+        audit('SELF_EDIT_MEMBER', f"uid={uid}")
+        return jsonify({'ok': True})
+
+    # Admin full update below
     d = request.json
 
     # Status-only update (toggle activate/deactivate)
@@ -612,7 +681,7 @@ def add_haazri_batch():
 def dashboard_stats():
     stats = {}
     # Members — from member_details
-    stats['totalMembers']    = query("SELECT count(*) as c FROM member_details", one=True)['c']
+    stats['totalMembers']    = query("SELECT count(*) as c FROM member_details WHERE record_status='Activated'", one=True)['c']
     stats['activeMembers']   = query("SELECT count(*) as c FROM member_details WHERE record_status='Activated'", one=True)['c']
     stats['transferIn']      = query("SELECT count(*) as c FROM member_details WHERE date_transfer_in IS NOT NULL", one=True)['c']
     stats['transferOut']     = query("SELECT count(*) as c FROM member_details WHERE date_transfer_out IS NOT NULL", one=True)['c']
