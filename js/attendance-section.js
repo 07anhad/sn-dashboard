@@ -86,6 +86,11 @@ function renderAttUI() {
   const uniqueBranches = [...new Set(attData.map(r => r.branch).filter(Boolean))].sort();
   const uniqueEvents   = [...new Set(attData.map(r => r.event).filter(Boolean))].sort();
 
+  const dates = attData.map(r => r.date).filter(Boolean).sort();
+  const dateRangeMsg = dates.length
+    ? `📅 Records available from <strong>${dates[0]}</strong> to <strong>${dates[dates.length - 1]}</strong>`
+    : '';
+
   container.innerHTML = `
     <!-- Upload Card -->
     <div class="card" style="padding:var(--sp-lg);display:flex;align-items:center;gap:var(--sp-lg);flex-wrap:wrap;margin-bottom:var(--sp-xl)">
@@ -112,6 +117,7 @@ function renderAttUI() {
     </div>
 
     ${total > 0 ? `
+    ${dateRangeMsg ? `<div style="font-size:0.83rem;color:var(--txt-muted);margin-bottom:var(--sp-md);padding:6px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);display:inline-block">${dateRangeMsg}</div>` : ''}
     <!-- Stats -->
     <div class="stats-grid" style="margin-bottom:var(--sp-xl)">
       <div class="stat-card accent-saffron">
