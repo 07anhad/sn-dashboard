@@ -66,6 +66,121 @@ CREATE TABLE IF NOT EXISTS reg_links (
     created_on  DATE DEFAULT CURRENT_DATE
 );
 
+-- Pending Member Registrations (submitted via reg link, awaiting admin approval)
+-- Mirrors all user-fillable fields from member_details
+CREATE TABLE IF NOT EXISTS pending_members (
+    id                          SERIAL PRIMARY KEY,
+    reg_link_code               VARCHAR(50),
+    submitted_at                TIMESTAMP DEFAULT NOW(),
+    status                      VARCHAR(20) DEFAULT 'pending',  -- pending | approved | rejected
+    reviewed_at                 TIMESTAMP,
+    reviewed_by                 VARCHAR(100),
+    -- Personal
+    name                        VARCHAR(200),
+    uid                         VARCHAR(50),
+    date_of_initiation          DATE,
+    date_of_registration_jigyasu DATE,
+    date_of_first_initiation    DATE,
+    date_of_second_initiation   DATE,
+    date_of_birth               DATE,
+    blood_group                 VARCHAR(10),
+    caste                       VARCHAR(100),
+    nationality                 VARCHAR(100),
+    profession                  VARCHAR(200),
+    ashram                      VARCHAR(100),
+    -- Contact
+    mobile1                     VARCHAR(30),
+    mobile2                     VARCHAR(30),
+    landline                    VARCHAR(30),
+    office_phone                VARCHAR(30),
+    email1                      VARCHAR(200),
+    email2                      VARCHAR(200),
+    -- Address
+    address_line1               VARCHAR(300),
+    address_line2               VARCHAR(300),
+    address_line3               VARCHAR(300),
+    city                        VARCHAR(100),
+    pincode                     VARCHAR(20),
+    state                       VARCHAR(100),
+    country                     VARCHAR(100),
+    -- Professional
+    qualification               VARCHAR(200),
+    occupation                  VARCHAR(200),
+    designation                 VARCHAR(200),
+    organization                VARCHAR(200),
+    -- Father
+    father_title                VARCHAR(20),
+    father_first_name           VARCHAR(100),
+    father_middle_name          VARCHAR(100),
+    father_last_name            VARCHAR(100),
+    father_branch               VARCHAR(200),
+    father_bslno                VARCHAR(50),
+    father_uid                  VARCHAR(50),
+    father_doi                  DATE,
+    father_phone                VARCHAR(30),
+    father_city                 VARCHAR(100),
+    father_state                VARCHAR(100),
+    -- Mother
+    mother_title                VARCHAR(20),
+    mother_first_name           VARCHAR(100),
+    mother_middle_name          VARCHAR(100),
+    mother_last_name            VARCHAR(100),
+    mother_branch               VARCHAR(200),
+    mother_bslno                VARCHAR(50),
+    mother_uid                  VARCHAR(50),
+    mother_doi                  DATE,
+    mother_phone                VARCHAR(30),
+    mother_city                 VARCHAR(100),
+    mother_state                VARCHAR(100),
+    -- Spouse
+    spouse_title                VARCHAR(20),
+    spouse_first_name           VARCHAR(100),
+    spouse_middle_name          VARCHAR(100),
+    spouse_last_name            VARCHAR(100),
+    spouse_branch               VARCHAR(200),
+    spouse_bslno                VARCHAR(50),
+    spouse_uid                  VARCHAR(50),
+    spouse_doi                  DATE,
+    spouse_phone                VARCHAR(30),
+    spouse_city                 VARCHAR(100),
+    spouse_state                VARCHAR(100),
+    -- Nee (maiden name)
+    nee_first_name              VARCHAR(100),
+    nee_middle_name             VARCHAR(100),
+    nee_last_name               VARCHAR(100),
+    -- Group memberships
+    mahila_association_member   VARCHAR(10),
+    youth_member                VARCHAR(10),
+    associate_youth_member      VARCHAR(10),
+    junior_pre_initiate_member  VARCHAR(10),
+    senior_pre_initiate_member  VARCHAR(10),
+    crc_member                  VARCHAR(10),
+    cca_member                  VARCHAR(10),
+    sant_su_member              VARCHAR(10),
+    -- Reference 1
+    ref1_name                   VARCHAR(200),
+    ref1_address                VARCHAR(300),
+    ref1_email                  VARCHAR(200),
+    ref1_phone                  VARCHAR(30),
+    ref1_branch                 VARCHAR(200),
+    ref1_relation               VARCHAR(100),
+    -- Reference 2
+    ref2_name                   VARCHAR(200),
+    ref2_address                VARCHAR(300),
+    ref2_email                  VARCHAR(200),
+    ref2_phone                  VARCHAR(30),
+    ref2_branch                 VARCHAR(200),
+    ref2_relation               VARCHAR(100),
+    notes                       TEXT
+);
+
+-- Migrate: add new columns to pending_members if upgrading from an older schema
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS uid                          VARCHAR(50);
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_initiation          DATE;
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_registration_jigyasu DATE;
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_first_initiation    DATE;
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_second_initiation   DATE;
+
 -- Contributions
 CREATE TABLE IF NOT EXISTS contributions (
     id          SERIAL PRIMARY KEY,

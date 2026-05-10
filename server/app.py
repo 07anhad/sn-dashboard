@@ -1,7 +1,10 @@
 """
 app.py — Flask server: serves static frontend + REST API
 """
-import os, sys, logging, shutil
+import os, sys, logging, shutil, smtplib
+import datetime as _dt
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from logging.handlers import TimedRotatingFileHandler
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -25,6 +28,41 @@ CORS(app)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB upload limit
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
+
+# ═══════════════════════════════════════════
+# Email configuration — set these env vars or edit defaults
+# ═══════════════════════════════════════════
+SMTP_HOST     = os.environ.get('SMTP_HOST',     'smtp.gmail.com')
+SMTP_PORT     = int(os.environ.get('SMTP_PORT', 465))
+SMTP_USER     = os.environ.get('SMTP_USER',     'anhadparashar07@gmail.com')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SMTP_FROM     = os.environ.get('SMTP_FROM',     SMTP_USER)
+
+def send_email(to_addr, subject, html_body):
+    """Send an HTML email. Silently logs on failure so server never crashes."""
+    if not SMTP_USER or not SMTP_PASSWORD or not to_addr:
+        logging.getLogger('audit').warning(f"EMAIL_SKIPPED: missing creds or to_addr")
+        return
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From']    = SMTP_FROM
+        msg['To']      = to_addr
+        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as s:
+            s.login(SMTP_USER, SMTP_PASSWORD)
+            s.sendmail(SMTP_FROM, [to_addr], msg.as_string())
+        logging.getLogger('audit').info(f"EMAIL_SENT to={to_addr} subject={subject}")
+        print(f"[EMAIL] Sent to {to_addr}", flush=True)
+    except Exception as e:
+        logging.getLogger('audit').warning(f"EMAIL_FAILED to={to_addr} err={e}")
+        print(f"[EMAIL ERROR] {e}", flush=True)
+
+@app.route('/api/test-email')
+def test_email():
+    """Dev-only: send a test email to the configured SMTP_USER."""
+    send_email(SMTP_USER, 'Test Email — Satsang Portal', '<h2>It works!</h2><p>Email sending is configured correctly.</p>')
+    return jsonify({'ok': True, 'to': SMTP_USER, 'from': SMTP_FROM})
 
 # ═══════════════════════════════════════════
 # Audit logger — writes to logs/audit_YYYY-MM-DD.log
@@ -417,6 +455,250 @@ def delete_reg_link(id):
     return jsonify({'ok': True})
 
 # ═══════════════════════════════════════════
+# PUBLIC REGISTRATION API
+# ═══════════════════════════════════════════
+@app.route('/register')
+@app.route('/register/<code>')
+def register_page(code=None):
+    return send_from_directory(os.path.join(ROOT, 'html'), 'register.html')
+
+@app.route('/api/register/<code>')
+def validate_reg_link(code):
+    link = query("SELECT * FROM reg_links WHERE code=%s AND active=true", (code,), one=True)
+    if not link:
+        return jsonify({'ok': False, 'error': 'This registration link is invalid or inactive.'}), 404
+    if link['expiry'] and link['expiry'] < _dt.date.today():
+        return jsonify({'ok': False, 'error': 'This registration link has expired.'}), 410
+    if link['max_uses'] and link['used_count'] >= link['max_uses']:
+        return jsonify({'ok': False, 'error': 'This registration link has reached its maximum uses.'}), 410
+    return jsonify({'ok': True, 'title': link['title'], 'code': link['code']})
+
+@app.route('/api/register/<code>', methods=['POST'])
+def submit_registration(code):
+    link = query("SELECT * FROM reg_links WHERE code=%s AND active=true", (code,), one=True)
+    if not link:
+        return jsonify({'ok': False, 'error': 'Invalid or inactive link.'}), 404
+    if link['expiry'] and link['expiry'] < _dt.date.today():
+        return jsonify({'ok': False, 'error': 'Link has expired.'}), 410
+    if link['max_uses'] and link['used_count'] >= link['max_uses']:
+        return jsonify({'ok': False, 'error': 'Link has reached maximum uses.'}), 410
+
+    d = request.json or {}
+    name = (d.get('name') or '').strip()
+    if not name:
+        return jsonify({'ok': False, 'error': 'Name is required.'}), 400
+
+    n = lambda k: d.get(k) or None
+    execute("""
+        INSERT INTO pending_members (
+            reg_link_code, name, uid, date_of_initiation, date_of_registration_jigyasu,
+            date_of_first_initiation, date_of_second_initiation,
+            date_of_birth, blood_group, caste, nationality, profession, ashram,
+            mobile1, mobile2, landline, office_phone, email1, email2,
+            address_line1, address_line2, address_line3, city, pincode, state, country,
+            qualification, occupation, designation, organization,
+            father_title, father_first_name, father_middle_name, father_last_name,
+            father_branch, father_bslno, father_uid, father_doi, father_phone, father_city, father_state,
+            mother_title, mother_first_name, mother_middle_name, mother_last_name,
+            mother_branch, mother_bslno, mother_uid, mother_doi, mother_phone, mother_city, mother_state,
+            spouse_title, spouse_first_name, spouse_middle_name, spouse_last_name,
+            spouse_branch, spouse_bslno, spouse_uid, spouse_doi, spouse_phone, spouse_city, spouse_state,
+            nee_first_name, nee_middle_name, nee_last_name,
+            mahila_association_member, youth_member, associate_youth_member,
+            junior_pre_initiate_member, senior_pre_initiate_member,
+            crc_member, cca_member, sant_su_member,
+            ref1_name, ref1_address, ref1_email, ref1_phone, ref1_branch, ref1_relation,
+            ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
+            notes
+        ) VALUES (
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,
+            %s
+        )
+    """, (
+        code, name, n('uid'), n('dateOfInitiation'), n('dateOfRegistrationJigyasu'),
+        n('dateOfFirstInitiation'), n('dateOfSecondInitiation'),
+        n('dateOfBirth'), n('bloodGroup'), n('caste'), n('nationality'), n('profession'), n('ashram'),
+        n('mobile1'), n('mobile2'), n('landline'), n('officePhone'), n('email1'), n('email2'),
+        n('addressLine1'), n('addressLine2'), n('addressLine3'), n('city'), n('pincode'), n('state'), n('country'),
+        n('qualification'), n('occupation'), n('designation'), n('organization'),
+        n('fatherTitle'), n('fatherFirstName'), n('fatherMiddleName'), n('fatherLastName'),
+        n('fatherBranch'), n('fatherBslno'), n('fatherUid'), n('fatherDoi'), n('fatherPhone'), n('fatherCity'), n('fatherState'),
+        n('motherTitle'), n('motherFirstName'), n('motherMiddleName'), n('motherLastName'),
+        n('motherBranch'), n('motherBslno'), n('motherUid'), n('motherDoi'), n('motherPhone'), n('motherCity'), n('motherState'),
+        n('spouseTitle'), n('spouseFirstName'), n('spouseMiddleName'), n('spouseLastName'),
+        n('spouseBranch'), n('spouseBslno'), n('spouseUid'), n('spouseDoi'), n('spousePhone'), n('spouseCity'), n('spouseState'),
+        n('neeFirstName'), n('neeMiddleName'), n('neeLastName'),
+        n('mahilaAssociationMember'), n('youthMember'), n('associateYouthMember'),
+        n('juniorPreInitiateMember'), n('seniorPreInitiateMember'),
+        n('crcMember'), n('ccaMember'), n('santSuMember'),
+        n('ref1Name'), n('ref1Address'), n('ref1Email'), n('ref1Phone'), n('ref1Branch'), n('ref1Relation'),
+        n('ref2Name'), n('ref2Address'), n('ref2Email'), n('ref2Phone'), n('ref2Branch'), n('ref2Relation'),
+        n('notes')
+    ))
+    execute("UPDATE reg_links SET used_count=used_count+1 WHERE code=%s", (code,))
+    audit('REGISTRATION_SUBMIT', f"code={code} name={name}")
+    return jsonify({'ok': True, 'message': 'Registration submitted successfully! An administrator will review your details.'}), 201
+
+@app.route('/api/pending-members')
+def get_pending_members():
+    return jsonify(query("SELECT * FROM pending_members ORDER BY submitted_at DESC"))
+
+@app.route('/api/pending-members/<int:id>/approve', methods=['POST'])
+def approve_pending_member(id):
+    row = query("SELECT * FROM pending_members WHERE id=%s", (id,), one=True)
+    if not row:
+        return jsonify({'ok': False, 'error': 'Not found'}), 404
+
+    actor = request.headers.get('X-User', 'unknown')
+    import random, string
+    initials = ''.join(w[0].upper() for w in (row['name'] or 'XX').split()[:3])
+    year = _dt.date.today().year
+    suffix = ''.join(random.choices(string.digits, k=8))
+    uid = f"{initials}{year}{suffix}"
+    while query("SELECT 1 FROM member_details WHERE uid=%s", (uid,)):
+        suffix = ''.join(random.choices(string.digits, k=8))
+        uid = f"{initials}{year}{suffix}"
+
+    execute("""
+        INSERT INTO member_details (
+            uid, name, date_of_initiation, date_of_registration_jigyasu,
+            date_of_first_initiation, date_of_second_initiation,
+            date_of_birth, blood_group, caste, nationality, profession, ashram,
+            mobile1, mobile2, landline, office_phone, email1, email2,
+            address_line1, address_line2, address_line3, city, pincode, state, country,
+            qualification, occupation, designation, organization,
+            father_title, father_first_name, father_middle_name, father_last_name,
+            father_branch, father_bslno, father_uid, father_doi, father_phone, father_city, father_state,
+            mother_title, mother_first_name, mother_middle_name, mother_last_name,
+            mother_branch, mother_bslno, mother_uid, mother_doi, mother_phone, mother_city, mother_state,
+            spouse_title, spouse_first_name, spouse_middle_name, spouse_last_name,
+            spouse_branch, spouse_bslno, spouse_uid, spouse_doi, spouse_phone, spouse_city, spouse_state,
+            nee_first_name, nee_middle_name, nee_last_name,
+            mahila_association_member, youth_member, associate_youth_member,
+            junior_pre_initiate_member, senior_pre_initiate_member,
+            crc_member, cca_member, sant_su_member,
+            ref1_name, ref1_address, ref1_email, ref1_phone, ref1_branch, ref1_relation,
+            ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
+            record_status
+        ) VALUES (
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,
+            'Activated'
+        )
+    """, (
+        uid, row['name'], row.get('date_of_initiation'), row.get('date_of_registration_jigyasu'),
+        row.get('date_of_first_initiation'), row.get('date_of_second_initiation'),
+        row['date_of_birth'], row['blood_group'], row['caste'], row['nationality'], row['profession'], row['ashram'],
+        row['mobile1'], row['mobile2'], row['landline'], row['office_phone'], row['email1'], row['email2'],
+        row['address_line1'], row['address_line2'], row['address_line3'], row['city'], row['pincode'], row['state'], row['country'],
+        row['qualification'], row['occupation'], row['designation'], row['organization'],
+        row['father_title'], row['father_first_name'], row['father_middle_name'], row['father_last_name'],
+        row['father_branch'], row['father_bslno'], row['father_uid'], row['father_doi'], row['father_phone'], row['father_city'], row['father_state'],
+        row['mother_title'], row['mother_first_name'], row['mother_middle_name'], row['mother_last_name'],
+        row['mother_branch'], row['mother_bslno'], row['mother_uid'], row['mother_doi'], row['mother_phone'], row['mother_city'], row['mother_state'],
+        row['spouse_title'], row['spouse_first_name'], row['spouse_middle_name'], row['spouse_last_name'],
+        row['spouse_branch'], row['spouse_bslno'], row['spouse_uid'], row['spouse_doi'], row['spouse_phone'], row['spouse_city'], row['spouse_state'],
+        row['nee_first_name'], row['nee_middle_name'], row['nee_last_name'],
+        row['mahila_association_member'], row['youth_member'], row['associate_youth_member'],
+        row['junior_pre_initiate_member'], row['senior_pre_initiate_member'],
+        row['crc_member'], row['cca_member'], row['sant_su_member'],
+        row['ref1_name'], row['ref1_address'], row['ref1_email'], row['ref1_phone'], row['ref1_branch'], row['ref1_relation'],
+        row['ref2_name'], row['ref2_address'], row['ref2_email'], row['ref2_phone'], row['ref2_branch'], row['ref2_relation']
+    ))
+    execute(
+        "UPDATE pending_members SET status='approved', reviewed_at=NOW(), reviewed_by=%s WHERE id=%s",
+        (actor, id)
+    )
+    audit('APPROVE_REGISTRATION', f"id={id} name={row['name']} new_uid={uid}")
+
+    # Send approval email if applicant provided an email
+    to_email = row.get('email1') or row.get('email2')
+    if to_email:
+        send_email(
+            to_addr  = to_email,
+            subject  = 'Your Registration is Approved — Soaminagar Branch Delhi',
+            html_body= f"""
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:'Segoe UI',Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:40px 20px">
+  <table width="560" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
+    <!-- Header -->
+    <tr><td style="background:#1a2d5a;padding:32px;text-align:center">
+      <div style="font-size:2rem">🙏</div>
+      <h1 style="color:#f4a124;font-size:1.4rem;margin:10px 0 4px;font-family:Georgia,serif">
+        Soaminagar Branch Delhi
+      </h1>
+      <p style="color:rgba(255,255,255,0.7);margin:0;font-size:0.85rem">Ra Dha Sva Aa Mi</p>
+    </td></tr>
+    <!-- Body -->
+    <tr><td style="padding:36px 40px">
+      <h2 style="color:#1a2d5a;margin:0 0 16px;font-size:1.25rem">Registration Approved ✅</h2>
+      <p style="color:#444;line-height:1.6;margin:0 0 12px">
+        Dear <strong>{row['name']}</strong>,
+      </p>
+      <p style="color:#444;line-height:1.6;margin:0 0 20px">
+        We are pleased to inform you that your membership registration with
+        <strong>Soaminagar Branch Delhi</strong> has been <strong style="color:#16a34a">approved</strong>.
+      </p>
+      <div style="background:#f0f7ff;border-left:4px solid #1a2d5a;padding:16px 20px;border-radius:6px;margin-bottom:24px">
+        <p style="margin:0 0 6px;color:#666;font-size:0.8rem;text-transform:uppercase;letter-spacing:.05em">Your Member UID</p>
+        <p style="margin:0;font-size:1.4rem;font-weight:700;color:#1a2d5a;letter-spacing:.05em">{uid}</p>
+      </div>
+      <p style="color:#444;line-height:1.6;margin:0 0 24px">
+        Please keep your Member UID safe — it uniquely identifies you in our system.
+        You may be asked to provide it at satsang events and programmes.
+      </p>
+      <p style="color:#888;font-size:0.85rem;line-height:1.6;margin:0">
+        If you have any questions, please contact your branch secretary.
+      </p>
+    </td></tr>
+    <!-- Footer -->
+    <tr><td style="background:#f8f8f8;padding:20px 40px;border-top:1px solid #eee;text-align:center">
+      <p style="color:#aaa;font-size:0.78rem;margin:0">
+        This is an automated message from Soaminagar Branch Delhi portal.
+      </p>
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>"""
+        )
+
+    return jsonify({'ok': True, 'uid': uid})
+
+@app.route('/api/pending-members/<int:id>/reject', methods=['POST'])
+def reject_pending_member(id):
+    actor = request.headers.get('X-User', 'unknown')
+    execute(
+        "UPDATE pending_members SET status='rejected', reviewed_at=NOW(), reviewed_by=%s WHERE id=%s",
+        (actor, id)
+    )
+    audit('REJECT_REGISTRATION', f"id={id}")
+    return jsonify({'ok': True})
+
+# ═══════════════════════════════════════════
 # ANNOUNCEMENTS API
 # ═══════════════════════════════════════════
 @app.route('/api/announcements')
@@ -686,7 +968,7 @@ def dashboard_stats():
     stats['transferIn']      = query("SELECT count(*) as c FROM member_details WHERE date_transfer_in IS NOT NULL", one=True)['c']
     stats['transferOut']     = query("SELECT count(*) as c FROM member_details WHERE date_transfer_out IS NOT NULL", one=True)['c']
     stats['expired']         = query("SELECT count(*) as c FROM member_details WHERE date_of_expire IS NOT NULL AND date_of_expire < CURRENT_DATE", one=True)['c']
-    stats['pendingApprovals'] = 0
+    stats['pendingApprovals'] = query("SELECT count(*) as c FROM pending_members WHERE status='pending'", one=True)['c']
     # Reg links
     stats['activeRegLinks']  = query("SELECT count(*) as c FROM reg_links WHERE active=true", one=True)['c']
     # Zones
@@ -746,7 +1028,12 @@ if __name__ == '__main__':
     conn = get_conn()
     cur = conn.cursor()
     with open(os.path.join(os.path.dirname(__file__), 'schema.sql')) as f:
-        cur.execute(f.read())
+        sql = f.read()
+    # psycopg2 execute() does not support multiple statements; run each individually
+    for statement in sql.split(';'):
+        stmt = statement.strip()
+        if stmt:
+            cur.execute(stmt)
     conn.commit()
     cur.close()
     conn.close()
