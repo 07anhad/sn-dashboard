@@ -12,11 +12,30 @@ const ATT_PER_PAGE = 10;
 // ── Entry point (called by router) ─────────
 function renderAttendance() {
   if (!isAdmin()) {
-    document.getElementById('attendanceContent').innerHTML =
-      '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">\u26d4 Access Denied \u2014 Attendance data is restricted to administrators only.</div>';
+    loadMemberOwnAttendance();
     return;
   }
   loadAttendanceData();
+}
+
+// ── Member: load only their own attendance ──
+async function loadMemberOwnAttendance() {
+  const container = document.getElementById('attendanceContent');
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt-muted)">Loading\u2026</div>';
+  const u = getCurrentUser();
+  const memberUid = u?.memberUid;
+  if (!memberUid) {
+    container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--txt-muted);font-size:1rem;">No attendance record found linked to your account. Please contact an administrator.</div>';
+    return;
+  }
+  try {
+    const raw = await apiGet('/api/attendance/esatsang');
+    attData = mapRows(raw).filter(r => r.uid === memberUid);
+  } catch (e) {
+    attData = [];
+  }
+  filteredAtt = [...attData];
+  renderAttUI();
 }
 
 // ── Load from DB ───────────────────────────
@@ -97,21 +116,21 @@ function renderAttUI() {
     <div class="stats-grid" style="margin-bottom:var(--sp-xl)">
       <div class="stat-card accent-saffron">
         <div class="stat-label">Total Records</div>
-        <div class="stat-value">${total.toLocaleString()}</div>
+        <div class="stat-value" id="attStatTotal">${total.toLocaleString()}</div>
       </div>
       <div class="stat-card accent-green">
         <div class="stat-label">Audio</div>
-        <div class="stat-value">${audio.toLocaleString()}</div>
-        <div class="stat-link">${total ? Math.round(audio / total * 100) : 0}%</div>
+        <div class="stat-value" id="attStatAudio">${audio.toLocaleString()}</div>
+        <div class="stat-link" id="attStatAudioPct">${total ? Math.round(audio / total * 100) : 0}%</div>
       </div>
       <div class="stat-card accent-blue">
         <div class="stat-label">Video</div>
-        <div class="stat-value">${video.toLocaleString()}</div>
-        <div class="stat-link">${total ? Math.round(video / total * 100) : 0}%</div>
+        <div class="stat-value" id="attStatVideo">${video.toLocaleString()}</div>
+        <div class="stat-link" id="attStatVideoPct">${total ? Math.round(video / total * 100) : 0}%</div>
       </div>
       <div class="stat-card accent-purple">
         <div class="stat-label">Branches</div>
-        <div class="stat-value">${uniqueBranches.length}</div>
+        <div class="stat-value" id="attStatBranches">${uniqueBranches.length}</div>
       </div>
     </div>
 
@@ -145,8 +164,12 @@ function renderAttUI() {
         </select>
       </div>
       <div class="filter-group">
-        <label>Date</label>
-        <input type="date" id="attFilterDate" onchange="filterAtt()" />
+        <label>From Date</label>
+        <input type="date" id="attFilterFromDate" onchange="filterAtt()" />
+      </div>
+      <div class="filter-group">
+        <label>To Date</label>
+        <input type="date" id="attFilterToDate" onchange="filterAtt()" />
       </div>
       <div class="filter-group filter-reset">
         <button class="btn btn-outline btn-sm" onclick="clearAttFilters()">Reset</button>
@@ -199,7 +222,8 @@ function filterAtt() {
   const event  = document.getElementById('attFilterEvent')?.value  || '';
   const branch = document.getElementById('attFilterBranch')?.value || '';
   const type   = (document.getElementById('attFilterType')?.value  || '').toUpperCase();
-  const date   = document.getElementById('attFilterDate')?.value   || ''; // yyyy-mm-dd
+  const dateFrom = document.getElementById('attFilterFromDate')?.value || ''; // yyyy-mm-dd
+  const dateTo   = document.getElementById('attFilterToDate')?.value   || ''; // yyyy-mm-dd
 
   filteredAtt = attData.filter(r => {
     if (q && !r.name.toLowerCase().includes(q) &&
@@ -208,15 +232,29 @@ function filterAtt() {
     if (event  && r.event  !== event)                    return false;
     if (branch && r.branch !== branch)                   return false;
     if (type   && (r.type || '').toUpperCase() !== type) return false;
-    if (date   && !String(r.date).startsWith(date))      return false;
+    if (dateFrom && r.date < dateFrom)                  return false;
+    if (dateTo   && r.date > dateTo)                    return false;
     return true;
   });
   attPage = 1;
+
+  const fTotal    = filteredAtt.length;
+  const fAudio    = filteredAtt.filter(r => (r.type || '').toUpperCase() === 'AUDIO').length;
+  const fVideo    = filteredAtt.filter(r => (r.type || '').toUpperCase() === 'VIDEO').length;
+  const fBranches = new Set(filteredAtt.map(r => r.branch).filter(Boolean)).size;
+  const el = id => document.getElementById(id);
+  if (el('attStatTotal'))    el('attStatTotal').textContent    = fTotal.toLocaleString();
+  if (el('attStatAudio'))    el('attStatAudio').textContent    = fAudio.toLocaleString();
+  if (el('attStatAudioPct')) el('attStatAudioPct').textContent = (fTotal ? Math.round(fAudio / fTotal * 100) : 0) + '%';
+  if (el('attStatVideo'))    el('attStatVideo').textContent    = fVideo.toLocaleString();
+  if (el('attStatVideoPct')) el('attStatVideoPct').textContent = (fTotal ? Math.round(fVideo / fTotal * 100) : 0) + '%';
+  if (el('attStatBranches')) el('attStatBranches').textContent = fBranches.toLocaleString();
+
   renderAttTable();
 }
 
 function clearAttFilters() {
-  ['attSearch', 'attFilterEvent', 'attFilterBranch', 'attFilterType', 'attFilterDate'].forEach(id => {
+  ['attSearch', 'attFilterEvent', 'attFilterBranch', 'attFilterType', 'attFilterFromDate', 'attFilterToDate'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });

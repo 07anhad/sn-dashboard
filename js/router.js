@@ -14,14 +14,20 @@ const SECTION_RENDERERS = {
   'attendance':      renderAttendance
 };
 
-const SECTION_TITLES = {
-  'dashboard':       'Dashboard',
-  'change-password': 'Change Password',
-  'members':         'Members',
-  'registration':    'Registration Links',
-  'announcements':   'Announcements',
-  'attendance':      'Attendance / Haazri'
-};
+function getSectionTitle(section) {
+  const adminTitles = { members: 'Members', attendance: 'Attendance / Haazri' };
+  const memberTitles = { members: 'My Profile', attendance: 'My Attendance' };
+  const base = {
+    'dashboard':       'Dashboard',
+    'change-password': 'Change Password',
+    'members':         'Members',
+    'registration':    'Registration Links',
+    'announcements':   'Announcements',
+    'attendance':      'Attendance / Haazri'
+  };
+  if (!isAdmin() && memberTitles[section]) return memberTitles[section];
+  return base[section] || section;
+}
 
 let currentSection = 'dashboard';
 let renderCache    = new Set();
@@ -51,6 +57,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.style.display = isAdmin() ? '' : 'none';
   });
 
+  // Show member-visible nav items for all logged-in users
+  document.querySelectorAll('.member-visible-nav').forEach(el => {
+    el.style.display = '';
+  });
+
+  // For admins: restore original label text
+  if (isAdmin()) {
+    const membersLink = document.querySelector('[data-section="members"]');
+    if (membersLink) membersLink.querySelector('span:last-child').textContent = 'Members';
+    const attLink = document.querySelector('[data-section="attendance"]');
+    if (attLink) attLink.querySelector('span:last-child').textContent = 'Attendance / Haazri';
+  }
+
   // Render initial section
   navigateTo('dashboard');
 });
@@ -72,14 +91,17 @@ function navigateTo(section) {
 
   // Update topbar title
   const titleEl = document.getElementById('topbarTitle');
-  if (titleEl) titleEl.textContent = SECTION_TITLES[section] || section;
+  if (titleEl) titleEl.textContent = getSectionTitle(section);
 
   currentSection = section;
 
+  // Non-admin members: profile/attendance always re-render (modal-based, no cache)
+  const noCache = !isAdmin() && (section === 'members' || section === 'attendance');
+
   // Render if not cached
-  if (!renderCache.has(section)) {
+  if (noCache || !renderCache.has(section)) {
     SECTION_RENDERERS[section]();
-    renderCache.add(section);
+    if (!noCache) renderCache.add(section);
   }
 }
 

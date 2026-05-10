@@ -10,7 +10,16 @@ const MEMBERS_PER_PAGE = 10;
 
 function renderMembers() {
   const container = document.getElementById('membersContent');
-  if (!isAdmin()) { container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">⛔ Access Denied — Admin only.</div>'; return; }
+  if (!isAdmin()) {
+    const u = getCurrentUser();
+    const m = MEMBERS.find(x => x.uid === u?.memberUid);
+    if (m) {
+      viewMember(m.uid);
+    } else {
+      container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--txt-muted);font-size:1rem;">No member record is linked to your account.</div>';
+    }
+    return;
+  }
   container.innerHTML = `
     <!-- Filter Bar -->
     <div class="filters-bar">
@@ -197,7 +206,8 @@ function renderMembersTable() {
   if (!tbody) return;
 
   const total = membersData.length;
-  if (countEl) countEl.textContent = total + ' members';
+  const activeCount = membersData.filter(m => (m.status || '').toLowerCase() !== 'deactivated').length;
+  if (countEl) countEl.textContent = activeCount + ' members';
 
   const start = (membersPage - 1) * MEMBERS_PER_PAGE;
   const slice = membersData.slice(start, start + MEMBERS_PER_PAGE);
@@ -454,10 +464,92 @@ function viewMember(uid) {
         ${mf('DOI (New Initiate)', formatDate(m.dateOfInitiationNew))}
       </div>
     </div>
-    <div style="margin-top:var(--sp-lg);text-align:right">
+    <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end">
+      ${!isAdmin() ? `<button class="btn btn-outline" onclick="editSelfMember('${m.uid}')">✏️ Edit My Profile</button>` : ''}
       <button class="btn btn-primary" onclick="closeForcedModal()">Close</button>
     </div>
   `);
+}
+
+// ── Member self-edit (contact + address + professional only) ──
+function editSelfMember(uid) {
+  const m = MEMBERS.find(x => x.uid === uid);
+  if (!m) return;
+  const ea = v => String(v ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const fld = (id, label, val, type='text') =>
+    `<div class="form-field"><label>${label}</label><input id="${id}" type="${type}" value="${ea(val)}" /></div>`;
+
+  openModal(`
+    <div class="modal-header">
+      <h3>✏️ Edit My Profile — ${ea(m.name)}</h3>
+      <button class="modal-close" onclick="closeForcedModal()">✕</button>
+    </div>
+    <div style="overflow-y:auto;max-height:60vh;padding-right:4px;">
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:8px 0 6px">Contact</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
+        ${fld('sm_mobile',      'Mobile 1',     m.mobile)}
+        ${fld('sm_mobile2',     'Mobile 2',     m.mobile2)}
+        ${fld('sm_landline',    'Landline',     m.landline)}
+        ${fld('sm_officePhone', 'Office Phone', m.officePhone)}
+        ${fld('sm_email',       'Email 1',      m.email,  'email')}
+        ${fld('sm_email2',      'Email 2',      m.email2, 'email')}
+      </div>
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Address</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
+        ${fld('sm_addr1',   'Address Line 1', m.addressLine1)}
+        ${fld('sm_addr2',   'Address Line 2', m.addressLine2)}
+        ${fld('sm_addr3',   'Address Line 3', m.addressLine3)}
+        ${fld('sm_city',    'City',           m.city)}
+        ${fld('sm_pincode', 'Pincode',        m.pincode)}
+        ${fld('sm_state',   'State',          m.state)}
+        ${fld('sm_country', 'Country',        m.country)}
+      </div>
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Professional</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
+        ${fld('sm_qual',   'Qualification', m.qualification)}
+        ${fld('sm_occ',    'Occupation',    m.occupation)}
+        ${fld('sm_desig',  'Designation',   m.designation)}
+        ${fld('sm_org',    'Organization',  m.organization)}
+        ${fld('sm_prof',   'Profession',    m.profession)}
+      </div>
+    </div>
+    <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end">
+      <button class="btn btn-outline" onclick="viewMember('${ea(uid)}')">← Back</button>
+      <button class="btn btn-saffron" onclick="saveSelfMember('${ea(uid)}')">Save Changes</button>
+    </div>
+  `);
+}
+
+async function saveSelfMember(uid) {
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  try {
+    await apiPut('/api/members/' + uid + '/self', {
+      mobile:        g('sm_mobile'),
+      mobile2:       g('sm_mobile2'),
+      landline:      g('sm_landline'),
+      officePhone:   g('sm_officePhone'),
+      email:         g('sm_email'),
+      email2:        g('sm_email2'),
+      addressLine1:  g('sm_addr1'),
+      addressLine2:  g('sm_addr2'),
+      addressLine3:  g('sm_addr3'),
+      city:          g('sm_city'),
+      pincode:       g('sm_pincode'),
+      state:         g('sm_state'),
+      country:       g('sm_country'),
+      qualification: g('sm_qual'),
+      occupation:    g('sm_occ'),
+      designation:   g('sm_desig'),
+      organization:  g('sm_org'),
+      profession:    g('sm_prof'),
+    });
+    await reloadMembers();
+    closeForcedModal();
+    showToast('Profile updated successfully!', 'success');
+    // Re-open view modal with fresh data
+    const m = MEMBERS.find(x => x.uid === uid);
+    if (m) viewMember(m.uid);
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
 function switchEditTab(name, btn) {
@@ -798,6 +890,8 @@ async function confirmToggleMember(uid, newStatus) {
   try {
     await apiPut('/api/members/' + uid, { status: newStatus });
     await reloadMembers();
+    await reloadDashStats();
+    renderCache.delete('dashboard');
     closeForcedModal();
     filterMembers();
     showToast(newStatus === 'Deactivated' ? 'Member deactivated.' : 'Member reactivated!', newStatus === 'Deactivated' ? '' : 'success');

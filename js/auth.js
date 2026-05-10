@@ -65,7 +65,8 @@ function handleLogin(e) {
         name: data.user.name,
         role: data.user.role,
         email: data.user.email,
-        memberId: data.user.member_id || null
+        memberId: data.user.member_id || null,
+        memberUid: data.user.member_uid || null
       }));
       window.location.href = 'dashboard.html';
     } else {
