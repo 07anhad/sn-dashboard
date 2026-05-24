@@ -173,19 +173,28 @@ function handleSignup(e) {
   const consent  = document.getElementById('signupConsent')?.checked;
   const errEl    = document.getElementById('signupError');
   const succEl   = document.getElementById('signupSuccess');
+  const btn      = document.getElementById('signupBtn');
 
   errEl.style.display = 'none';
   succEl.style.display = 'none';
 
-  if (!consent) {
-    errEl.textContent = 'You must give your data consent to create an account.';
+  // Validation
+  if (!name) {
+    errEl.textContent = 'Please enter your full name.';
     errEl.style.display = 'block';
+    document.getElementById('signupName').focus();
     return;
   }
-
-  if (pass !== confirm) {
-    errEl.textContent = 'Passwords do not match.';
+  if (!username || !/^[a-z0-9._]+$/.test(username)) {
+    errEl.textContent = 'Username can only contain lowercase letters, numbers, dots and underscores.';
     errEl.style.display = 'block';
+    document.getElementById('signupUsername').focus();
+    return;
+  }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    document.getElementById('signupEmail').focus();
     return;
   }
   if (pass.length < 6) {
@@ -193,11 +202,20 @@ function handleSignup(e) {
     errEl.style.display = 'block';
     return;
   }
-  if (!/^[a-z0-9._]+$/.test(username)) {
-    errEl.textContent = 'Username can only contain lowercase letters, numbers, dots and underscores.';
+  if (pass !== confirm) {
+    errEl.textContent = 'Passwords do not match.';
+    errEl.style.display = 'block';
+    document.getElementById('signupConfirm').focus();
+    return;
+  }
+  if (!consent) {
+    errEl.textContent = 'You must give your data consent to create an account.';
     errEl.style.display = 'block';
     return;
   }
+
+  btn.disabled = true;
+  btn.querySelector('.btn-text').textContent = 'Creating account…';
 
   fetch('/api/auth/signup', {
     method: 'POST',
@@ -206,16 +224,30 @@ function handleSignup(e) {
   })
   .then(r => r.json())
   .then(data => {
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Create Account';
     if (data.ok) {
-      succEl.textContent = 'Account created! You can now sign in as "' + username + '".';
+      // Show success, then auto-redirect to login after 2s
+      succEl.innerHTML = `✓ Account created! Redirecting to sign in…`;
       succEl.style.display = 'block';
       document.getElementById('signupForm').reset();
+      setTimeout(() => {
+        showLoginForm({ preventDefault: () => {} });
+        // Pre-fill username on login form
+        const loginIdEl = document.getElementById('loginId');
+        if (loginIdEl) {
+          loginIdEl.value = username;
+          document.getElementById('loginPass')?.focus();
+        }
+      }, 1800);
     } else {
-      errEl.textContent = data.error || 'Signup failed.';
+      errEl.textContent = data.error || 'Signup failed. Please try again.';
       errEl.style.display = 'block';
     }
   })
   .catch(() => {
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Create Account';
     errEl.textContent = 'Server error. Please try again later.';
     errEl.style.display = 'block';
   });
@@ -229,20 +261,31 @@ function handleForgotPassword(e) {
   const confirm  = document.getElementById('forgotConfirm').value;
   const errEl    = document.getElementById('forgotError');
   const succEl   = document.getElementById('forgotSuccess');
+  const btn      = document.getElementById('forgotBtn');
 
   errEl.style.display = 'none';
   succEl.style.display = 'none';
 
-  if (newPass !== confirm) {
-    errEl.textContent = 'Passwords do not match.';
+  if (!username) {
+    errEl.textContent = 'Please enter your username.';
     errEl.style.display = 'block';
+    document.getElementById('forgotUsername').focus();
     return;
   }
   if (newPass.length < 6) {
-    errEl.textContent = 'Password must be at least 6 characters.';
+    errEl.textContent = 'New password must be at least 6 characters.';
     errEl.style.display = 'block';
     return;
   }
+  if (newPass !== confirm) {
+    errEl.textContent = 'Passwords do not match.';
+    errEl.style.display = 'block';
+    document.getElementById('forgotConfirm').focus();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.querySelector('.btn-text').textContent = 'Resetting…';
 
   fetch('/api/auth/reset-password', {
     method: 'POST',
@@ -251,16 +294,28 @@ function handleForgotPassword(e) {
   })
   .then(r => r.json())
   .then(data => {
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Reset Password';
     if (data.ok) {
-      succEl.textContent = 'Password updated! You can now sign in with your new password.';
+      succEl.textContent = '✓ Password updated! Redirecting to sign in…';
       succEl.style.display = 'block';
       document.getElementById('forgotForm').reset();
+      setTimeout(() => {
+        showLoginForm({ preventDefault: () => {} });
+        const loginIdEl = document.getElementById('loginId');
+        if (loginIdEl) {
+          loginIdEl.value = username;
+          document.getElementById('loginPass')?.focus();
+        }
+      }, 1800);
     } else {
-      errEl.textContent = data.error || 'Reset failed.';
+      errEl.textContent = data.error || 'Reset failed. Check your username.';
       errEl.style.display = 'block';
     }
   })
   .catch(() => {
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Reset Password';
     errEl.textContent = 'Server error. Please try again later.';
     errEl.style.display = 'block';
   });
