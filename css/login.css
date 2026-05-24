@@ -167,7 +167,17 @@
 .input-wrap input:focus {
   outline: none;
   border-color: var(--clr-saffron);
-  background: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06); /* stay dark — don't go white */
+  box-shadow: 0 0 0 3px rgba(245,166,35,0.18);
+}
+/* Chrome autofill on login page (dark navy bg) */
+.input-wrap input:-webkit-autofill,
+.input-wrap input:-webkit-autofill:hover,
+.input-wrap input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px rgba(255,255,255,0.07) inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #fff !important;
+  transition: background-color 9999s ease 0s;
 }
 .pass-toggle {
   position: absolute; right: 12px;
@@ -243,3 +253,62 @@
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
 }
+
+/* Field hints (validation) */
+.field-hint {
+  font-size: 0.75rem;
+  margin-top: 5px;
+  line-height: 1.4;
+  padding-left: 2px;
+}
+
+/* Password strength bar */
+.pw-strength-bar {
+  margin-top: 6px;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.1);
+  overflow: hidden;
+}
+.pw-strength-bar > div {
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+/* Button loading spinner */
+.btn-spinner {
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  font-style: normal;
+}
+
+/* Disabled login-btn state */
+.login-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Better mobile login card */
+@media (max-width: 500px) {
+  .login-wrapper { padding: var(--sp-md); }
+  .login-card {
+    padding: var(--sp-xl) var(--sp-lg);
+    border-radius: var(--radius-lg);
+  }
+  .brand-title { font-size: 1.5rem; }
+  .login-toggle { margin-bottom: var(--sp-lg); }
+  .login-form { gap: var(--sp-sm); }
+  .login-btn { padding: 13px; font-size: 0.95rem; }
+}
+
+/* Shake animation for errors */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.login-error { animation: shake 0.35s ease; }
