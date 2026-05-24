@@ -65,9 +65,12 @@ function zonesRows() {
       <td>${z.memberCount}</td>
       <td><span class="badge ${z.active ? 'badge-green' : 'badge-red'}">${z.active ? 'Active' : 'Inactive'}</span></td>
       <td>
-        <div class="td-actions">
-          ${isAdmin() ? `<button class="tbl-btn tbl-btn-edit" onclick="editZone(${z.id})">Edit</button>` : ''}
-          ${isAdmin() ? `<button class="tbl-btn tbl-btn-delete" onclick="toggleZoneStatus(${z.id})">${z.active ? 'Deactivate' : 'Activate'}</button>` : ''}
+        <div class="act-menu" onclick="event.stopPropagation()">
+          <button class="act-trigger" onclick="toggleActMenu(this)" title="Actions">⋮</button>
+          <div class="act-dropdown">
+            ${isAdmin() ? `<button class="act-item act-edit" onclick="editZone(${z.id});closeActMenus()">✏ Edit</button>` : ''}
+            ${isAdmin() ? `<button class="act-item ${z.active ? 'act-delete' : 'act-warn'}" onclick="toggleZoneStatus(${z.id});closeActMenus()">${z.active ? '⊘ Deactivate' : '↑ Activate'}</button>` : ''}
+          </div>
         </div>
       </td>
     </tr>
