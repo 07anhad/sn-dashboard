@@ -11,7 +11,8 @@ const SECTION_RENDERERS = {
   'members':         renderMembers,
   'registration':    renderRegistration,
   'announcements':   renderAnnouncements,
-  'attendance':      renderAttendance
+  'attendance':      renderAttendance,
+  'my-children':     renderMyChildren
 };
 
 function getSectionTitle(section) {
@@ -23,7 +24,8 @@ function getSectionTitle(section) {
     'members':         'Members',
     'registration':    'Registration Links',
     'announcements':   'Announcements',
-    'attendance':      'Attendance / Haazri'
+    'attendance':      'Attendance / Haazri',
+    'my-children':     'My Children'
   };
   if (!isAdmin() && memberTitles[section]) return memberTitles[section];
   return base[section] || section;
@@ -46,7 +48,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Load all data from API before rendering
-  await loadAllData();
+  try {
+    await loadAllData();
+  } catch (err) {
+    // Error screen is already shown by loadAllData; stop init
+    return;
+  }
 
   // Hide loader
   const loader = document.getElementById('appLoader');
@@ -61,6 +68,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.querySelectorAll('.member-visible-nav').forEach(el => {
     el.style.display = '';
   });
+
+  // Show/hide children nav based on whether this member has children in superhumane
+  checkAndShowChildrenNav();
 
   // For admins: restore original label text
   if (isAdmin()) {
