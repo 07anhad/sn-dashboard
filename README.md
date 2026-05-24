@@ -64,6 +64,30 @@ Go to **http://localhost:5000**
 ---
 
 ## Notes
-- Attendance data lives in `esatsang_attendance` table — upload via the Haazri tab
-- Member data lives in `member_details` table (831 rows seeded from `seed.py`)
+- **Attendance data** lives in `esatsang_attendance` table — upload via the Haazri tab
+- **Member data** lives in `member_details` table — upload via the Members tab (Excel/CSV upload button)
 - The `.venv/` folder is gitignored — never commit it
+
+## Importing Data
+
+### Members (Initiated + Jigyasus)
+Go to **Dashboard → Members** and click **"Upload Excel / CSV"** at the top.
+- Accepts `.xlsx`, `.xlsm`, or `.csv` files
+- **Multi-sheet support**: Automatically imports from all sheets with member data (FormA, Jigyasus, etc.)
+- **Required column**: UID
+- All other columns are auto-detected from Excel headers (e.g., Name, Mobile-1, Email-1, City, etc.)
+- Existing records (matching UID) are updated; new UIDs are inserted
+- No Python environment needed — works entirely from the browser
+
+### Superhumane (Sant-Su Children)
+Go to **Dashboard → Members → Superhumane (Sant-Su)** tab and click **"Upload Excel / CSV"**.
+- Auto-detects Superhumane sheet from your Excel file
+- Imports children data including parent info (Father/Mother UID, contact, DOI)
+- **Required column**: UID
+- Supports the standard FormA Excel format with Superhumane sheet
+
+### Attendance
+Go to **Dashboard → Haazri** and click **"Upload Excel / CSV"**.
+- Accepts `.xlsx` or `.csv` files
+- Required columns: Attendance Date, Member ID, Event Name
+- Duplicates (same date + member + event) are automatically skipped
