@@ -16,3 +16,14 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Local data (don't deploy sensitive Excel files)
+dataset/
+
+# Environment variables
+.env
+.env.local
+
+# Test scripts
+check_data.py
+check_db.py
