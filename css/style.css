@@ -84,19 +84,22 @@ input, select, textarea { font-family: var(--font-body); }
 
 /* ── Dark Theme ─────────────────────────── */
 [data-theme="dark"] {
-  --bg-body:        #141720;
-  --bg-card:        #1e2130;
-  --bg-sidebar:     #0f1219;
-  --txt-primary:    #e8eaf2;
-  --txt-secondary:  #a8b0c8;
-  --txt-muted:      #7880a0;
-  --txt-light:      #50587a;
-  --border:         #2c3050;
-  --border-dark:    #3a4060;
-  --shadow-sm:   0 1px 4px rgba(0,0,0,0.4);
-  --shadow-md:   0 4px 20px rgba(0,0,0,0.5);
-  --shadow-lg:   0 8px 36px rgba(0,0,0,0.65);
-  --shadow-card: 0 2px 14px rgba(0,0,0,0.45);
+  --bg-body:        #1c212e;
+  --bg-card:        #262d3f;
+  --bg-sidebar:     #151a24;
+  --txt-primary:    #f0f2f8;
+  --txt-secondary:  #b8c0d8;
+  --txt-muted:      #8890b0;
+  --txt-light:      #606888;
+  --border:         #3a4260;
+  --border-dark:    #4a5270;
+  --shadow-sm:   0 1px 4px rgba(0,0,0,0.35);
+  --shadow-md:   0 4px 20px rgba(0,0,0,0.45);
+  --shadow-lg:   0 8px 36px rgba(0,0,0,0.55);
+  --shadow-card: 0 2px 14px rgba(0,0,0,0.4);
+  /* Override navy colors for visibility */
+  --clr-navy-mid:   #7da8ff;
+  --clr-navy-light: #6090d8;
 }
 
 /* Scrollbar */
@@ -163,8 +166,14 @@ input, select, textarea { font-family: var(--font-body); }
 .modal-box {
   background: var(--bg-card); border-radius: var(--radius-lg);
   padding: var(--sp-xl); width: 100%; max-width: 520px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
   box-shadow: var(--shadow-lg);
   animation: modalIn 0.25s ease;
+}
+/* Wider modal for forms with many fields */
+.modal-box.modal-wide {
+  max-width: 720px;
 }
 @keyframes modalIn {
   from { transform: scale(0.93) translateY(-10px); opacity: 0; }
