@@ -4,9 +4,29 @@
 
 'use strict';
 
-let membersData    = [...MEMBERS];
-let membersPage    = 1;
+let membersData      = [...MEMBERS];
+let membersPage      = 1;
 const MEMBERS_PER_PAGE = 10;
+let membersActiveTab = 'members'; // 'members' | 'superhumane'
+
+/* Superhumane tab state */
+let superhumaneAllData  = [];
+let superhumaneFiltered = [];
+let superhumanePage     = 1;
+const SH_PER_PAGE       = 10;
+
+/* Set a button into loading/done state */
+function setButtonLoading(btn, loading, loadingLabel) {
+  if (!btn) return;
+  if (loading) {
+    btn.dataset.origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="btn-spinner"></span>${loadingLabel || btn.innerHTML}`;
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.origHtml || btn.innerHTML;
+  }
+}
 
 function renderMembers() {
   const container = document.getElementById('membersContent');
@@ -14,13 +34,62 @@ function renderMembers() {
     const u = getCurrentUser();
     const m = MEMBERS.find(x => x.uid === u?.memberUid);
     if (m) {
-      viewMember(m.uid);
+      renderSelfProfileInline(m);
     } else {
       container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--txt-muted);font-size:1rem;">No member record is linked to your account.</div>';
     }
     return;
   }
+  // ── Admin: Tab switcher (Members / Superhumane) ──
   container.innerHTML = `
+    <div class="section-tabs">
+      <button class="section-tab-btn ${membersActiveTab === 'members' ? 'active' : ''}"
+              onclick="switchMembersTab('members')">Members</button>
+      <button class="section-tab-btn ${membersActiveTab === 'superhumane' ? 'active' : ''}"
+              onclick="switchMembersTab('superhumane')">Superhumane (Sant-Su)</button>
+    </div>
+    <div id="membersTabContent"></div>
+  `;
+  if (membersActiveTab === 'members') {
+    _renderMembersListTab();
+  } else {
+    renderSuperhumaneAdminTab();
+  }
+}
+
+function switchMembersTab(tab) {
+  membersActiveTab = tab;
+  renderMembers();
+}
+
+function _renderMembersListTab() {
+  const tabContent = document.getElementById('membersTabContent');
+  if (!tabContent) return;
+  tabContent.innerHTML = `
+    <!-- Upload Card -->
+    <div class="card" style="padding:var(--sp-lg);display:flex;align-items:center;gap:var(--sp-lg);flex-wrap:wrap;margin-bottom:var(--sp-xl)">
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:600;font-size:1rem;margin-bottom:4px">Upload Members Excel / CSV</div>
+        <div class="text-muted" style="font-size:0.85em">
+          Accepts <code>.xlsx</code>, <code>.xlsm</code>, or <code>.csv</code>. <strong>Multi-sheet supported</strong> — will auto-import from all sheets with member data (FormA, Jigyasus, etc.). Required: UID column.
+        </div>
+        <div id="membersUploadStatus" style="margin-top:8px;font-size:0.85em"></div>
+        <div id="membersProgressWrap" style="display:none;margin-top:10px">
+          <div style="display:flex;justify-content:space-between;font-size:0.78em;color:var(--txt-muted);margin-bottom:4px">
+            <span id="membersProgressLabel">Uploading…</span>
+            <span id="membersProgressPct">0%</span>
+          </div>
+          <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden">
+            <div id="membersProgressBar" style="height:100%;width:0%;background:var(--clr-saffron);border-radius:99px;transition:width 0.2s"></div>
+          </div>
+        </div>
+      </div>
+      ${canWrite() ? `<label class="btn btn-primary" style="cursor:pointer;white-space:nowrap">
+        ↑ Upload Excel / CSV
+        <input type="file" accept=".csv,.xlsx,.xlsm,.xls" style="display:none" onchange="handleMembersUpload(event)">
+      </label>` : '<span class="text-muted" style="font-size:0.85em">View-only access — contact a Super Admin to upload.</span>'}
+    </div>
+
     <!-- Filter Bar -->
     <div class="filters-bar">
       <div class="filter-group">
@@ -59,7 +128,7 @@ function renderMembers() {
         <table style="min-width:11000px;">
           <thead>
             <tr>
-              <th style="min-width:110px;position:sticky;left:0;z-index:2;background:#f8faff">Actions</th>
+              <th style="min-width:52px;position:sticky;left:0;z-index:2;background:#f8faff">Actions</th>
               <th style="min-width:40px">SL</th>
               <th style="min-width:160px">UID</th>
               <th style="min-width:60px">BSL</th>
@@ -167,23 +236,600 @@ function renderMembers() {
       <div class="pagination" id="membersPagination"></div>
     </div>
   `;
-
   filterMembers();
 }
 
+function renderSuperhumaneAdminTab() {
+  const tabContent = document.getElementById('membersTabContent');
+  if (!tabContent) return;
+  tabContent.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt-muted);">Loading Superhumane records…</div>';
+
+  fetch('/api/all-superhumane')
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) {
+        tabContent.innerHTML = `<div class="alert alert-error">${data.error || 'Failed to load.'}</div>`;
+        return;
+      }
+      superhumaneAllData = data.children || [];
+      superhumanePage = 1;
+      tabContent.innerHTML = `
+        <!-- Upload Card -->
+        <div class="card" style="padding:var(--sp-lg);display:flex;align-items:center;gap:var(--sp-lg);flex-wrap:wrap;margin-bottom:var(--sp-xl)">
+          <div style="flex:1;min-width:200px">
+            <div style="font-weight:600;font-size:1rem;margin-bottom:4px">Upload Superhumane (Sant-Su) Excel / CSV</div>
+            <div class="text-muted" style="font-size:0.85em">
+              Accepts <code>.xlsx</code>, <code>.xlsm</code>, or <code>.csv</code>. Auto-detects Superhumane sheet. Required: UID column.
+            </div>
+            <div id="shUploadStatus" style="margin-top:8px;font-size:0.85em"></div>
+            <div id="shProgressWrap" style="display:none;margin-top:10px">
+              <div style="display:flex;justify-content:space-between;font-size:0.78em;color:var(--txt-muted);margin-bottom:4px">
+                <span id="shProgressLabel">Uploading…</span>
+                <span id="shProgressPct">0%</span>
+              </div>
+              <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden">
+                <div id="shProgressBar" style="height:100%;width:0%;background:var(--clr-saffron);border-radius:99px;transition:width 0.2s"></div>
+              </div>
+            </div>
+          </div>
+          ${canWrite() ? `<label class="btn btn-primary" style="cursor:pointer;white-space:nowrap">
+            ↑ Upload Excel / CSV
+            <input type="file" accept=".csv,.xlsx,.xlsm,.xls" style="display:none" onchange="handleSuperhumaneUpload(event)">
+          </label>` : '<span class="text-muted" style="font-size:0.85em">View-only access.</span>'}
+        </div>
+
+        <!-- SantSu Filter Bar -->
+        <div class="filters-bar">
+          <div class="filter-group">
+            <label>Search by Name</label>
+            <input type="text" id="shFilterName" placeholder="Enter name…" oninput="filterSuperhumane()" />
+          </div>
+          <div class="filter-group">
+            <label>Search by UID</label>
+            <input type="text" id="shFilterUid" placeholder="Enter UID…" oninput="filterSuperhumane()" />
+          </div>
+          <div class="filter-group">
+            <label>Status</label>
+            <select id="shFilterStatus" onchange="filterSuperhumane()">
+              <option value="">All</option>
+              <option value="active">Active</option>
+              <option value="exited">Exited</option>
+            </select>
+          </div>
+          <div class="filter-group filter-reset">
+            <button class="btn btn-outline btn-sm" onclick="clearSuperhumaneFilters()">✕ Reset</button>
+          </div>
+        </div>
+
+        <!-- SantSu Table -->
+        <div class="table-wrap" style="margin-top:var(--sp-lg);">
+          <div class="table-toolbar">
+            <div>
+              <span class="table-title">Superhumane (Sant-Su)</span>
+              <span class="table-count" id="shCount">0</span>
+            </div>
+            <div class="table-actions">
+              ${canWrite() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddSuperhumaneModal()">+ Add</button>' : ''}
+              <button class="toolbar-btn" onclick="exportSuperhumane()">↓ Export</button>
+            </div>
+          </div>
+          <div class="table-scroll" style="overflow-x:auto;">
+            <table style="min-width:2400px;">
+              <thead>
+                <tr>
+                  <th style="min-width:52px;position:sticky;left:0;z-index:2;background:#f8faff">Actions</th>
+                  <th style="min-width:40px">S.No</th>
+                  <th style="min-width:160px">UID</th>
+                  <th style="min-width:180px">Name</th>
+                  <th style="min-width:70px">Gender</th>
+                  <th style="min-width:105px">Date of Birth</th>
+                  <th style="min-width:80px">Phase</th>
+                  <th style="min-width:140px">Branch</th>
+                  <th style="min-width:120px">Member Type</th>
+                  <th style="min-width:60px">BSL</th>
+                  <th style="min-width:110px">Form Check</th>
+                  <th style="min-width:90px">UID Check</th>
+                  <th style="min-width:105px">Scheme Entry</th>
+                  <th style="min-width:105px">Scheme Exit</th>
+                  <th style="min-width:70px">Status</th>
+                  <th style="min-width:200px">Address</th>
+                  <th style="min-width:160px">Father Name</th>
+                  <th style="min-width:140px">Father UID</th>
+                  <th style="min-width:110px">Father Contact</th>
+                  <th style="min-width:105px">Father DOI</th>
+                  <th style="min-width:160px">Mother Name</th>
+                  <th style="min-width:140px">Mother UID</th>
+                  <th style="min-width:110px">Mother Contact</th>
+                  <th style="min-width:105px">Mother DOI</th>
+                  <th style="min-width:160px">Grandfather Name</th>
+                  <th style="min-width:140px">Grandfather UID</th>
+                  <th style="min-width:110px">Grandfather Contact</th>
+                  <th style="min-width:160px">Grandmother Name</th>
+                  <th style="min-width:140px">Grandmother UID</th>
+                  <th style="min-width:110px">Grandmother Contact</th>
+                  <th style="min-width:200px">Comments</th>
+                </tr>
+              </thead>
+              <tbody id="shTableBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="shPagination"></div>
+        </div>
+      `;
+      filterSuperhumane();
+    })
+    .catch(err => {
+      tabContent.innerHTML = `<div class="alert alert-error">Network error: ${err.message}</div>`;
+    });
+}
+
+function filterSuperhumane() {
+  const name   = (document.getElementById('shFilterName')?.value   || '').toLowerCase();
+  const uid    = (document.getElementById('shFilterUid')?.value    || '').toLowerCase();
+  const status = (document.getElementById('shFilterStatus')?.value || '');
+
+  superhumaneFiltered = superhumaneAllData.filter(c => {
+    if (name   && !(c.name || '').toLowerCase().includes(name))         return false;
+    if (uid    && !(c.uid  || '').toLowerCase().includes(uid))          return false;
+    if (status === 'active' && c.date_exit_scheme)                      return false;
+    if (status === 'exited' && !c.date_exit_scheme)                     return false;
+    return true;
+  });
+
+  superhumanePage = 1;
+  renderSuperhumaneTable();
+}
+
+function clearSuperhumaneFilters() {
+  ['shFilterName', 'shFilterUid', 'shFilterStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filterSuperhumane();
+}
+
+function renderSuperhumaneTable() {
+  const tbody   = document.getElementById('shTableBody');
+  const countEl = document.getElementById('shCount');
+  if (!tbody) return;
+
+  const total = superhumaneFiltered.length;
+  if (countEl) countEl.textContent = total + ' records';
+
+  const start = (superhumanePage - 1) * SH_PER_PAGE;
+  const slice = superhumaneFiltered.slice(start, start + SH_PER_PAGE);
+
+  if (!slice.length) {
+    tbody.innerHTML = `<tr><td colspan="31" style="padding:32px;text-align:center;color:var(--txt-muted);">No records match your filters.</td></tr>`;
+    renderSuperhumanePagination(total);
+    return;
+  }
+
+  const fmt = d => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+  const sh  = x => (x != null && x !== '') ? String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '—';
+
+  tbody.innerHTML = slice.map(c => {
+    const statusBadge = c.date_exit_scheme
+      ? '<span class="badge badge-gray">Exited</span>'
+      : '<span class="badge badge-success">Active</span>';
+    const exitItem = canWrite()
+      ? (c.date_exit_scheme
+          ? `<button class="act-item act-warn" onclick="toggleSuperhumaneStatus('${c.uid}');closeActMenus()">\u2191 Reactivate</button>`
+          : `<button class="act-item act-delete" onclick="toggleSuperhumaneStatus('${c.uid}');closeActMenus()">\u2298 Deactivate</button>`)
+      : '';
+    return `<tr${c.date_exit_scheme ? ' style="opacity:0.55;filter:grayscale(0.5)"' : ''}>
+      <td style="position:sticky;left:0;z-index:1;background:var(--bg-card);white-space:nowrap">
+        <div class="act-menu" onclick="event.stopPropagation()">
+          <button class="act-trigger" onclick="toggleActMenu(this)" title="Actions">⋮</button>
+          <div class="act-dropdown">
+            <button class="act-item act-view" onclick="viewSuperhumane('${c.uid}');closeActMenus()">\ud83d\udc41 View</button>
+            ${canWrite() ? `<button class="act-item act-edit" onclick="editSuperhumane('${c.uid}');closeActMenus()">\u270f Edit</button>` : ''}
+            ${exitItem}
+          </div>
+        </div>
+      </td>
+      <td>${sh(c.sno)}</td>
+      <td><code style="font-size:0.78rem;color:var(--clr-navy-mid)">${sh(c.uid)}</code></td>
+      <td><strong>${sh(c.name)}</strong></td>
+      <td>${c.gender === 'M' ? 'Male' : c.gender === 'F' ? 'Female' : sh(c.gender)}</td>
+      <td>${fmt(c.date_of_birth)}</td>
+      <td>${sh(c.phase)}</td>
+      <td style="font-size:0.82rem">${sh(c.branch)}</td>
+      <td>${sh(c.member_type)}</td>
+      <td>${sh(c.bsl)}</td>
+      <td style="font-size:0.82rem">${sh(c.form_check)}</td>
+      <td>${sh(c.uid_check)}</td>
+      <td>${fmt(c.date_entry_scheme)}</td>
+      <td>${c.date_exit_scheme ? fmt(c.date_exit_scheme) : '—'}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:0.82rem">${sh(c.address)}</td>
+      <td>${sh(c.father_name)}</td>
+      <td><code style="font-size:0.78rem">${sh(c.father_uid)}</code></td>
+      <td>${sh(c.father_contact)}</td>
+      <td>${fmt(c.father_doi)}</td>
+      <td>${sh(c.mother_name)}</td>
+      <td><code style="font-size:0.78rem">${sh(c.mother_uid)}</code></td>
+      <td>${sh(c.mother_contact)}</td>
+      <td>${fmt(c.mother_doi)}</td>
+      <td>${sh(c.grandfather_name)}</td>
+      <td><code style="font-size:0.78rem">${sh(c.grandfather_uid)}</code></td>
+      <td>${sh(c.grandfather_contact)}</td>
+      <td>${sh(c.grandmother_name)}</td>
+      <td><code style="font-size:0.78rem">${sh(c.grandmother_uid)}</code></td>
+      <td>${sh(c.grandmother_contact)}</td>
+      <td style="font-size:0.82rem">${sh(c.comments)}</td>
+    </tr>`;
+  }).join('');
+
+  renderSuperhumanePagination(total);
+}
+
+function renderSuperhumanePagination(total) {
+  const el = document.getElementById('shPagination');
+  if (!el) return;
+  const pages = Math.ceil(total / SH_PER_PAGE);
+  if (pages <= 1) { el.innerHTML = ''; return; }
+
+  const p = superhumanePage;
+  const btn = (i, label, cls='') =>
+    `<button class="page-btn ${cls}" onclick="gotoSuperhumanePage(${i})">${label}</button>`;
+  const disabled = (label, cls='') =>
+    `<button class="page-btn ${cls}" disabled>${label}</button>`;
+
+  let html = '';
+  html += p === 1 ? disabled('‹ Prev') : btn(p - 1, '‹ Prev');
+
+  const WINDOW = 2;
+  const showFirst = p > WINDOW + 2;
+  const showLast  = p < pages - WINDOW - 1;
+  if (showFirst) { html += btn(1, '1'); html += disabled('…'); }
+
+  const lo = Math.max(1, p - WINDOW);
+  const hi = Math.min(pages, p + WINDOW);
+  for (let i = lo; i <= hi; i++) html += btn(i, i, i === p ? 'active' : '');
+
+  if (showLast) { html += disabled('…'); html += btn(pages, pages); }
+  html += p === pages ? disabled('Next ›') : btn(p + 1, 'Next ›');
+  html += `<span style="margin-left:12px;font-size:0.8rem;color:var(--txt-muted);align-self:center">Page ${p} of ${pages} &nbsp;|&nbsp; ${total} records</span>`;
+
+  el.innerHTML = html;
+}
+
+function gotoSuperhumanePage(page) {
+  const pages = Math.ceil(superhumaneFiltered.length / SH_PER_PAGE);
+  if (page < 1 || page > pages) return;
+  superhumanePage = page;
+  renderSuperhumaneTable();
+}
+
+function exportSuperhumane() {
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const fmt = d => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+
+  const COLS = [
+    ['S.No',              c => c.sno],
+    ['UID',               c => c.uid],
+    ['Name',              c => c.name],
+    ['Gender',            c => c.gender === 'M' ? 'Male' : c.gender === 'F' ? 'Female' : (c.gender || '')],
+    ['Date of Birth',     c => fmt(c.date_of_birth)],
+    ['Phase',             c => c.phase],
+    ['Branch',            c => c.branch],
+    ['Member Type',       c => c.member_type],
+    ['BSL',               c => c.bsl],
+    ['Form Check',        c => c.form_check],
+    ['UID Check',         c => c.uid_check],
+    ['Scheme Entry',      c => fmt(c.date_entry_scheme)],
+    ['Scheme Exit',       c => fmt(c.date_exit_scheme)],
+    ['Status',            c => c.date_exit_scheme ? 'Exited' : 'Active'],
+    ['Address',           c => c.address],
+    ['Father Name',       c => c.father_name],
+    ['Father UID',        c => c.father_uid],
+    ['Father Contact',    c => c.father_contact],
+    ['Father DOI',        c => fmt(c.father_doi)],
+    ['Mother Name',       c => c.mother_name],
+    ['Mother UID',        c => c.mother_uid],
+    ['Mother Contact',    c => c.mother_contact],
+    ['Mother DOI',        c => fmt(c.mother_doi)],
+    ['Grandfather Name',  c => c.grandfather_name],
+    ['Grandfather UID',   c => c.grandfather_uid],
+    ['Grandfather Cont.', c => c.grandfather_contact],
+    ['Grandmother Name',  c => c.grandmother_name],
+    ['Grandmother UID',   c => c.grandmother_uid],
+    ['Grandmother Cont.', c => c.grandmother_contact],
+    ['Comments',          c => c.comments],
+  ];
+
+  const header = COLS.map(([h]) => esc(h)).join(',');
+  const rows   = superhumaneFiltered.map(c => COLS.map(([, fn]) => esc(fn(c))).join(','));
+  const csv    = [header, ...rows].join('\r\n');
+  const blob   = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url    = URL.createObjectURL(blob);
+  const a      = document.createElement('a');
+  a.href = url; a.download = 'superhumane_export.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ── Superhumane: reload cache + re-filter ─── */
+async function reloadSuperhumane() {
+  const r    = await fetch('/api/all-superhumane');
+  const data = await r.json();
+  if (data.ok) superhumaneAllData = data.children || [];
+  filterSuperhumane();
+}
+
+/* ── Superhumane: View modal ─────────────── */
+function viewSuperhumane(uid) {
+  const c = superhumaneAllData.find(x => x.uid === uid);
+  if (!c) return;
+  const fmt = d => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+  const sh  = x => (x != null && x !== '') ? String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '—';
+  const rf  = (label, val) => `<div><span style="color:var(--txt-muted);font-size:0.76rem;">${label}</span><br><strong style="font-size:0.88rem;">${sh(val)}</strong></div>`;
+  const rfd = (label, val) => `<div><span style="color:var(--txt-muted);font-size:0.76rem;">${label}</span><br><strong style="font-size:0.88rem;">${fmt(val)}</strong></div>`;
+  const sec = t => `<div style="grid-column:1/-1;font-weight:700;font-size:0.73rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">${t}</div>`;
+  const statusBadge = c.date_exit_scheme
+    ? '<span class="badge badge-gray">Exited Scheme</span>'
+    : '<span class="badge badge-success">Active</span>';
+
+  openModal(`
+    <div class="modal-header">
+      <h3>Superhumane Record</h3>
+      <button class="modal-close" onclick="closeForcedModal()">✕</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--clr-saffron);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;flex-shrink:0;">${(c.name||'?').charAt(0).toUpperCase()}</div>
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;">${sh(c.name)}</div>
+        <div style="font-size:0.8rem;color:var(--txt-muted);">UID: <code>${sh(c.uid)}</code> &nbsp;|&nbsp; ${sh(c.member_type)} &nbsp;|&nbsp; ${statusBadge}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 16px;font-size:0.84rem;">
+      ${sec('Identity')}
+      ${rf('UID', c.uid)}  ${rf('BSL', c.bsl)}  ${rf('Phase', c.phase)}  ${rf('Branch', c.branch)}
+      ${rf('Gender', c.gender === 'M' ? 'Male' : c.gender === 'F' ? 'Female' : c.gender)}
+      ${rf('Member Type', c.member_type)}  ${rf('UID Check', c.uid_check)}  ${rf('Form Check', c.form_check)}
+      ${sec('Dates')}
+      ${rfd('Date of Birth', c.date_of_birth)}  ${rfd('Scheme Entry', c.date_entry_scheme)}  ${rfd('Scheme Exit', c.date_exit_scheme)}
+      ${sec('Address / Comments')}
+      ${rf('Address', c.address)}  ${rf('Comments', c.comments)}
+      ${sec('Father')}
+      ${rf('Name', c.father_name)}  ${rf('UID', c.father_uid)}  ${rf('Contact', c.father_contact)}  ${rfd('DOI', c.father_doi)}
+      ${sec('Mother')}
+      ${rf('Name', c.mother_name)}  ${rf('UID', c.mother_uid)}  ${rf('Contact', c.mother_contact)}  ${rfd('DOI', c.mother_doi)}
+      ${(c.grandfather_name||c.grandfather_uid) ? sec('Grandfather') : ''}
+      ${rf('Name', c.grandfather_name)}  ${rf('UID', c.grandfather_uid)}  ${rf('Contact', c.grandfather_contact)}
+      ${(c.grandmother_name||c.grandmother_uid) ? sec('Grandmother') : ''}
+      ${rf('Name', c.grandmother_name)}  ${rf('UID', c.grandmother_uid)}  ${rf('Contact', c.grandmother_contact)}
+    </div>
+    <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end;flex-wrap:wrap;">
+      ${canWrite() ? `<button class="btn btn-outline" onclick="closeForcedModal();editSuperhumane('${uid}')">✏️ Edit</button>` : ''}
+      <button class="btn btn-outline" onclick="closeForcedModal()">Close</button>
+    </div>
+  `, true);
+}
+
+/* ── Superhumane: Edit modal ─────────────── */
+function editSuperhumane(uid) {
+  const c = superhumaneAllData.find(x => x.uid === uid);
+  if (!c) return;
+  const dv = (k, fallback='') => (c[k] != null && c[k] !== '') ? c[k] : fallback;
+  const dateVal = k => c[k] ? c[k].slice(0, 10) : '';
+  const fi = (id, label, val, type='text') =>
+    `<div class="form-field"><label>${label}</label><input id="${id}" type="${type}" value="${String(val||'').replace(/"/g,'&quot;')}" /></div>`;
+  const sel = (id, label, val, opts) =>
+    `<div class="form-field"><label>${label}</label><select id="${id}">${opts.map(o => `<option value="${o}"${o===val?' selected':''}>${o||'—'}</option>`).join('')}</select></div>`;
+
+  openModal(`
+    <div class="modal-header">
+      <h3>✏️ Edit Superhumane — ${String(c.name||'').replace(/</g,'&lt;')}</h3>
+      <button class="modal-close" onclick="closeForcedModal()">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);">
+      ${fi('she_name',        'Name *',         dv('name'))}
+      ${fi('she_uid',         'UID *',           dv('uid'))}
+      ${fi('she_bsl',         'BSL',             dv('bsl'))}
+      ${fi('she_member_type', 'Member Type',     dv('member_type'))}
+      ${sel('she_gender',     'Gender',          dv('gender'), ['','M','F'])}
+      ${fi('she_phase',       'Phase',           dv('phase'))}
+      ${fi('she_branch',      'Branch',          dv('branch'))}
+      ${fi('she_dob',         'Date of Birth',   dateVal('date_of_birth'), 'date')}
+      ${fi('she_form_check',  'Form Check',      dv('form_check'))}
+      ${fi('she_uid_check',   'UID Check',       dv('uid_check'))}
+      ${fi('she_date_entry',  'Scheme Entry',    dateVal('date_entry_scheme'), 'date')}
+      ${fi('she_date_exit',   'Scheme Exit',     dateVal('date_exit_scheme'), 'date')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);margin-top:var(--sp-md);">
+      ${fi('she_address',     'Address',         dv('address'))}
+      ${fi('she_comments',    'Comments',        dv('comments'))}
+    </div>
+    <div style="font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-muted);margin:var(--sp-md) 0 var(--sp-sm);">Father</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);">
+      ${fi('she_father_name',    'Father Name',    dv('father_name'))}
+      ${fi('she_father_uid',     'Father UID',     dv('father_uid'))}
+      ${fi('she_father_contact', 'Father Contact', dv('father_contact'))}
+      ${fi('she_father_doi',     'Father DOI',     dateVal('father_doi'), 'date')}
+    </div>
+    <div style="font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-muted);margin:var(--sp-md) 0 var(--sp-sm);">Mother</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);">
+      ${fi('she_mother_name',    'Mother Name',    dv('mother_name'))}
+      ${fi('she_mother_uid',     'Mother UID',     dv('mother_uid'))}
+      ${fi('she_mother_contact', 'Mother Contact', dv('mother_contact'))}
+      ${fi('she_mother_doi',     'Mother DOI',     dateVal('mother_doi'), 'date')}
+    </div>
+    <div style="font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-muted);margin:var(--sp-md) 0 var(--sp-sm);">Grandparents</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);">
+      ${fi('she_gf_name',    'Grandfather Name',    dv('grandfather_name'))}
+      ${fi('she_gf_uid',     'Grandfather UID',     dv('grandfather_uid'))}
+      ${fi('she_gf_contact', 'Grandfather Contact', dv('grandfather_contact'))}
+      ${fi('she_gm_name',    'Grandmother Name',    dv('grandmother_name'))}
+      ${fi('she_gm_uid',     'Grandmother UID',     dv('grandmother_uid'))}
+      ${fi('she_gm_contact', 'Grandmother Contact', dv('grandmother_contact'))}
+    </div>
+    <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeForcedModal()">Cancel</button>
+      <button id="shEditSaveBtn" class="btn btn-primary" onclick="saveSuperhumaneEdit('${uid}')">Save Changes</button>
+    </div>
+  `, true);
+}
+
+async function saveSuperhumaneEdit(uid) {
+  const g = id => document.getElementById(id)?.value.trim() ?? '';
+  const name = g('she_name');
+  if (!name) { showToast('Name is required!', 'error'); return; }
+  const btn = document.getElementById('shEditSaveBtn');
+  setButtonLoading(btn, true, 'Saving…');
+  try {
+    await apiPut('/api/superhumane/' + uid, {
+      name,
+      member_type:         g('she_member_type'),
+      gender:              g('she_gender'),
+      bsl:                 g('she_bsl'),
+      phase:               g('she_phase'),
+      branch:              g('she_branch'),
+      date_of_birth:       g('she_dob')         || null,
+      form_check:          g('she_form_check'),
+      uid_check:           g('she_uid_check'),
+      address:             g('she_address'),
+      comments:            g('she_comments'),
+      father_name:         g('she_father_name'),
+      father_uid:          g('she_father_uid'),
+      father_contact:      g('she_father_contact'),
+      father_doi:          g('she_father_doi')   || null,
+      mother_name:         g('she_mother_name'),
+      mother_uid:          g('she_mother_uid'),
+      mother_contact:      g('she_mother_contact'),
+      mother_doi:          g('she_mother_doi')   || null,
+      grandfather_name:    g('she_gf_name'),
+      grandfather_uid:     g('she_gf_uid'),
+      grandfather_contact: g('she_gf_contact'),
+      grandmother_name:    g('she_gm_name'),
+      grandmother_uid:     g('she_gm_uid'),
+      grandmother_contact: g('she_gm_contact'),
+      date_entry_scheme:   g('she_date_entry')   || null,
+      date_exit_scheme:    g('she_date_exit')    || null,
+    });
+    await reloadSuperhumane();
+    closeForcedModal();
+    showToast('Superhumane record updated!', 'success');
+  } catch(e) {
+    setButtonLoading(btn, false);
+    showToast('Failed: ' + e.message, 'error');
+  }
+}
+
+/* ── Superhumane: Toggle Deactivate status ─ */
+function toggleSuperhumaneStatus(uid) {
+  const c = superhumaneAllData.find(x => x.uid === uid);
+  if (!c) return;
+  const isExit = !c.date_exit_scheme; // true = about to exit, false = about to reactivate
+  openModal(`
+    <div class="modal-header">
+      <h3>${isExit ? '⬜ Deactivate' : '✅ Reactivate'}</h3>
+      <button class="modal-close" onclick="closeForcedModal()">✕</button>
+    </div>
+    <p>${isExit ? 'Mark <strong>' + String(c.name||'').replace(/</g,'&lt;') + '</strong> as exited from the Sant-Su scheme?' : 'Reactivate <strong>' + String(c.name||'').replace(/</g,'&lt;') + '</strong> in the Sant-Su scheme?'}</p>
+    <p style="font-size:0.85rem;color:var(--txt-muted);">${isExit ? 'Today\'s date will be recorded as the exit date.' : 'The exit date will be cleared.'}</p>
+    <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeForcedModal()">Cancel</button>
+      <button id="shToggleBtn" class="btn ${isExit ? 'btn-danger' : 'btn-saffron'}"
+              onclick="confirmToggleSuperhumane('${uid}', ${isExit})">${isExit ? 'Deactivate' : 'Reactivate'}</button>
+    </div>
+  `);
+}
+
+async function confirmToggleSuperhumane(uid, doExit) {
+  const btn = document.getElementById('shToggleBtn');
+  setButtonLoading(btn, true, doExit ? 'Exiting…' : 'Reactivating…');
+  try {
+    await apiPut('/api/superhumane/' + uid, { exit: doExit });
+    await reloadSuperhumane();
+    closeForcedModal();
+    showToast(doExit ? 'Marked as exited from scheme.' : 'Reactivated!', doExit ? '' : 'success');
+  } catch(e) {
+    setButtonLoading(btn, false);
+    showToast('Failed: ' + e.message, 'error');
+  }
+}
+
+/* ── Superhumane: Add new record modal ───── */
+function openAddSuperhumaneModal() {
+  openModal(`
+    <div class="modal-header">
+      <h3>➕ Add Superhumane Record</h3>
+      <button class="modal-close" onclick="closeForcedModal()">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);">
+      <div class="form-field"><label>UID *</label><input id="sha_uid" placeholder="Child's UID" /></div>
+      <div class="form-field"><label>Name *</label><input id="sha_name" placeholder="Full Name" /></div>
+      <div class="form-field"><label>Member Type</label><input id="sha_member_type" placeholder="e.g. Superhumane" /></div>
+      <div class="form-field"><label>Gender</label>
+        <select id="sha_gender"><option value="">—</option><option value="M">Male</option><option value="F">Female</option></select>
+      </div>
+      <div class="form-field"><label>BSL</label><input id="sha_bsl" type="number" /></div>
+      <div class="form-field"><label>Phase</label><input id="sha_phase" /></div>
+      <div class="form-field"><label>Branch</label><input id="sha_branch" /></div>
+      <div class="form-field"><label>Date of Birth</label><input id="sha_dob" type="date" /></div>
+      <div class="form-field"><label>Scheme Entry Date</label><input id="sha_entry" type="date" /></div>
+      <div class="form-field"><label>Father UID</label><input id="sha_father_uid" placeholder="Father's member UID" /></div>
+      <div class="form-field"><label>Father Name</label><input id="sha_father_name" /></div>
+      <div class="form-field"><label>Father Contact</label><input id="sha_father_contact" /></div>
+      <div class="form-field"><label>Mother UID</label><input id="sha_mother_uid" placeholder="Mother's member UID" /></div>
+      <div class="form-field"><label>Mother Name</label><input id="sha_mother_name" /></div>
+      <div class="form-field"><label>Mother Contact</label><input id="sha_mother_contact" /></div>
+      <div class="form-field" style="grid-column:1/-1"><label>Address</label><input id="sha_address" /></div>
+      <div class="form-field" style="grid-column:1/-1"><label>Comments</label><input id="sha_comments" /></div>
+    </div>
+    <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeForcedModal()">Cancel</button>
+      <button id="shAddSaveBtn" class="btn btn-saffron" onclick="saveNewSuperhumane()">Add Record</button>
+    </div>
+  `, true);
+}
+
+async function saveNewSuperhumane() {
+  const g = id => document.getElementById(id)?.value.trim() ?? '';
+  const uid  = g('sha_uid');
+  const name = g('sha_name');
+  if (!uid)  { showToast('UID is required!',  'error'); return; }
+  if (!name) { showToast('Name is required!', 'error'); return; }
+  const btn = document.getElementById('shAddSaveBtn');
+  setButtonLoading(btn, true, 'Adding…');
+  try {
+    await apiPost('/api/superhumane', {
+      uid, name,
+      member_type:    g('sha_member_type'),
+      gender:         g('sha_gender'),
+      bsl:            g('sha_bsl') || null,
+      phase:          g('sha_phase'),
+      branch:         g('sha_branch'),
+      date_of_birth:  g('sha_dob')          || null,
+      date_entry_scheme: g('sha_entry')     || null,
+      father_name:    g('sha_father_name'),
+      father_uid:     g('sha_father_uid'),
+      father_contact: g('sha_father_contact'),
+      mother_name:    g('sha_mother_name'),
+      mother_uid:     g('sha_mother_uid'),
+      mother_contact: g('sha_mother_contact'),
+      address:        g('sha_address'),
+      comments:       g('sha_comments'),
+    });
+    await reloadSuperhumane();
+    closeForcedModal();
+    showToast('Superhumane record added!', 'success');
+  } catch(e) {
+    setButtonLoading(btn, false);
+    showToast('Failed: ' + e.message, 'error');
+  }
+}
+
 function filterMembers() {
-  const name     = (document.getElementById('filterName')?.value     || '').toLowerCase();
-  const mobile   = (document.getElementById('filterMobile')?.value   || '');
-  const zone     = (document.getElementById('filterZone')?.value     || '');
-  const approval = (document.getElementById('filterApproval')?.value || '');
-  const type     = (document.getElementById('filterType')?.value     || '');
+  const name   = (document.getElementById('filterName')?.value   || '').toLowerCase();
+  const mobile = (document.getElementById('filterMobile')?.value || '');
+  const type   = (document.getElementById('filterType')?.value   || '');
 
   membersData = MEMBERS.filter(m => {
-    if (name   && !(m.name   || '').toLowerCase().includes(name))   return false;
-    if (mobile && !(m.mobile || '').includes(mobile))                return false;
-    if (zone   && m.zone !== zone)                                   return false;
-    if (approval && m.approvalStatus !== approval)                   return false;
-    if (type   && m.type !== type)                                   return false;
+    if (name   && !(m.name   || '').toLowerCase().includes(name)) return false;
+    if (mobile && !(m.mobile || '').includes(mobile))             return false;
+    if (type   && m.type !== type)                                return false;
     return true;
   }).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
   membersData.forEach((m, i) => { m.sl = i + 1; });
@@ -193,7 +839,7 @@ function filterMembers() {
 }
 
 function clearMemberFilters() {
-  ['filterName','filterMobile','filterZone','filterApproval','filterType'].forEach(id => {
+  ['filterName', 'filterMobile', 'filterType'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -235,9 +881,9 @@ function memberRow(m) {
       : m.status
         ? `<span class="badge badge-gray">${m.status}</span>`
         : '';
-  const deactivateBtn = isExpired
-    ? `<button class="tbl-btn tbl-btn-view" onclick="toggleMemberActive('${m.uid}')">Reactivate</button>`
-    : `<button class="tbl-btn tbl-btn-delete" onclick="toggleMemberActive('${m.uid}')">Deactivate</button>`;
+  const deactivateItem = isExpired
+    ? `<button class="act-item act-warn" onclick="toggleMemberActive('${m.uid}');closeActMenus()">\u2191 Reactivate</button>`
+    : `<button class="act-item act-delete" onclick="toggleMemberActive('${m.uid}');closeActMenus()">\u2298 Deactivate</button>`;
   const v = (val) => val || '';
 
   const d = (val) => `<td style="font-size:0.82rem;white-space:nowrap">${formatDate(val)}</td>`;
@@ -246,10 +892,13 @@ function memberRow(m) {
   return `
     <tr${rowStyle}>
       <td style="position:sticky;left:0;z-index:1;background:var(--bg-card);white-space:nowrap">
-        <div class="td-actions">
-          <button class="tbl-btn tbl-btn-view" onclick="viewMember('${m.uid}')">View</button>
-          ${canWrite() ? `<button class="tbl-btn tbl-btn-edit" onclick="editMember('${m.uid}')">Edit</button>` : ''}
-          ${canWrite() ? deactivateBtn : ''}
+        <div class="act-menu" onclick="event.stopPropagation()">
+          <button class="act-trigger" onclick="toggleActMenu(this)" title="Actions">⋮</button>
+          <div class="act-dropdown">
+            <button class="act-item act-view" onclick="viewMember('${m.uid}');closeActMenus()">\ud83d\udc41 View</button>
+            ${canWrite() ? `<button class="act-item act-edit" onclick="editMember('${m.uid}');closeActMenus()">\u270f Edit</button>` : ''}
+            ${canWrite() ? deactivateItem : ''}
+          </div>
         </div>
       </td>
       <td>${v(m.sl)}</td>
@@ -404,6 +1053,254 @@ function gotoMembersPage(page) {
 }
 
 // ── CRUD Modals ────────────────────────────
+// ── Inline self-profile (card page, no modal) ────────────────
+function renderSelfProfileInline(m) {
+  const container = document.getElementById('membersContent');
+  container.innerHTML = buildSelfProfileHTML(m);
+}
+
+function buildSelfProfileHTML(m) {
+  const pf = (label, val) => val
+    ? `<div>
+        <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-muted);margin-bottom:3px">${label}</div>
+        <div style="font-size:0.88rem;color:var(--txt-primary)">${val}</div>
+       </div>`
+    : '';
+  const sec = title =>
+    `<div style="grid-column:1/-1;font-weight:700;font-size:0.78rem;text-transform:uppercase;
+       letter-spacing:.06em;color:var(--clr-saffron,#e07b29);margin-top:18px;padding-top:12px;
+       border-top:1px solid var(--border);">${title}</div>`;
+  const grid = (...fields) =>
+    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 20px;margin-top:8px;">
+       ${fields.join('')}
+     </div>`;
+  const badge = label =>
+    `<span style="display:inline-block;background:var(--clr-saffron,#e07b29);color:#fff;
+       padding:3px 10px;border-radius:12px;font-size:0.75rem;margin:3px 4px 3px 0;">${label}</span>`;
+
+  const flags = [
+    m.mahila    === 'Y' && badge('Mahila Association'),
+    m.youth     === 'Y' && badge('Youth Member'),
+    m.assocYouth=== 'Y' && badge('Associate Youth'),
+    m.jrPreInit === 'Y' && badge('Jr. Pre-Initiate'),
+    m.srPreInit === 'Y' && badge('Sr. Pre-Initiate'),
+    m.crc       === 'Y' && badge('CRC'),
+    m.cca       === 'Y' && badge('CCA'),
+    m.santSu    === 'Y' && badge('Sant-Su'),
+  ].filter(Boolean).join('') || '<span style="color:var(--txt-muted);font-size:0.85rem;">—</span>';
+
+  return `
+    <div class="card" style="padding:var(--sp-lg);max-width:900px;margin:0 auto;">
+
+      <!-- Header row -->
+        <div class="profile-header-row" style="display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+        <div style="width:60px;height:60px;border-radius:50%;background:var(--clr-saffron,#e07b29);
+          color:#fff;display:flex;align-items:center;justify-content:center;
+          font-size:1.6rem;font-weight:700;flex-shrink:0;">
+          ${(m.name||'?').charAt(0).toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:1.15rem;font-weight:700;color:var(--txt-primary);">${m.name}</div>
+          <div style="font-size:0.82rem;color:var(--txt-muted);margin-top:2px;">
+            UID: <code style="font-size:0.8rem;">${m.uid||'—'}</code>
+            ${[m.category, m.gender, m.status].filter(Boolean).map(v=>`&nbsp;·&nbsp; ${v}`).join('')}
+          </div>
+        </div>
+        <button class="btn btn-saffron" onclick="editSelfProfileInline('${m.uid}')">✏️ Edit Profile</button>
+      </div>
+
+      <!-- Identity -->
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);">Identity</div>
+      ${grid(
+        pf('SL', m.sl), pf('UID', m.uid), pf('BSL No.', m.bslno),
+        pf('Category', m.category), pf('Gender', m.gender), pf('Marital Status', m.maritalStatus),
+        pf('Previous Branch', m.previousBranch), pf('SN/EXT', m.snExt), pf('Ashram', m.ashram),
+        pf('Branch I.D. Card', m.branchIdCard), pf('Record Status', m.status)
+      )}
+
+      <!-- Initiation Dates -->
+      ${sec('Initiation Dates')}
+      ${grid(
+        pf('Date of Initiation', formatDate(m.dateOfInitiation)),
+        pf('Date of Birth', formatDate(m.dateOfBirth)),
+        pf('Reg. Date (Jigyasu)', formatDate(m.dateOfRegistration)),
+        pf('1st Initiation', formatDate(m.dateOfFirstInitiation)),
+        pf('2nd Initiation', formatDate(m.dateOfSecondInitiation)),
+        pf('DOR (Youth)', formatDate(m.dorYouth)),
+        pf('DOI (New Initiate)', formatDate(m.dateOfInitiationNew))
+      )}
+
+      <!-- Personal -->
+      ${sec('Personal')}
+      ${grid(
+        pf('Blood Group', m.bloodGroup), pf('Caste', m.caste), pf('Nationality', m.nationality),
+        pf('Nee First Name', m.neeFirst), pf('Nee Middle Name', m.neeMiddle), pf('Nee Last Name', m.neeLast)
+      )}
+
+      <!-- Contact -->
+      ${sec('Contact')}
+      ${grid(
+        pf('Mobile 1', m.mobile), pf('Mobile 2', m.mobile2), pf('Landline', m.landline),
+        pf('Office Phone', m.officePhone), pf('Email 1', m.email), pf('Email 2', m.email2)
+      )}
+
+      <!-- Address -->
+      ${sec('Address')}
+      ${grid(
+        pf('Line 1', m.addressLine1), pf('Line 2', m.addressLine2), pf('Line 3', m.addressLine3),
+        pf('City', m.city), pf('Pincode', m.pincode), pf('State', m.state), pf('Country', m.country)
+      )}
+
+      <!-- Professional -->
+      ${sec('Professional')}
+      ${grid(
+        pf('Qualification', m.qualification), pf('Occupation', m.occupation), pf('Designation', m.designation),
+        pf('Organization', m.organization), pf('Profession', m.profession),
+        pf('Profession Code', m.professionCode), pf('Comm. Grid Code', m.commGridCode)
+      )}
+
+      <!-- Membership Flags -->
+      ${sec('Membership Flags')}
+      <div style="margin-top:8px;">${flags}</div>
+
+      <!-- Father -->
+      ${sec('Father')}
+      ${grid(
+        pf('Name', m.fatherName), pf('UID', m.fatherUid), pf('BSL No.', m.fatherBslno),
+        pf('Branch', m.fatherBranch), pf('DOI', formatDate(m.fatherDoi)), pf('Phone', m.fatherPhone),
+        pf('City', m.fatherCity), pf('State', m.fatherState)
+      )}
+
+      <!-- Mother -->
+      ${sec('Mother')}
+      ${grid(
+        pf('Name', m.motherName), pf('UID', m.motherUid), pf('BSL No.', m.motherBslno),
+        pf('Branch', m.motherBranch), pf('DOI', formatDate(m.motherDoi)), pf('Phone', m.motherPhone),
+        pf('City', m.motherCity), pf('State', m.motherState)
+      )}
+
+      <!-- Spouse -->
+      ${sec('Spouse')}
+      ${grid(
+        pf('Name', m.spouseName), pf('UID', m.spouseUid), pf('BSL No.', m.spouseBslno),
+        pf('Branch', m.spouseBranch), pf('DOI', formatDate(m.spouseDoi)), pf('Phone', m.spousePhone),
+        pf('City', m.spouseCity), pf('State', m.spouseState)
+      )}
+
+      <!-- Reference 1 -->
+      ${sec('Reference 1')}
+      ${grid(
+        pf('Name', m.ref1Name), pf('Relation', m.ref1Relation), pf('Branch', m.ref1Branch),
+        pf('Email', m.ref1Email), pf('Phone', m.ref1Phone), pf('Address', m.ref1Address)
+      )}
+
+      <!-- Reference 2 -->
+      ${sec('Reference 2')}
+      ${grid(
+        pf('Name', m.ref2Name), pf('Relation', m.ref2Relation), pf('Branch', m.ref2Branch),
+        pf('Email', m.ref2Email), pf('Phone', m.ref2Phone), pf('Address', m.ref2Address)
+      )}
+
+      <!-- Transfer / History -->
+      ${sec('Transfer / History')}
+      ${grid(
+        pf('Transfer In', formatDate(m.dateTransferIn)), pf('From Branch', m.transferFromBranch),
+        pf('Transfer Out', formatDate(m.dateTransferOut)), pf('To Branch', m.transferToBranch),
+        pf('Date of Expire', formatDate(m.dateOfExpire))
+      )}
+
+    </div>`;
+}
+
+function editSelfProfileInline(uid) {
+  const m = MEMBERS.find(x => x.uid === uid);
+  if (!m) return;
+  const container = document.getElementById('membersContent');
+  const ea = v => String(v ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const fld = (id, label, val, type='text') =>
+    `<div class="form-field">
+       <label style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-muted);">${label}</label>
+       <input id="${id}" type="${type}" value="${ea(val)}" style="width:100%;" />
+     </div>`;
+  const sec = title =>
+    `<div style="grid-column:1/-1;font-weight:700;font-size:0.78rem;text-transform:uppercase;
+       letter-spacing:.06em;color:var(--clr-saffron,#e07b29);margin-top:18px;padding-top:12px;
+       border-top:1px solid var(--border);">${title}</div>`;
+
+  container.innerHTML = `
+    <div class="card" style="padding:var(--sp-lg);max-width:900px;margin:0 auto;">
+      <div class="edit-header-row" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+        <div style="flex:1;">
+          <div style="font-size:1.1rem;font-weight:700;color:var(--txt-primary);">✏️ Edit Profile — ${ea(m.name)}</div>
+          <div style="font-size:0.8rem;color:var(--txt-muted);margin-top:2px;">You can update your contact, address and professional details.</div>
+        </div>
+        <button class="btn btn-outline" onclick="renderSelfProfileInline(MEMBERS.find(x=>x.uid==='${ea(uid)}'))">← Cancel</button>
+        <button class="btn btn-saffron" onclick="saveSelfMemberInline('${ea(uid)}')">Save Changes</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 20px;">
+        ${sec('Contact')}
+        ${fld('sm_mobile',      'Mobile 1',     m.mobile)}
+        ${fld('sm_mobile2',     'Mobile 2',     m.mobile2)}
+        ${fld('sm_landline',    'Landline',     m.landline)}
+        ${fld('sm_officePhone', 'Office Phone', m.officePhone)}
+        ${fld('sm_email',       'Email 1',      m.email,  'email')}
+        ${fld('sm_email2',      'Email 2',      m.email2, 'email')}
+
+        ${sec('Address')}
+        ${fld('sm_addr1',   'Address Line 1', m.addressLine1)}
+        ${fld('sm_addr2',   'Address Line 2', m.addressLine2)}
+        ${fld('sm_addr3',   'Address Line 3', m.addressLine3)}
+        ${fld('sm_city',    'City',           m.city)}
+        ${fld('sm_pincode', 'Pincode',        m.pincode)}
+        ${fld('sm_state',   'State',          m.state)}
+        ${fld('sm_country', 'Country',        m.country)}
+
+        ${sec('Professional')}
+        ${fld('sm_qual',   'Qualification', m.qualification)}
+        ${fld('sm_occ',    'Occupation',    m.occupation)}
+        ${fld('sm_desig',  'Designation',   m.designation)}
+        ${fld('sm_org',    'Organization',  m.organization)}
+        ${fld('sm_prof',   'Profession',    m.profession)}
+      </div>
+
+      <div style="display:flex;gap:var(--sp-sm);justify-content:flex-end;margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
+        <button class="btn btn-outline" onclick="renderSelfProfileInline(MEMBERS.find(x=>x.uid==='${ea(uid)}'))">← Cancel</button>
+        <button class="btn btn-saffron" onclick="saveSelfMemberInline('${ea(uid)}')">Save Changes</button>
+      </div>
+    </div>`;
+}
+
+async function saveSelfMemberInline(uid) {
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  try {
+    await apiPut('/api/members/' + uid + '/self', {
+      mobile:        g('sm_mobile'),
+      mobile2:       g('sm_mobile2'),
+      landline:      g('sm_landline'),
+      officePhone:   g('sm_officePhone'),
+      email:         g('sm_email'),
+      email2:        g('sm_email2'),
+      addressLine1:  g('sm_addr1'),
+      addressLine2:  g('sm_addr2'),
+      addressLine3:  g('sm_addr3'),
+      city:          g('sm_city'),
+      pincode:       g('sm_pincode'),
+      state:         g('sm_state'),
+      country:       g('sm_country'),
+      qualification: g('sm_qual'),
+      occupation:    g('sm_occ'),
+      designation:   g('sm_desig'),
+      organization:  g('sm_org'),
+      profession:    g('sm_prof'),
+    });
+    await reloadMembers();
+    showToast('Profile updated successfully!', 'success');
+    const m = MEMBERS.find(x => x.uid === uid);
+    if (m) renderSelfProfileInline(m);
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
+}
+
 function viewMember(uid) {
   const m = MEMBERS.find(x => x.uid === uid);
   if (!m) return;
@@ -418,14 +1315,29 @@ function viewMember(uid) {
       <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:12px 0 6px">Identity</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
         ${mf('SL', m.sl)} ${mf('UID', m.uid)} ${mf('BSL No.', m.bslno)}
-        ${mf('Name', m.name)} ${mf('Date of Initiation', formatDate(m.dateOfInitiation))} ${mf('Date of Birth', formatDate(m.dateOfBirth))}
+        ${mf('Name', m.name)} ${mf('Category', m.category)} ${mf('Gender', m.gender)}
+        ${mf('Marital Status', m.maritalStatus)} ${mf('Previous Branch', m.previousBranch)} ${mf('Record Status', m.status)}
+        ${mf('SN/EXT', m.snExt)} ${mf('Ashram', m.ashram)} ${mf('Branch I.D. Card', m.branchIdCard)}
+      </div>
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Initiation Dates</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
+        ${mf('Date of Initiation', formatDate(m.dateOfInitiation))}
+        ${mf('Date of Birth', formatDate(m.dateOfBirth))}
+        ${mf('Date of Reg. (Jigyasu)', formatDate(m.dateOfRegistration))}
+        ${mf('Date of 1st Initiation', formatDate(m.dateOfFirstInitiation))}
+        ${mf('Date of 2nd Initiation', formatDate(m.dateOfSecondInitiation))}
+        ${mf('DOR (Youth)', formatDate(m.dorYouth))}
+        ${mf('DOI (New Initiate)', formatDate(m.dateOfInitiationNew))}
+      </div>
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Personal</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
         ${mf('Blood Group', m.bloodGroup)} ${mf('Caste', m.caste)} ${mf('Nationality', m.nationality)}
-        ${mf('Ashram', m.ashram)} ${mf('SN/EXT', m.snExt)} ${mf('Record Status', m.status)}
+        ${mf('Nee First Name', m.neeFirst)} ${mf('Nee Middle Name', m.neeMiddle)} ${mf('Nee Last Name', m.neeLast)}
       </div>
       <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Contact</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${mf('Mobile-1', m.mobile)} ${mf('Mobile-2', m.mobile2)} ${mf('Email-1', m.email)}
-        ${mf('Email-2', m.email2)} ${mf('Landline', m.landline)} ${mf('Office Phone', m.officePhone)}
+        ${mf('Mobile-1', m.mobile)} ${mf('Mobile-2', m.mobile2)} ${mf('Landline', m.landline)}
+        ${mf('Office Phone', m.officePhone)} ${mf('Email-1', m.email)} ${mf('Email-2', m.email2)}
       </div>
       <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Address</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
@@ -450,106 +1362,45 @@ function viewMember(uid) {
         ${m.cca === 'Y' ? '<span class="badge badge-info">CCA</span>' : ''}
         ${m.santSu === 'Y' ? '<span class="badge badge-info">Sant-Su</span>' : ''}
       </div>
-      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Family</div>
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Father</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${mf('Father Name', m.fatherName)} ${mf('Father UID', m.fatherUid)}
-        ${mf('Mother Name', m.motherName)} ${mf('Mother UID', m.motherUid)}
-        ${mf('Spouse Name', m.spouseName)} ${mf('Spouse UID', m.spouseUid)}
+        ${mf('Name', m.fatherName)} ${mf('UID', m.fatherUid)} ${mf('BSL No.', m.fatherBslno)}
+        ${mf('Branch', m.fatherBranch)} ${mf('DOI', formatDate(m.fatherDoi))} ${mf('Phone', m.fatherPhone)}
+        ${mf('City', m.fatherCity)} ${mf('State', m.fatherState)}
+      </div>
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Mother</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
+        ${mf('Name', m.motherName)} ${mf('UID', m.motherUid)} ${mf('BSL No.', m.motherBslno)}
+        ${mf('Branch', m.motherBranch)} ${mf('DOI', formatDate(m.motherDoi))} ${mf('Phone', m.motherPhone)}
+        ${mf('City', m.motherCity)} ${mf('State', m.motherState)}
+      </div>
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Spouse</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
+        ${mf('Name', m.spouseName)} ${mf('UID', m.spouseUid)} ${mf('BSL No.', m.spouseBslno)}
+        ${mf('Branch', m.spouseBranch)} ${mf('DOI', formatDate(m.spouseDoi))} ${mf('Phone', m.spousePhone)}
+        ${mf('City', m.spouseCity)} ${mf('State', m.spouseState)}
+      </div>
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Reference 1</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
+        ${mf('Name', m.ref1Name)} ${mf('Relation', m.ref1Relation)} ${mf('Branch', m.ref1Branch)}
+        ${mf('Email', m.ref1Email)} ${mf('Phone', m.ref1Phone)} ${mf('Address', m.ref1Address)}
+      </div>
+      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Reference 2</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
+        ${mf('Name', m.ref2Name)} ${mf('Relation', m.ref2Relation)} ${mf('Branch', m.ref2Branch)}
+        ${mf('Email', m.ref2Email)} ${mf('Phone', m.ref2Phone)} ${mf('Address', m.ref2Address)}
       </div>
       <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Transfer / History</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-sm);">
         ${mf('Transfer In', formatDate(m.dateTransferIn))} ${mf('From Branch', m.transferFromBranch)}
         ${mf('Transfer Out', formatDate(m.dateTransferOut))} ${mf('To Branch', m.transferToBranch)}
-        ${mf('Date of Expire', formatDate(m.dateOfExpire))} ${mf('DOR Youth', formatDate(m.dorYouth))}
-        ${mf('DOI (New Initiate)', formatDate(m.dateOfInitiationNew))}
+        ${mf('Date of Expire', formatDate(m.dateOfExpire))}
       </div>
     </div>
     <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end">
-      ${!isAdmin() ? `<button class="btn btn-outline" onclick="editSelfMember('${m.uid}')">✏️ Edit My Profile</button>` : ''}
       <button class="btn btn-primary" onclick="closeForcedModal()">Close</button>
     </div>
   `);
-}
-
-// ── Member self-edit (contact + address + professional only) ──
-function editSelfMember(uid) {
-  const m = MEMBERS.find(x => x.uid === uid);
-  if (!m) return;
-  const ea = v => String(v ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-  const fld = (id, label, val, type='text') =>
-    `<div class="form-field"><label>${label}</label><input id="${id}" type="${type}" value="${ea(val)}" /></div>`;
-
-  openModal(`
-    <div class="modal-header">
-      <h3>✏️ Edit My Profile — ${ea(m.name)}</h3>
-      <button class="modal-close" onclick="closeForcedModal()">✕</button>
-    </div>
-    <div style="overflow-y:auto;max-height:60vh;padding-right:4px;">
-      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:8px 0 6px">Contact</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${fld('sm_mobile',      'Mobile 1',     m.mobile)}
-        ${fld('sm_mobile2',     'Mobile 2',     m.mobile2)}
-        ${fld('sm_landline',    'Landline',     m.landline)}
-        ${fld('sm_officePhone', 'Office Phone', m.officePhone)}
-        ${fld('sm_email',       'Email 1',      m.email,  'email')}
-        ${fld('sm_email2',      'Email 2',      m.email2, 'email')}
-      </div>
-      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Address</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${fld('sm_addr1',   'Address Line 1', m.addressLine1)}
-        ${fld('sm_addr2',   'Address Line 2', m.addressLine2)}
-        ${fld('sm_addr3',   'Address Line 3', m.addressLine3)}
-        ${fld('sm_city',    'City',           m.city)}
-        ${fld('sm_pincode', 'Pincode',        m.pincode)}
-        ${fld('sm_state',   'State',          m.state)}
-        ${fld('sm_country', 'Country',        m.country)}
-      </div>
-      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Professional</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${fld('sm_qual',   'Qualification', m.qualification)}
-        ${fld('sm_occ',    'Occupation',    m.occupation)}
-        ${fld('sm_desig',  'Designation',   m.designation)}
-        ${fld('sm_org',    'Organization',  m.organization)}
-        ${fld('sm_prof',   'Profession',    m.profession)}
-      </div>
-    </div>
-    <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end">
-      <button class="btn btn-outline" onclick="viewMember('${ea(uid)}')">← Back</button>
-      <button class="btn btn-saffron" onclick="saveSelfMember('${ea(uid)}')">Save Changes</button>
-    </div>
-  `);
-}
-
-async function saveSelfMember(uid) {
-  const g = id => (document.getElementById(id)?.value || '').trim();
-  try {
-    await apiPut('/api/members/' + uid + '/self', {
-      mobile:        g('sm_mobile'),
-      mobile2:       g('sm_mobile2'),
-      landline:      g('sm_landline'),
-      officePhone:   g('sm_officePhone'),
-      email:         g('sm_email'),
-      email2:        g('sm_email2'),
-      addressLine1:  g('sm_addr1'),
-      addressLine2:  g('sm_addr2'),
-      addressLine3:  g('sm_addr3'),
-      city:          g('sm_city'),
-      pincode:       g('sm_pincode'),
-      state:         g('sm_state'),
-      country:       g('sm_country'),
-      qualification: g('sm_qual'),
-      occupation:    g('sm_occ'),
-      designation:   g('sm_desig'),
-      organization:  g('sm_org'),
-      profession:    g('sm_prof'),
-    });
-    await reloadMembers();
-    closeForcedModal();
-    showToast('Profile updated successfully!', 'success');
-    // Re-open view modal with fresh data
-    const m = MEMBERS.find(x => x.uid === uid);
-    if (m) viewMember(m.uid);
-  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
 function switchEditTab(name, btn) {
@@ -747,7 +1598,7 @@ function editMember(uid) {
 
     <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end">
       <button class="btn btn-outline" onclick="closeForcedModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveMemberEdit('${ea(uid)}')">Save All Changes</button>
+      <button id="editMemberSaveBtn" class="btn btn-primary" onclick="saveMemberEdit('${ea(uid)}')">Save All Changes</button>
     </div>
   `, true);
 }
@@ -757,6 +1608,8 @@ async function saveMemberEdit(uid) {
   if (!name) { showToast('Name is required!', 'error'); return; }
   const g = id => document.getElementById(id)?.value ?? '';
 
+  const btn = document.getElementById('editMemberSaveBtn');
+  setButtonLoading(btn, true, 'Saving…');
   try {
     await apiPut('/api/members/' + uid, {
       name,
@@ -862,7 +1715,10 @@ async function saveMemberEdit(uid) {
     filterMembers();
     renderCache.delete('members');
     showToast('Member updated successfully!', 'success');
-  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
+  } catch(e) {
+    setButtonLoading(btn, false);
+    showToast('Failed: ' + e.message, 'error');
+  }
 }
 
 async function toggleMemberActive(uid) {
@@ -879,7 +1735,7 @@ async function toggleMemberActive(uid) {
     <span style="color:var(--txt-muted);font-size:0.85rem;">The record will be kept in the database — only marked ${newStatus.toLowerCase()}.</span></p>
     <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end">
       <button class="btn btn-outline" onclick="closeForcedModal()">Cancel</button>
-      <button class="btn ${newStatus === 'Deactivated' ? 'btn-danger' : 'btn-saffron'}" onclick="confirmToggleMember('${uid}', '${newStatus}')">${action}</button>
+      <button id="confirmToggleBtn" class="btn ${newStatus === 'Deactivated' ? 'btn-danger' : 'btn-saffron'}" onclick="confirmToggleMember('${uid}', '${newStatus}')">${action}</button>
     </div>
   `);
 }
@@ -887,6 +1743,8 @@ async function toggleMemberActive(uid) {
 async function confirmToggleMember(uid, newStatus) {
   const m = MEMBERS.find(x => x.uid === uid);
   if (!m) return;
+  const btn = document.getElementById('confirmToggleBtn');
+  setButtonLoading(btn, true, newStatus === 'Deactivated' ? 'Deactivating…' : 'Reactivating…');
   try {
     await apiPut('/api/members/' + uid, { status: newStatus });
     await reloadMembers();
@@ -895,7 +1753,10 @@ async function confirmToggleMember(uid, newStatus) {
     closeForcedModal();
     filterMembers();
     showToast(newStatus === 'Deactivated' ? 'Member deactivated.' : 'Member reactivated!', newStatus === 'Deactivated' ? '' : 'success');
-  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
+  } catch(e) {
+    setButtonLoading(btn, false);
+    showToast('Failed: ' + e.message, 'error');
+  }
 }
 
 function openAddMemberModal() {
@@ -922,7 +1783,7 @@ function openAddMemberModal() {
     </div>
     <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end">
       <button class="btn btn-outline" onclick="closeForcedModal()">Cancel</button>
-      <button class="btn btn-saffron" onclick="saveNewMember()">Add Member</button>
+      <button id="addMemberSaveBtn" class="btn btn-saffron" onclick="saveNewMember()">Add Member</button>
     </div>
   `);
 }
@@ -935,6 +1796,8 @@ async function saveNewMember() {
   if (!name)   { showToast('Name is required!',   'error'); return; }
   if (!mobile) { showToast('Mobile is required!', 'error'); return; }
 
+  const btn = document.getElementById('addMemberSaveBtn');
+  setButtonLoading(btn, true, 'Adding…');
   try {
     const u = getCurrentUser();
     const res = await fetch('/api/members', {
@@ -953,6 +1816,7 @@ async function saveNewMember() {
     });
     const data = await res.json();
     if (!res.ok || data.ok === false) {
+      setButtonLoading(btn, false);
       showToast(data.error || 'Failed to add member.', 'error');
       return;
     }
@@ -961,7 +1825,10 @@ async function saveNewMember() {
     filterMembers();
     renderCache.delete('dashboard');
     showToast('New member added!', 'success');
-  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
+  } catch(e) {
+    setButtonLoading(btn, false);
+    showToast('Failed: ' + e.message, 'error');
+  }
 }
 
 function exportMembers() {
@@ -1080,6 +1947,157 @@ function exportMembers() {
   a.href = url; a.download = 'members.csv'; a.click();
   URL.revokeObjectURL(url);
   showToast(`Exported ${membersData.length} members as CSV!`, 'success');
+}
+
+// ── Upload Members Excel/CSV ────────────────
+function handleMembersUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const status = document.getElementById('membersUploadStatus');
+  const wrap   = document.getElementById('membersProgressWrap');
+  const bar    = document.getElementById('membersProgressBar');
+  const pct    = document.getElementById('membersProgressPct');
+  const lbl    = document.getElementById('membersProgressLabel');
+
+  // Reset UI
+  if (status) status.textContent = '';
+  if (wrap)   { wrap.style.display = 'block'; }
+  if (bar)    { bar.style.width = '0%'; bar.style.background = 'var(--clr-saffron)'; }
+  if (pct)    pct.textContent = '0%';
+  if (lbl)    lbl.textContent = 'Uploading ' + file.name + '…';
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const xhr = new XMLHttpRequest();
+
+  // Upload progress (browser → server)
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) {
+      const p = Math.round(e.loaded / e.total * 100);
+      if (bar) bar.style.width = p + '%';
+      if (pct) pct.textContent = p + '%';
+      if (lbl) lbl.textContent = p < 100 ? 'Uploading…' : 'Processing on server…';
+    }
+  };
+
+  xhr.onload = async () => {
+    if (bar) { bar.style.width = '100%'; }
+    if (pct) pct.textContent = '100%';
+    try {
+      const data = JSON.parse(xhr.responseText);
+      if (xhr.status < 200 || xhr.status >= 300 || !data.ok) {
+        const err = data.error || 'Upload failed';
+        if (lbl)    lbl.textContent = 'Error';
+        if (bar)    bar.style.background = 'var(--clr-red)';
+        if (status) status.innerHTML = '<span style="color:var(--clr-red)">' + err + '</span>';
+        showToast('Upload failed: ' + err, 'error');
+        return;
+      }
+      if (lbl) lbl.textContent = 'Done!';
+      if (bar) bar.style.background = 'var(--clr-green)';
+      
+      const sheetsInfo = data.sheets_processed ? ` (from: ${data.sheets_processed.join(', ')})` : '';
+      const msg = data.inserted > 0 
+        ? `✅ ${data.inserted} new, ${data.updated} updated${sheetsInfo}`
+        : `✅ ${data.updated} members updated${sheetsInfo}`;
+      showToast(`Processed ${data.count.toLocaleString()} records!`, 'success');
+      if (status) status.innerHTML = `<span style="color:var(--clr-green)">${msg}</span>`;
+
+      // Reload members data
+      await reloadMembers();
+      await reloadDashStats();
+      renderCache.delete('dashboard');
+      filterMembers();
+    } catch (e) {
+      if (status) status.innerHTML = '<span style="color:var(--clr-red)">Invalid server response.</span>';
+    }
+  };
+
+  xhr.onerror = () => {
+    if (bar)    bar.style.background = 'var(--clr-red)';
+    if (status) status.innerHTML = '<span style="color:var(--clr-red)">Network error.</span>';
+    showToast('Upload failed: network error', 'error');
+  };
+
+  xhr.open('POST', '/api/members/upload');
+  const u = getCurrentUser();
+  if (u) xhr.setRequestHeader('X-User', `${u.username}(${u.role})`);
+  xhr.send(formData);
+}
+
+// ── Upload Superhumane Excel/CSV ────────────────
+function handleSuperhumaneUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const status = document.getElementById('shUploadStatus');
+  const wrap   = document.getElementById('shProgressWrap');
+  const bar    = document.getElementById('shProgressBar');
+  const pct    = document.getElementById('shProgressPct');
+  const lbl    = document.getElementById('shProgressLabel');
+
+  // Reset UI
+  if (status) status.textContent = '';
+  if (wrap)   { wrap.style.display = 'block'; }
+  if (bar)    { bar.style.width = '0%'; bar.style.background = 'var(--clr-saffron)'; }
+  if (pct)    pct.textContent = '0%';
+  if (lbl)    lbl.textContent = 'Uploading ' + file.name + '…';
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const xhr = new XMLHttpRequest();
+
+  xhr.upload.onprogress = e => {
+    if (e.lengthComputable) {
+      const p = Math.round(e.loaded / e.total * 100);
+      if (bar) bar.style.width = p + '%';
+      if (pct) pct.textContent = p + '%';
+      if (lbl) lbl.textContent = p < 100 ? 'Uploading…' : 'Processing on server…';
+    }
+  };
+
+  xhr.onload = async () => {
+    if (bar) { bar.style.width = '100%'; }
+    if (pct) pct.textContent = '100%';
+    try {
+      const data = JSON.parse(xhr.responseText);
+      if (xhr.status < 200 || xhr.status >= 300 || !data.ok) {
+        const err = data.error || 'Upload failed';
+        if (lbl)    lbl.textContent = 'Error';
+        if (bar)    bar.style.background = 'var(--clr-red)';
+        if (status) status.innerHTML = '<span style="color:var(--clr-red)">' + err + '</span>';
+        showToast('Upload failed: ' + err, 'error');
+        return;
+      }
+      if (lbl) lbl.textContent = 'Done!';
+      if (bar) bar.style.background = 'var(--clr-green)';
+      
+      const msg = data.inserted > 0 
+        ? `✅ ${data.inserted} new, ${data.updated} updated`
+        : `✅ ${data.updated} children updated`;
+      showToast(`Processed ${data.count.toLocaleString()} Superhumane records!`, 'success');
+      if (status) status.innerHTML = `<span style="color:var(--clr-green)">${msg}</span>`;
+
+      // Reload Superhumane data
+      await reloadSuperhumane();
+    } catch (e) {
+      if (status) status.innerHTML = '<span style="color:var(--clr-red)">Invalid server response.</span>';
+    }
+  };
+
+  xhr.onerror = () => {
+    if (bar)    bar.style.background = 'var(--clr-red)';
+    if (status) status.innerHTML = '<span style="color:var(--clr-red)">Network error.</span>';
+    showToast('Upload failed: network error', 'error');
+  };
+
+  xhr.open('POST', '/api/superhumane/upload');
+  const u = getCurrentUser();
+  if (u) xhr.setRequestHeader('X-User', `${u.username}(${u.role})`);
+  xhr.send(formData);
 }
 
 function modalField(label, value) {
