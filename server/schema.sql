@@ -363,5 +363,50 @@ CREATE TABLE IF NOT EXISTS member_details (
     date_of_expire                  DATE,
     record_status                   VARCHAR(50),
     profession_code                 VARCHAR(50),
-    communication_grid_code         VARCHAR(50)
+    communication_grid_code         VARCHAR(50),
+    -- Extra fields from FormA
+    category                        VARCHAR(100),
+    gender                          VARCHAR(20),
+    marital_status                  VARCHAR(50),
+    previous_branch                 VARCHAR(200)
+);
+
+-- Migrate: add FormA extra columns to member_details if upgrading
+ALTER TABLE member_details ADD COLUMN IF NOT EXISTS category        VARCHAR(100);
+ALTER TABLE member_details ADD COLUMN IF NOT EXISTS gender          VARCHAR(20);
+ALTER TABLE member_details ADD COLUMN IF NOT EXISTS marital_status  VARCHAR(50);
+ALTER TABLE member_details ADD COLUMN IF NOT EXISTS previous_branch VARCHAR(200);
+
+-- Superhumane (children in Sant-Su scheme) — linked to parents via father_uid / mother_uid
+CREATE TABLE IF NOT EXISTS superhumane_details (
+    id                  SERIAL PRIMARY KEY,
+    sno                 INTEGER,
+    member_type         VARCHAR(50),
+    name                VARCHAR(200),
+    form_check          VARCHAR(200),
+    uid_check           VARCHAR(100),
+    bsl                 VARCHAR(50),
+    gender              VARCHAR(5),
+    comments            TEXT,
+    uid                 VARCHAR(50) UNIQUE,
+    date_of_birth       DATE,
+    phase               INTEGER,
+    branch              VARCHAR(200),
+    father_name         VARCHAR(200),
+    father_contact      VARCHAR(30),
+    father_uid          VARCHAR(50),
+    father_doi          DATE,
+    mother_name         VARCHAR(200),
+    mother_contact      VARCHAR(30),
+    mother_uid          VARCHAR(50),
+    mother_doi          DATE,
+    address             TEXT,
+    grandfather_name    VARCHAR(200),
+    grandfather_uid     VARCHAR(50),
+    grandfather_contact VARCHAR(30),
+    grandmother_name    VARCHAR(200),
+    grandmother_uid     VARCHAR(50),
+    grandmother_contact VARCHAR(30),
+    date_entry_scheme   DATE,
+    date_exit_scheme    DATE
 );
