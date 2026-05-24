@@ -3,240 +3,830 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Soaminagar Branch Delhi — Login</title>
+  <title>Member Registration — Soaminagar Branch Delhi</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/css/style.css?v=3" />
-  <link rel="stylesheet" href="/css/login.css?v=3" />
-</head>
-<body class="login-body">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Crimson+Pro:ital,wght@0,600;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  <div class="login-bg">
-    <div class="login-bg-circle c1"></div>
-    <div class="login-bg-circle c2"></div>
-    <div class="login-bg-circle c3"></div>
+    html { color-scheme: light; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f0f2f8;
+      color: #1e293b;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    .page-header {
+      background: #1a2d5a;
+      padding: 18px 0 14px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+    }
+    .page-header .org-name {
+      font-family: 'Crimson Pro', Georgia, serif;
+      font-size: 1.35rem;
+      color: #f4a124;
+      letter-spacing: .02em;
+    }
+    .page-header .form-title {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.5);
+      margin-top: 2px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .page-header #headerLinkTitle {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.78);
+      margin-top: 3px;
+    }
+
+    /* ── Progress bar ── */
+    #progressBar { height: 3px; background: #dde3f0; }
+    #progressFill {
+      height: 100%;
+      background: linear-gradient(90deg, #e8832a, #f4a124);
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    /* ── Main layout ── */
+    .reg-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 28px 20px 100px;
+      display: none;
+    }
+
+    /* ── Overlay (loading / link error) ── */
+    #overlay {
+      min-height: 80vh;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 14px;
+    }
+    #overlayMsg { font-size: 1rem; color: #64748b; text-align: center; }
+    .spinner {
+      width: 34px; height: 34px;
+      border: 3px solid #dde3f0;
+      border-top-color: #e8832a;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #linkErrorPage {
+      min-height: 80vh;
+      display: none; align-items: center; justify-content: center;
+      flex-direction: column; gap: 14px; text-align: center; padding: 40px;
+    }
+    #linkErrorPage .err-icon  { font-size: 3rem; }
+    #linkErrorPage .err-title { font-size: 1.2rem; font-weight: 700; color: #1a2d5a; }
+    #linkErrorPage .err-msg   { color: #64748b; font-size: 0.9rem; max-width: 400px; line-height: 1.7; }
+
+    /* ── Section cards ── */
+    .sec-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 1px 8px rgba(26,45,90,0.07);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .sec-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px;
+      cursor: pointer; user-select: none;
+      background: #ffffff;
+      transition: background 0.15s;
+    }
+    .sec-head:hover { background: #f8faff; }
+    .sec-head-left { display: flex; align-items: center; gap: 12px; }
+    .sec-icon {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: #eef2ff; display: flex; align-items: center; justify-content: center;
+      font-size: 1.05rem; flex-shrink: 0;
+    }
+    .sec-name { font-size: 0.9rem; font-weight: 600; color: #1a2d5a; }
+    .sec-badge {
+      font-size: 0.68rem; padding: 2px 9px;
+      border-radius: 99px; font-weight: 600; letter-spacing: .03em;
+    }
+    .badge-required { background: #fff3e0; color: #c2410c; }
+    .badge-optional { background: #f1f5f9; color: #64748b; }
+    .sec-chevron { font-size: 0.7rem; color: #94a3b8; transition: transform 0.2s; }
+    .sec-head.open .sec-chevron { transform: rotate(180deg); }
+
+    .sec-body {
+      display: none;
+      padding: 18px 20px 20px;
+      border-top: 1px solid #e2e8f0;
+      background: #ffffff;
+    }
+    .sec-body.open { display: block; }
+
+    /* ── Grids ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+    .full   { grid-column: 1 / -1; }
+    @media (max-width: 620px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    }
+
+    /* ── Form fields ── */
+    .field label {
+      display: block;
+      font-size: 0.7rem; font-weight: 600;
+      color: #64748b;
+      margin-bottom: 5px;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .req-star { color: #e8832a; }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 0.88rem;
+      font-family: 'Inter', sans-serif;
+      color: #1e293b;
+      background: #ffffff;
+      outline: none;
+      transition: border-color 0.18s, box-shadow 0.18s;
+      -webkit-appearance: none;
+    }
+    .field input[type=date] { color: #1e293b; }
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      border-color: #e8832a;
+      box-shadow: 0 0 0 3px rgba(232,131,42,0.13);
+    }
+    .field input::placeholder { color: #c0cce0; }
+    .field select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M1 1l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+
+    /* ── Sub-labels ── */
+    .sub-label {
+      font-size: 0.7rem; font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase; letter-spacing: .07em;
+      margin: 18px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .sub-label:first-child { margin-top: 0; }
+
+    /* ── Checkboxes ── */
+    .check-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+      gap: 10px;
+    }
+    .check-item {
+      display: flex; align-items: center; gap: 9px;
+      font-size: 0.84rem; color: #334155;
+      cursor: pointer;
+      padding: 9px 12px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      background: #ffffff;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .check-item:has(input:checked) { border-color: #e8832a; background: #fff8f2; }
+    .check-item input[type=checkbox] { width: 15px; height: 15px; accent-color: #e8832a; cursor: pointer; flex-shrink: 0; }
+
+    /* ── Inline error ── */
+    #inlineMsg {
+      padding: 12px 16px; border-radius: 8px;
+      font-size: 0.88rem; display: none; margin-bottom: 16px;
+    }
+    #inlineMsg.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; display: block; }
+
+    /* ── Fixed submit bar ── */
+    .submit-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #ffffff;
+      border-top: 1px solid #e2e8f0;
+      padding: 12px 24px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      box-shadow: 0 -4px 24px rgba(26,45,90,0.10);
+      z-index: 200;
+    }
+    .submit-note { font-size: 0.78rem; color: #94a3b8; flex: 1; }
+    .btn-submit {
+      padding: 11px 30px;
+      background: #e8832a; color: #ffffff;
+      font-weight: 700; font-size: 0.9rem;
+      border: none; border-radius: 8px; cursor: pointer;
+      transition: background 0.18s, transform 0.1s;
+      white-space: nowrap; letter-spacing: .02em;
+    }
+    .btn-submit:hover { background: #d4731f; }
+    .btn-submit:active { transform: scale(0.98); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ── Result page ── */
+    #resultPage {
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 80vh; padding: 40px; text-align: center;
+    }
+    .result-icon  { font-size: 4rem; margin-bottom: 18px; }
+    .result-title { font-size: 1.5rem; font-weight: 700; color: #1a2d5a; margin-bottom: 10px; }
+    .result-msg   { font-size: 0.95rem; color: #64748b; max-width: 460px; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky header -->
+  <div class="page-header">
+    <div class="org-name">Soaminagar Branch Delhi</div>
+    <div class="form-title">Member Registration Form</div>
+    <div id="headerLinkTitle"></div>
+  </div>
+  <div id="progressBar"><div id="progressFill"></div></div>
+
+  <!-- Loading / Link error -->
+  <div id="overlay">
+    <div class="spinner"></div>
+    <div id="overlayMsg">Validating registration link…</div>
   </div>
 
-  <div class="login-wrapper">
-    <div class="login-card">
+  <div id="linkErrorPage">
+    <div class="err-icon"></div>
+    <div class="err-title" id="errTitle">Invalid Link</div>
+    <div class="err-msg"   id="errMsg">Please use the registration link shared with you.</div>
+  </div>
 
-      <div class="login-brand">
-        <h1 class="brand-title">Soaminagar Branch Delhi</h1>
+  <!-- Main form -->
+  <div class="reg-container" id="regContainer">
+
+    <div id="inlineMsg"></div>
+
+    <form id="regForm" onsubmit="submitRegistration(event)" novalidate>
+
+      <!-- 1. Personal -->
+      <div class="sec-card">
+        <div class="sec-head open" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div>
+              <div class="sec-name">Personal Details</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-required">Required</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body open">
+          <div class="grid-2">
+            <div class="field full">
+              <label>Full Name <span class="req-star">*</span></label>
+              <input id="rf_name" placeholder="As per initiation records" required />
+            </div>
+            <div class="field">
+              <label>Member UID <span style="font-weight:400;text-transform:none;letter-spacing:0">(if already assigned)</span></label>
+              <input id="rf_uid" placeholder="e.g. SND2024XXXXXX" />
+            </div>
+            <div class="field">
+              <label>Date of Initiation</label>
+              <input id="rf_doi" type="date" />
+            </div>
+            <div class="field">
+              <label>Date of Registration (Jigyasu)</label>
+              <input id="rf_dor_jigyasu" type="date" />
+            </div>
+            <div class="field">
+              <label>Date of First Initiation</label>
+              <input id="rf_doi_first" type="date" />
+            </div>
+            <div class="field">
+              <label>Date of Second Initiation</label>
+              <input id="rf_doi_second" type="date" />
+            </div>
+            <div class="field">
+              <label>Date of Birth</label>
+              <input id="rf_dob" type="date" />
+            </div>
+            <div class="field">
+              <label>Blood Group</label>
+              <select id="rf_blood">
+                <option value="">Select</option>
+                <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Caste / Community</label>
+              <input id="rf_caste" placeholder="e.g. Hindu, Sikh" />
+            </div>
+            <div class="field">
+              <label>Nationality</label>
+              <input id="rf_nationality" value="Indian" />
+            </div>
+            <div class="field">
+              <label>Profession</label>
+              <input id="rf_profession" placeholder="e.g. Engineer, Business, Service" />
+            </div>
+            <div class="field">
+              <label>Ashram</label>
+              <input id="rf_ashram" placeholder="e.g. Grihastha, Brahmacharya" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Toggle -->
-      <div class="login-toggle">
-        <button class="toggle-btn active" id="btnAdmin" onclick="switchRole('admin')">Admin</button>
-        <button class="toggle-btn" id="btnMember" onclick="switchRole('member')">Member</button>
-        <span class="toggle-slider" id="toggleSlider"></span>
+      <!-- 2. Contact -->
+      <div class="sec-card">
+        <div class="sec-head open" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Contact Details</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-required">Required</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body open">
+          <div class="grid-2">
+            <div class="field">
+              <label>Mobile 1 <span class="req-star">*</span></label>
+              <input id="rf_mobile1" type="tel" placeholder="Primary mobile number" required />
+            </div>
+            <div class="field">
+              <label>Mobile 2</label>
+              <input id="rf_mobile2" type="tel" placeholder="Alternative number" />
+            </div>
+            <div class="field">
+              <label>Landline</label>
+              <input id="rf_landline" type="tel" placeholder="With STD code" />
+            </div>
+            <div class="field">
+              <label>Office Phone</label>
+              <input id="rf_officePhone" type="tel" placeholder="Office number" />
+            </div>
+            <div class="field">
+              <label>Email 1</label>
+              <input id="rf_email1" type="email" placeholder="Primary email address" />
+            </div>
+            <div class="field">
+              <label>Email 2</label>
+              <input id="rf_email2" type="email" placeholder="Secondary email address" />
+            </div>
+          </div>
+          <p style="font-size:0.75rem;color:#64748b;margin-top:10px">
+            Approval notification will be sent to your email address once reviewed.
+          </p>
+        </div>
       </div>
 
-      <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group">
-          <label for="loginId">
-            <span id="loginLabel">Username / Email</span>
-          </label>
-          <div class="input-wrap">
-            <span class="input-icon">◎</span>
-            <input type="text" id="loginId" placeholder="Enter your username" required autocomplete="off" />
+      <!-- 3. Address -->
+      <div class="sec-card">
+        <div class="sec-head open" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Address</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-required">Required</span>
+            <span class="sec-chevron">▼</span>
           </div>
         </div>
-
-        <div class="form-group">
-          <label for="loginPass">Password</label>
-          <div class="input-wrap">
-            <span class="input-icon">◉</span>
-            <input type="password" id="loginPass" placeholder="Enter your password" required />
-            <button type="button" class="pass-toggle" onclick="togglePass()">👁</button>
+        <div class="sec-body open">
+          <div class="grid-2">
+            <div class="field full">
+              <label>Address Line 1</label>
+              <input id="rf_addr1" placeholder="House / Flat No., Street, Building" />
+            </div>
+            <div class="field full">
+              <label>Address Line 2</label>
+              <input id="rf_addr2" placeholder="Locality / Area / Sector" />
+            </div>
+            <div class="field full">
+              <label>Address Line 3</label>
+              <input id="rf_addr3" placeholder="Landmark / Colony (optional)" />
+            </div>
+            <div class="field">
+              <label>City</label>
+              <input id="rf_city" placeholder="City" />
+            </div>
+            <div class="field">
+              <label>Pincode</label>
+              <input id="rf_pincode" placeholder="6-digit pincode" maxlength="6" />
+            </div>
+            <div class="field">
+              <label>State</label>
+              <input id="rf_state" placeholder="State" />
+            </div>
+            <div class="field">
+              <label>Country</label>
+              <input id="rf_country" value="India" />
+            </div>
           </div>
         </div>
-
-        <div id="loginError" class="login-error" style="display:none;"></div>
-
-        <button type="submit" class="login-btn" id="loginBtn">
-          <span class="btn-text">Sign In</span>
-          <span class="btn-arrow">→</span>
-        </button>
-
-        <div class="login-links">
-          <a href="#" onclick="showForgotPassword(event)">Forgot Password?</a>
-          <span class="link-sep">·</span>
-          <a href="#" onclick="showSignup(event)">Create Account</a>
-        </div>
-      </form>
-
-      <!-- SIGNUP FORM (hidden by default) -->
-      <form class="login-form" id="signupForm" style="display:none;" onsubmit="handleSignup(event)">
-        <div class="form-group">
-          <label for="signupName">Full Name</label>
-          <div class="input-wrap">
-            <span class="input-icon">◎</span>
-            <input type="text" id="signupName" placeholder="e.g. Anhad Parashar" required autocomplete="off" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="signupUsername">Username</label>
-          <div class="input-wrap">
-            <span class="input-icon">◎</span>
-            <input type="text" id="signupUsername" placeholder="e.g. anhad.parashar" required autocomplete="off"
-                   oninput="validateUsernameField(this)" />
-          </div>
-          <p id="signupUsernameHint" class="field-hint" style="display:none"></p>
-        </div>
-        <div class="form-group">
-          <label for="signupEmail">Email</label>
-          <div class="input-wrap">
-            <span class="input-icon">◎</span>
-            <input type="email" id="signupEmail" placeholder="e.g. name@email.com" required autocomplete="email" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="signupPass">Password</label>
-          <div class="input-wrap">
-            <span class="input-icon">◉</span>
-            <input type="password" id="signupPass" placeholder="At least 6 characters" required minlength="6"
-                   oninput="updateSignupStrength(this.value)" autocomplete="new-password" />
-            <button type="button" class="pass-toggle" onclick="toggleFieldPass('signupPass',this)" tabindex="-1">👁</button>
-          </div>
-          <div class="pw-strength-bar" style="display:none" id="signupStrengthBar">
-            <div id="signupStrengthFill"></div>
-          </div>
-          <p id="signupStrengthLabel" class="field-hint" style="display:none"></p>
-        </div>
-        <div class="form-group">
-          <label for="signupConfirm">Confirm Password</label>
-          <div class="input-wrap">
-            <span class="input-icon">◉</span>
-            <input type="password" id="signupConfirm" placeholder="Re-enter your password" required minlength="6"
-                   oninput="checkSignupMatch()" autocomplete="new-password" />
-            <button type="button" class="pass-toggle" onclick="toggleFieldPass('signupConfirm',this)" tabindex="-1">👁</button>
-          </div>
-          <p id="signupMatchLabel" class="field-hint" style="display:none"></p>
-        </div>
-
-        <div id="signupError" class="login-error" style="display:none;"></div>
-        <div id="signupSuccess" class="login-success" style="display:none;"></div>
-
-        <div class="form-group">
-          <label class="consent-label" for="signupConsent" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;color:rgba(255,255,255,0.55);font-size:0.82rem;text-transform:none;letter-spacing:0;font-weight:400;line-height:1.5;">
-            <input type="checkbox" id="signupConsent" required style="margin-top:3px;flex-shrink:0;accent-color:var(--clr-saffron);width:15px;height:15px;" />
-            <span>I give my consent for my personal data to be stored and used by Soaminagar Branch Delhi for administrative and community purposes only.</span>
-          </label>
-        </div>
-
-        <button type="submit" class="login-btn" id="signupBtn">
-          <span class="btn-spinner" style="display:none">⏳</span>
-          <span class="btn-text">Create Account</span>
-          <span class="btn-arrow">→</span>
-        </button>
-
-        <div class="login-links">
-          <a href="#" onclick="showLoginForm(event)">← Back to Sign In</a>
-        </div>
-      </form>
-
-      <!-- FORGOT PASSWORD FORM (hidden by default) -->
-      <form class="login-form" id="forgotForm" style="display:none;" onsubmit="handleForgotPassword(event)">
-        <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;margin-bottom:4px;line-height:1.5">
-          Enter your username and choose a new password. No email required.
-        </p>
-        <div class="form-group">
-          <label for="forgotUsername">Username</label>
-          <div class="input-wrap">
-            <span class="input-icon">◎</span>
-            <input type="text" id="forgotUsername" placeholder="Enter your username" required autocomplete="username" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="forgotNewPass">New Password</label>
-          <div class="input-wrap">
-            <span class="input-icon">◉</span>
-            <input type="password" id="forgotNewPass" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password" />
-            <button type="button" class="pass-toggle" onclick="toggleFieldPass('forgotNewPass',this)" tabindex="-1">👁</button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="forgotConfirm">Confirm New Password</label>
-          <div class="input-wrap">
-            <span class="input-icon">◉</span>
-            <input type="password" id="forgotConfirm" placeholder="Re-enter new password" required minlength="6" autocomplete="new-password" />
-            <button type="button" class="pass-toggle" onclick="toggleFieldPass('forgotConfirm',this)" tabindex="-1">👁</button>
-          </div>
-        </div>
-
-        <div id="forgotError" class="login-error" style="display:none;"></div>
-        <div id="forgotSuccess" class="login-success" style="display:none;"></div>
-
-        <button type="submit" class="login-btn" id="forgotBtn">
-          <span class="btn-text">Reset Password</span>
-          <span class="btn-arrow">→</span>
-        </button>
-
-        <div class="login-links">
-          <a href="#" onclick="showLoginForm(event)">← Back to Sign In</a>
-        </div>
-      </form>
-
-      <div class="login-hint" style="display:none;">
-        <p id="loginHint"></p>
       </div>
 
+      <!-- 4. Professional -->
+      <div class="sec-card">
+        <div class="sec-head" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Professional Details</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-optional">Optional</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body">
+          <div class="grid-2">
+            <div class="field">
+              <label>Qualification</label>
+              <input id="rf_qual" placeholder="e.g. B.Tech, M.A., MBA" />
+            </div>
+            <div class="field">
+              <label>Occupation</label>
+              <input id="rf_occ" placeholder="e.g. Engineer, Doctor, Teacher" />
+            </div>
+            <div class="field">
+              <label>Designation</label>
+              <input id="rf_desig" placeholder="e.g. Manager, Director" />
+            </div>
+            <div class="field">
+              <label>Organization</label>
+              <input id="rf_org" placeholder="Company / Institution name" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Father -->
+      <div class="sec-card">
+        <div class="sec-head" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Father's Details</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-optional">Optional</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body">
+          <div class="grid-4">
+            <div class="field">
+              <label>Title</label>
+              <select id="rf_fatherTitle">
+                <option value="">—</option><option>Sh.</option><option>Dr.</option><option>Er.</option><option>Prof.</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>First Name</label>
+              <input id="rf_fatherFirstName" placeholder="First" />
+            </div>
+            <div class="field">
+              <label>Middle Name</label>
+              <input id="rf_fatherMiddleName" placeholder="Middle" />
+            </div>
+            <div class="field">
+              <label>Last Name</label>
+              <input id="rf_fatherLastName" placeholder="Last" />
+            </div>
+          </div>
+          <div class="grid-2" style="margin-top:12px">
+            <div class="field"><label>Phone</label><input id="rf_fatherPhone" type="tel" placeholder="Mobile / Landline" /></div>
+            <div class="field"><label>City</label><input id="rf_fatherCity" placeholder="City" /></div>
+            <div class="field"><label>State</label><input id="rf_fatherState" placeholder="State" /></div>
+            <div class="field"><label>Branch (Satsang)</label><input id="rf_fatherBranch" placeholder="Branch name" /></div>
+            <div class="field"><label>BSL No.</label><input id="rf_fatherBslno" placeholder="If member" /></div>
+            <div class="field"><label>UID</label><input id="rf_fatherUid" placeholder="If known" /></div>
+            <div class="field"><label>Date of Initiation</label><input id="rf_fatherDoi" type="date" /></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Mother -->
+      <div class="sec-card">
+        <div class="sec-head" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Mother's Details</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-optional">Optional</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body">
+          <div class="grid-4">
+            <div class="field">
+              <label>Title</label>
+              <select id="rf_motherTitle">
+                <option value="">—</option><option>Smt.</option><option>Dr.</option><option>Prof.</option>
+              </select>
+            </div>
+            <div class="field"><label>First Name</label><input id="rf_motherFirstName" placeholder="First" /></div>
+            <div class="field"><label>Middle Name</label><input id="rf_motherMiddleName" placeholder="Middle" /></div>
+            <div class="field"><label>Last Name</label><input id="rf_motherLastName" placeholder="Last" /></div>
+          </div>
+          <div class="grid-2" style="margin-top:12px">
+            <div class="field"><label>Phone</label><input id="rf_motherPhone" type="tel" placeholder="Mobile / Landline" /></div>
+            <div class="field"><label>City</label><input id="rf_motherCity" placeholder="City" /></div>
+            <div class="field"><label>State</label><input id="rf_motherState" placeholder="State" /></div>
+            <div class="field"><label>Branch (Satsang)</label><input id="rf_motherBranch" placeholder="Branch name" /></div>
+            <div class="field"><label>BSL No.</label><input id="rf_motherBslno" placeholder="If member" /></div>
+            <div class="field"><label>UID</label><input id="rf_motherUid" placeholder="If known" /></div>
+            <div class="field"><label>Date of Initiation</label><input id="rf_motherDoi" type="date" /></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. Spouse -->
+      <div class="sec-card">
+        <div class="sec-head" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Spouse's Details</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-optional">Optional</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body">
+          <div class="grid-4">
+            <div class="field">
+              <label>Title</label>
+              <select id="rf_spouseTitle">
+                <option value="">—</option><option>Sh.</option><option>Smt.</option><option>Dr.</option>
+              </select>
+            </div>
+            <div class="field"><label>First Name</label><input id="rf_spouseFirstName" placeholder="First" /></div>
+            <div class="field"><label>Middle Name</label><input id="rf_spouseMiddleName" placeholder="Middle" /></div>
+            <div class="field"><label>Last Name</label><input id="rf_spouseLastName" placeholder="Last" /></div>
+          </div>
+          <div class="grid-2" style="margin-top:12px">
+            <div class="field"><label>Phone</label><input id="rf_spousePhone" type="tel" placeholder="Mobile / Landline" /></div>
+            <div class="field"><label>City</label><input id="rf_spouseCity" placeholder="City" /></div>
+            <div class="field"><label>State</label><input id="rf_spouseState" placeholder="State" /></div>
+            <div class="field"><label>Branch (Satsang)</label><input id="rf_spouseBranch" placeholder="Branch name" /></div>
+            <div class="field"><label>BSL No.</label><input id="rf_spouseBslno" placeholder="If member" /></div>
+            <div class="field"><label>UID</label><input id="rf_spouseUid" placeholder="If known" /></div>
+            <div class="field"><label>Date of Initiation</label><input id="rf_spouseDoi" type="date" /></div>
+          </div>
+          <div class="sub-label" style="margin-top:18px">Nee / Maiden Name (if applicable)</div>
+          <div class="grid-3">
+            <div class="field"><label>Nee First Name</label><input id="rf_neeFirst" placeholder="First" /></div>
+            <div class="field"><label>Nee Middle Name</label><input id="rf_neeMiddle" placeholder="Middle" /></div>
+            <div class="field"><label>Nee Last Name</label><input id="rf_neeLast" placeholder="Last / Surname" /></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8. Groups -->
+      <div class="sec-card">
+        <div class="sec-head" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Group Memberships</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-optional">Optional</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body">
+          <p style="font-size:0.82rem;color:#64748b;margin-bottom:12px">Select all groups you are a member of:</p>
+          <div class="check-grid">
+            <label class="check-item"><input type="checkbox" id="rf_mahila" /> Mahila Association</label>
+            <label class="check-item"><input type="checkbox" id="rf_youth" /> Youth Member</label>
+            <label class="check-item"><input type="checkbox" id="rf_assocYouth" /> Associate Youth Member</label>
+            <label class="check-item"><input type="checkbox" id="rf_jrPre" /> Junior Pre-Initiate</label>
+            <label class="check-item"><input type="checkbox" id="rf_srPre" /> Senior Pre-Initiate</label>
+            <label class="check-item"><input type="checkbox" id="rf_crc" /> CRC Member</label>
+            <label class="check-item"><input type="checkbox" id="rf_cca" /> CCA Member</label>
+            <label class="check-item"><input type="checkbox" id="rf_santSu" /> Sant Su Member</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 9. References -->
+      <div class="sec-card">
+        <div class="sec-head" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">References</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-optional">Optional</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body">
+          <div class="sub-label">Reference 1</div>
+          <div class="grid-2">
+            <div class="field"><label>Name</label><input id="rf_ref1Name" placeholder="Full name" /></div>
+            <div class="field"><label>Relation</label><input id="rf_ref1Relation" placeholder="e.g. Uncle, Friend, Colleague" /></div>
+            <div class="field"><label>Phone</label><input id="rf_ref1Phone" type="tel" placeholder="Mobile" /></div>
+            <div class="field"><label>Email</label><input id="rf_ref1Email" type="email" placeholder="Email address" /></div>
+            <div class="field"><label>Branch (Satsang)</label><input id="rf_ref1Branch" placeholder="Branch name" /></div>
+            <div class="field full"><label>Address</label><input id="rf_ref1Address" placeholder="City, State" /></div>
+          </div>
+          <div class="sub-label">Reference 2</div>
+          <div class="grid-2">
+            <div class="field"><label>Name</label><input id="rf_ref2Name" placeholder="Full name" /></div>
+            <div class="field"><label>Relation</label><input id="rf_ref2Relation" placeholder="e.g. Uncle, Friend, Colleague" /></div>
+            <div class="field"><label>Phone</label><input id="rf_ref2Phone" type="tel" placeholder="Mobile" /></div>
+            <div class="field"><label>Email</label><input id="rf_ref2Email" type="email" placeholder="Email address" /></div>
+            <div class="field"><label>Branch (Satsang)</label><input id="rf_ref2Branch" placeholder="Branch name" /></div>
+            <div class="field full"><label>Address</label><input id="rf_ref2Address" placeholder="City, State" /></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 10. Notes -->
+      <div class="sec-card">
+        <div class="sec-head" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Additional Notes</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-optional">Optional</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body">
+          <div class="field">
+            <label>Any additional information</label>
+            <textarea id="rf_notes" rows="3" placeholder="Any other details you'd like to share with the admin…"></textarea>
+          </div>
+        </div>
+      </div>
+
+    </form>
+
+    <!-- Bottom submit bar -->
+    <div class="submit-bar">
+      <div class="submit-note">Fields marked <span style="color:#e8832a;font-weight:600">*</span> are required. All other sections are optional.</div>
+      <button class="btn-submit" id="regSubmitBtn" onclick="submitRegistration(event)">Submit Registration →</button>
     </div>
   </div>
 
-  <script src="/js/api.js"></script>
-  <script src="/js/auth.js"></script>
+  <!-- Result page (success/error) -->
+  <div id="resultPage" style="display:none;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:40px;text-align:center">
+    <div class="result-icon" id="resultIcon"></div>
+    <div class="result-title" id="resultTitle">Registration Submitted!</div>
+    <div class="result-msg"   id="resultMsg"></div>
+  </div>
+
   <script>
-    // Signup field helpers (login-page only)
-    function toggleFieldPass(id, btn) {
-      const inp = document.getElementById(id);
-      if (!inp) return;
-      inp.type = inp.type === 'password' ? 'text' : 'password';
-      btn.style.opacity = inp.type === 'text' ? '1' : '0.5';
+    const code = new URLSearchParams(window.location.search).get('code')
+               || (window.location.pathname.split('/').filter(Boolean).pop() || '');
+
+    // ── Accordion ──
+    function toggleSec(head) {
+      const isOpen = head.classList.contains('open');
+      head.classList.toggle('open', !isOpen);
+      head.nextElementSibling.classList.toggle('open', !isOpen);
     }
-    function validateUsernameField(inp) {
-      const hint = document.getElementById('signupUsernameHint');
-      if (!hint) return;
-      const ok = /^[a-z0-9._]*$/.test(inp.value);
-      hint.style.display = inp.value && !ok ? 'block' : 'none';
-      hint.textContent = 'Only lowercase letters, numbers, dots and underscores allowed.';
-      hint.style.color = '#ff8b94';
+
+    // ── Progress bar driven by scroll ──
+    window.addEventListener('scroll', () => {
+      const doc  = document.documentElement;
+      const pct  = (window.scrollY / (doc.scrollHeight - doc.clientHeight)) * 100;
+      document.getElementById('progressFill').style.width = Math.min(pct, 100) + '%';
+    });
+
+    // ── Link validation ──
+    async function validateLink() {
+      if (!code || code === 'register') {
+        showLinkError('No Code', 'No registration code was provided. Please use the link shared with you.');
+        return;
+      }
+      try {
+        const res  = await fetch('/api/register/' + encodeURIComponent(code));
+        const data = await res.json();
+        if (!data.ok) {
+          showLinkError('Link Invalid', data.error);
+          return;
+        }
+        document.getElementById('headerLinkTitle').textContent = data.title;
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('regContainer').style.display = 'block';
+      } catch {
+        showLinkError('Connection Error', 'Unable to reach the server. Please check your connection and try again.');
+      }
     }
-    function updateSignupStrength(val) {
-      const bar   = document.getElementById('signupStrengthBar');
-      const fill  = document.getElementById('signupStrengthFill');
-      const label = document.getElementById('signupStrengthLabel');
-      if (!bar) return;
-      if (!val) { bar.style.display = 'none'; label.style.display = 'none'; return; }
-      bar.style.display = 'block'; label.style.display = 'block';
-      let score = 0;
-      if (val.length >= 6)  score++;
-      if (val.length >= 10) score++;
-      if (/[A-Z]/.test(val)) score++;
-      if (/[0-9]/.test(val)) score++;
-      if (/[^A-Za-z0-9]/.test(val)) score++;
-      const levels = [
-        { pct:'20%', color:'#ef4444', text:'Very weak' },
-        { pct:'40%', color:'#f97316', text:'Weak' },
-        { pct:'60%', color:'#eab308', text:'Fair' },
-        { pct:'80%', color:'#22c55e', text:'Strong' },
-        { pct:'100%',color:'#16a34a', text:'Very strong' },
-      ];
-      const lv = levels[Math.max(0, score - 1)] || levels[0];
-      fill.style.width = lv.pct;
-      fill.style.background = lv.color;
-      label.textContent = lv.text;
-      label.style.color = lv.color;
+
+    function showLinkError(title, msg) {
+      document.getElementById('overlay').style.display = 'none';
+      document.getElementById('errTitle').textContent = title;
+      document.getElementById('errMsg').textContent   = msg;
+      document.getElementById('linkErrorPage').style.display = 'flex';
     }
-    function checkSignupMatch() {
-      const nw  = document.getElementById('signupPass')?.value || '';
-      const cfg = document.getElementById('signupConfirm')?.value || '';
-      const lbl = document.getElementById('signupMatchLabel');
-      if (!lbl || !cfg) { if (lbl) lbl.style.display='none'; return; }
-      lbl.style.display = 'block';
-      lbl.textContent  = nw === cfg ? '✓ Passwords match' : '✗ Passwords do not match';
-      lbl.style.color  = nw === cfg ? '#6ee7a0' : '#ff8b94';
+
+    // ── Helpers ──
+    const g  = id => (document.getElementById(id)?.value || '').trim() || null;
+    const cb = id => document.getElementById(id)?.checked ? 'Y' : null;
+
+    // ── Submit ──
+    async function submitRegistration(e) {
+      e.preventDefault();
+      const name = g('rf_name');
+      const mobile1 = g('rf_mobile1');
+      if (!name)   { showInlineErr('Full Name is required.'); scrollTo(0,0); return; }
+      if (!mobile1){ showInlineErr('Mobile 1 is required.'); scrollTo(0,0); return; }
+
+      const btn = document.getElementById('regSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+      document.getElementById('inlineMsg').style.display = 'none';
+
+      const payload = {
+        name, dateOfBirth: g('rf_dob'), bloodGroup: g('rf_blood'),
+        uid: g('rf_uid'), dateOfInitiation: g('rf_doi'),
+        dateOfRegistrationJigyasu: g('rf_dor_jigyasu'),
+        dateOfFirstInitiation: g('rf_doi_first'),
+        dateOfSecondInitiation: g('rf_doi_second'),
+        caste: g('rf_caste'), nationality: g('rf_nationality'),
+        profession: g('rf_profession'), ashram: g('rf_ashram'),
+        mobile1, mobile2: g('rf_mobile2'), landline: g('rf_landline'),
+        officePhone: g('rf_officePhone'), email1: g('rf_email1'), email2: g('rf_email2'),
+        addressLine1: g('rf_addr1'), addressLine2: g('rf_addr2'), addressLine3: g('rf_addr3'),
+        city: g('rf_city'), pincode: g('rf_pincode'), state: g('rf_state'), country: g('rf_country'),
+        qualification: g('rf_qual'), occupation: g('rf_occ'),
+        designation: g('rf_desig'), organization: g('rf_org'),
+        fatherTitle: g('rf_fatherTitle'), fatherFirstName: g('rf_fatherFirstName'),
+        fatherMiddleName: g('rf_fatherMiddleName'), fatherLastName: g('rf_fatherLastName'),
+        fatherPhone: g('rf_fatherPhone'), fatherCity: g('rf_fatherCity'),
+        fatherState: g('rf_fatherState'), fatherBranch: g('rf_fatherBranch'),
+        fatherBslno: g('rf_fatherBslno'), fatherUid: g('rf_fatherUid'), fatherDoi: g('rf_fatherDoi'),
+        motherTitle: g('rf_motherTitle'), motherFirstName: g('rf_motherFirstName'),
+        motherMiddleName: g('rf_motherMiddleName'), motherLastName: g('rf_motherLastName'),
+        motherPhone: g('rf_motherPhone'), motherCity: g('rf_motherCity'),
+        motherState: g('rf_motherState'), motherBranch: g('rf_motherBranch'),
+        motherBslno: g('rf_motherBslno'), motherUid: g('rf_motherUid'), motherDoi: g('rf_motherDoi'),
+        spouseTitle: g('rf_spouseTitle'), spouseFirstName: g('rf_spouseFirstName'),
+        spouseMiddleName: g('rf_spouseMiddleName'), spouseLastName: g('rf_spouseLastName'),
+        spousePhone: g('rf_spousePhone'), spouseCity: g('rf_spouseCity'),
+        spouseState: g('rf_spouseState'), spouseBranch: g('rf_spouseBranch'),
+        spouseBslno: g('rf_spouseBslno'), spouseUid: g('rf_spouseUid'), spouseDoi: g('rf_spouseDoi'),
+        neeFirstName: g('rf_neeFirst'), neeMiddleName: g('rf_neeMiddle'), neeLastName: g('rf_neeLast'),
+        mahilaAssociationMember: cb('rf_mahila'), youthMember: cb('rf_youth'),
+        associateYouthMember: cb('rf_assocYouth'), juniorPreInitiateMember: cb('rf_jrPre'),
+        seniorPreInitiateMember: cb('rf_srPre'), crcMember: cb('rf_crc'),
+        ccaMember: cb('rf_cca'), santSuMember: cb('rf_santSu'),
+        ref1Name: g('rf_ref1Name'), ref1Relation: g('rf_ref1Relation'), ref1Phone: g('rf_ref1Phone'),
+        ref1Email: g('rf_ref1Email'), ref1Branch: g('rf_ref1Branch'), ref1Address: g('rf_ref1Address'),
+        ref2Name: g('rf_ref2Name'), ref2Relation: g('rf_ref2Relation'), ref2Phone: g('rf_ref2Phone'),
+        ref2Email: g('rf_ref2Email'), ref2Branch: g('rf_ref2Branch'), ref2Address: g('rf_ref2Address'),
+        notes: g('rf_notes'),
+      };
+
+      try {
+        const res  = await fetch('/api/register/' + encodeURIComponent(code), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok && res.status === 500) {
+          showInlineErr('Server error. Please try again or contact the administrator.');
+          window.scrollTo(0, 0);
+          btn.disabled = false;
+          btn.textContent = 'Submit Registration →';
+          return;
+        }
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('regContainer').style.display  = 'none';
+          document.getElementById('resultPage').style.display    = 'flex';
+          document.getElementById('resultIcon').textContent  = '';
+          document.getElementById('resultTitle').textContent = 'Registration Submitted!';
+          document.getElementById('resultMsg').textContent   = data.message;
+          window.scrollTo(0, 0);
+        } else {
+          showInlineErr(data.error || 'Submission failed. Please try again.');
+          btn.disabled = false;
+          btn.textContent = 'Submit Registration →';
+        }
+      } catch {
+        showInlineErr('Network error. Please check your connection and try again.');
+        window.scrollTo(0, 0);
+        btn.disabled = false;
+        btn.textContent = 'Submit Registration →';
+      }
     }
+
+    function showInlineErr(msg) {
+      const el = document.getElementById('inlineMsg');
+      el.className = 'error';
+      el.textContent = msg;
+    }
+
+    validateLink();
   </script>
 </body>
 </html>
