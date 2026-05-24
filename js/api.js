@@ -10,15 +10,24 @@ async function api(path, opts = {}) {
   const { body, headers, ...rest } = opts;
   const u = getCurrentUser();
   const actor = u ? `${u.username}(${u.role})` : 'anonymous';
-  const res = await fetch(API_BASE + path, {
-    ...rest,
-    headers: { 'Content-Type': 'application/json', 'X-User': actor, ...headers },
-    body: body ? JSON.stringify(body) : undefined
-  });
+
+  let res;
+  try {
+    res = await fetch(API_BASE + path, {
+      ...rest,
+      headers: { 'Content-Type': 'application/json', 'X-User': actor, ...headers },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  } catch (networkErr) {
+    throw new Error('Failed to fetch — check your internet connection.');
+  }
+
   const text = await res.text();
   let data;
-  try { data = JSON.parse(text); } catch { throw new Error('Server returned non-JSON: ' + text.slice(0, 80)); }
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  try { data = JSON.parse(text); } catch {
+    throw new Error('Server returned an unexpected response. Please try again.');
+  }
+  if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
   return data;
 }
 
