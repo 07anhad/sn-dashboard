@@ -815,6 +815,18 @@ tbody td {
   font-size: 0.8rem;
 }
 
+/* pending uid - orange */
+td code [data-pending] , code.uid-pending {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #b45309 !important;
+  border: 1px dashed #f59e0b !important;
+}
+
+[data-theme="dark"] td code [data-pending] , [data-theme="dark"] code.uid-pending {
+  background: rgba(245, 158, 11, 0.25) !important;
+  color: #f59e0b !important;
+  border: 1px dashed #f59e0b !important;
+
 /* ══════════════════════════════════════════════
    ENHANCED DARK THEME - Comprehensive Fixes
    ══════════════════════════════════════════════ */

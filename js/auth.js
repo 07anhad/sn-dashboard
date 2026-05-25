@@ -60,14 +60,19 @@ function handleLogin(e) {
   .then(r => r.json())
   .then(data => {
     if (data.ok) {
-      sessionStorage.setItem('currentUser', JSON.stringify({
-        username: data.user.username,
-        name: data.user.name,
-        role: data.user.role,
-        email: data.user.email,
-        memberId: data.user.member_id || null,
+      const userPayload = {
+        username:  data.user.username,
+        name:      data.user.name,
+        role:      data.user.role,
+        email:     data.user.email,
+        memberId:  data.user.member_id  || null,
         memberUid: data.user.member_uid || null
-      }));
+      };
+      // Write to both storages — sessionStorage is cleared by Safari on macOS
+      // when a tab suspends or restores from the back-forward cache.
+      // localStorage persists across those events and is the reliable fallback.
+      sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
+      localStorage.setItem('currentUser',   JSON.stringify(userPayload));
       window.location.href = 'dashboard.html';
     } else {
       err.textContent = currentRole === 'admin'
@@ -89,6 +94,7 @@ function handleLogin(e) {
 // ── Logout ────────────────────────────────
 function logout() {
   sessionStorage.removeItem('currentUser');
+  localStorage.removeItem('currentUser');
   window.location.href = 'index.html';
 }
 
@@ -103,20 +109,44 @@ function requireAuth() {
 }
 
 // ── Get current session user ──────────────
+// Checks sessionStorage first, falls back to localStorage.
+// This prevents macOS Safari from logging users out when a tab is suspended
+// or restored from the back-forward cache (which wipes sessionStorage).
 function getCurrentUser() {
   try {
-    return JSON.parse(sessionStorage.getItem('currentUser'));
+    const raw = sessionStorage.getItem('currentUser') || localStorage.getItem('currentUser');
+    if (!raw) return null;
+    const user = JSON.parse(raw);
+    // If we got it from localStorage but not sessionStorage, re-hydrate sessionStorage
+    // so same-tab code that reads sessionStorage directly still works.
+    if (!sessionStorage.getItem('currentUser')) {
+      sessionStorage.setItem('currentUser', raw);
+    }
+    return user;
   } catch {
     return null;
   }
+}
+
+// ── Role helpers ──────────────────────────
+function isAdmin() {
+  const u = getCurrentUser();
+  return u && (u.role === 'admin' || u.role === 'superadmin');
+}
+
+function isSuperAdmin() {
+  const u = getCurrentUser();
+  return u && u.role === 'superadmin';
 }
 
 // ── On dashboard.html: guard + init UI ────
 if (document.getElementById('userName')) {
   const user = requireAuth();
   if (user) {
-    document.getElementById('userName').textContent  = user.name;
-    document.getElementById('userRole').textContent  = user.role === 'superadmin' ? 'Super Administrator' : user.role === 'admin' ? 'Administrator' : 'Member';
+    document.getElementById('userName').textContent   = user.name;
+    document.getElementById('userRole').textContent   = user.role === 'superadmin'
+      ? 'Super Administrator'
+      : user.role === 'admin' ? 'Administrator' : 'Member';
     document.getElementById('userAvatar').textContent = user.name.charAt(0).toUpperCase();
     document.getElementById('topbarUser').textContent = user.name;
   }
@@ -131,32 +161,32 @@ if (document.getElementById('loginForm')) {
 // ── Form switching ────────────────────────
 function showSignup(e) {
   e.preventDefault();
-  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('loginForm').style.display  = 'none';
   document.getElementById('forgotForm').style.display = 'none';
   document.getElementById('signupForm').style.display = 'flex';
-  document.getElementById('loginHint').style.display = 'none';
+  document.getElementById('loginHint').style.display  = 'none';
   document.querySelector('.login-toggle').style.display = 'none';
 }
 
 function showForgotPassword(e) {
   e.preventDefault();
-  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('loginForm').style.display  = 'none';
   document.getElementById('signupForm').style.display = 'none';
   document.getElementById('forgotForm').style.display = 'flex';
-  document.getElementById('loginHint').style.display = 'none';
+  document.getElementById('loginHint').style.display  = 'none';
   document.querySelector('.login-toggle').style.display = 'none';
 }
 
 function showLoginForm(e) {
   e.preventDefault();
-  document.getElementById('loginForm').style.display = 'flex';
+  document.getElementById('loginForm').style.display  = 'flex';
   document.getElementById('signupForm').style.display = 'none';
   document.getElementById('forgotForm').style.display = 'none';
   const hint = document.getElementById('loginHint');
   if (hint) hint.style.display = 'none';
   document.querySelector('.login-toggle').style.display = 'flex';
   // Clear messages
-  ['signupError','signupSuccess','forgotError','forgotSuccess'].forEach(id => {
+  ['signupError', 'signupSuccess', 'forgotError', 'forgotSuccess'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -175,10 +205,9 @@ function handleSignup(e) {
   const succEl   = document.getElementById('signupSuccess');
   const btn      = document.getElementById('signupBtn');
 
-  errEl.style.display = 'none';
+  errEl.style.display  = 'none';
   succEl.style.display = 'none';
 
-  // Validation
   if (!name) {
     errEl.textContent = 'Please enter your full name.';
     errEl.style.display = 'block';
@@ -227,13 +256,11 @@ function handleSignup(e) {
     btn.disabled = false;
     btn.querySelector('.btn-text').textContent = 'Create Account';
     if (data.ok) {
-      // Show success, then auto-redirect to login after 2s
-      succEl.innerHTML = `✓ Account created! Redirecting to sign in…`;
+      succEl.innerHTML = '✓ Account created! Redirecting to sign in…';
       succEl.style.display = 'block';
       document.getElementById('signupForm').reset();
       setTimeout(() => {
         showLoginForm({ preventDefault: () => {} });
-        // Pre-fill username on login form
         const loginIdEl = document.getElementById('loginId');
         if (loginIdEl) {
           loginIdEl.value = username;
@@ -263,7 +290,7 @@ function handleForgotPassword(e) {
   const succEl   = document.getElementById('forgotSuccess');
   const btn      = document.getElementById('forgotBtn');
 
-  errEl.style.display = 'none';
+  errEl.style.display  = 'none';
   succEl.style.display = 'none';
 
   if (!username) {

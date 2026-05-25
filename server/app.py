@@ -438,12 +438,14 @@ def add_reg_link():
     audit('ADD_REG_LINK', f"title={d['title']} code={d['code']}")
     return jsonify(row), 201
 
+# AFTER — convert empty string to None so Postgres gets NULL instead of ''
 @app.route('/api/reg-links/<int:id>', methods=['PUT'])
 def update_reg_link(id):
     d = request.json
+    expiry = d.get('expiry') or None          # '' → None → SQL NULL
     execute(
         "UPDATE reg_links SET title=%s,code=%s,url=%s,active=%s,max_uses=%s,used_count=%s,expiry=%s WHERE id=%s",
-        (d['title'], d['code'], d.get('url',''), d.get('active',True), d.get('maxUses',0), d.get('usedCount',0), d.get('expiry'), id)
+        (d['title'], d['code'], d.get('url',''), d.get('active',True), d.get('maxUses',0), d.get('usedCount',0), expiry, id)
     )
     audit('EDIT_REG_LINK', f"id={id} title={d['title']}")
     return jsonify({'ok': True})
@@ -560,15 +562,14 @@ def approve_pending_member(id):
         return jsonify({'ok': False, 'error': 'Not found'}), 404
 
     actor = request.headers.get('X-User', 'unknown')
-    import random, string
-    initials = ''.join(w[0].upper() for w in (row['name'] or 'XX').split()[:3])
-    year = _dt.date.today().year
-    suffix = ''.join(random.choices(string.digits, k=8))
-    uid = f"{initials}{year}{suffix}"
-    while query("SELECT 1 FROM member_details WHERE uid=%s", (uid,)):
-        suffix = ''.join(random.choices(string.digits, k=8))
-        uid = f"{initials}{year}{suffix}"
+    
+    uid = (row.get('uid') or '').strip() or f"PENDING-{id}"
 
+    # if a real uid is given check if its already taken. 
+    
+    if not uid.startswith('PENDING-')and query("SELECT 1 FROM member_details WHERE uid=%s",(uid,)):
+        return jsonify({'ok':False,'error':f"UID '{uid}' id already in use"}),409
+    
     execute("""
         INSERT INTO member_details (
             uid, name, date_of_initiation, date_of_registration_jigyasu,
@@ -628,7 +629,7 @@ def approve_pending_member(id):
         "UPDATE pending_members SET status='approved', reviewed_at=NOW(), reviewed_by=%s WHERE id=%s",
         (actor, id)
     )
-    audit('APPROVE_REGISTRATION', f"id={id} name={row['name']} new_uid={uid}")
+    audit('APPROVE_REGISTRATION', f"id={id} name={row['name']} uid={uid or 'pending'}")
 
     # Send approval email if applicant provided an email
     to_email = row.get('email1') or row.get('email2')
@@ -1798,5 +1799,5 @@ if __name__ == '__main__':
     print("Seeding data...")
     seed_module.seed()
 
-    print("Starting server on http://localhost:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    print("Starting server on http://localhost:5001")
+    app.run(host='0.0.0.0', port=5001, debug=True)

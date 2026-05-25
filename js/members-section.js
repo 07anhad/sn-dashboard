@@ -902,7 +902,7 @@ function memberRow(m) {
         </div>
       </td>
       <td>${v(m.sl)}</td>
-      <td><code style="font-size:0.78rem;color:var(--clr-navy-mid)">${v(m.uid)}</code></td>
+<td><code style="font-size:0.78rem;color:var(--clr-navy-mid)" ${m.uid?.startsWith('PENDING-') ? 'data-pending title="UID not yet assigned"' : ''}>${v(m.uid)}</code></td>
       <td>${v(m.bslno)}</td>
       <td><strong>${v(m.name)}</strong></td>
       ${d(m.dateOfInitiation)}

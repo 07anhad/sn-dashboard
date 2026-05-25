@@ -8,7 +8,7 @@ const API_BASE = '';  // same origin
 
 async function api(path, opts = {}) {
   const { body, headers, ...rest } = opts;
-  const u = getCurrentUser();
+  const u     = getCurrentUser();
   const actor = u ? `${u.username}(${u.role})` : 'anonymous';
 
   let res;
@@ -27,11 +27,21 @@ async function api(path, opts = {}) {
   try { data = JSON.parse(text); } catch {
     throw new Error('Server returned an unexpected response. Please try again.');
   }
+
+  // 401 means the session is no longer valid on the server side.
+  // Clear both storages and redirect to login so the user can re-authenticate.
+  if (res.status === 401) {
+    sessionStorage.removeItem('currentUser');
+    localStorage.removeItem('currentUser');
+    window.location.href = 'index.html';
+    throw new Error('Session expired. Please log in again.');
+  }
+
   if (!res.ok) throw new Error(data.error || `Server error (${res.status})`);
   return data;
 }
 
-function apiGet(path)         { return api(path); }
-function apiPost(path, body)  { return api(path, { method: 'POST', body }); }
-function apiPut(path, body)   { return api(path, { method: 'PUT', body }); }
-function apiDelete(path)      { return api(path, { method: 'DELETE' }); }
+function apiGet(path)        { return api(path); }
+function apiPost(path, body) { return api(path, { method: 'POST', body }); }
+function apiPut(path, body)  { return api(path, { method: 'PUT',  body }); }
+function apiDelete(path)     { return api(path, { method: 'DELETE' }); }
