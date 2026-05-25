@@ -29,17 +29,17 @@ async function renderRegistration() {
 
     <!-- Links tab -->
     <div id="regPanelLinks">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-lg)">
-        <div style="display:flex;gap:var(--sp-md)">
-          <div class="contrib-card" style="min-width:120px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--sp-md);margin-bottom:var(--sp-lg)">
+        <div style="display:flex;gap:var(--sp-md);flex-wrap:wrap">
+          <div class="contrib-card" style="min-width:100px">
             <h4>Active Links</h4>
             <div class="amount" style="color:var(--clr-green)">${active.length}</div>
           </div>
-          <div class="contrib-card" style="min-width:120px;border-left-color:var(--clr-red)">
+          <div class="contrib-card" style="min-width:100px;border-left-color:var(--clr-red)">
             <h4>Inactive Links</h4>
             <div class="amount" style="color:var(--clr-red)">${inactive.length}</div>
           </div>
-          <div class="contrib-card" style="min-width:120px;border-left-color:var(--clr-saffron)">
+          <div class="contrib-card" style="min-width:100px;border-left-color:var(--clr-saffron)">
             <h4>Pending</h4>
             <div class="amount" style="color:var(--clr-saffron)">${pendingOpen.length}</div>
           </div>
