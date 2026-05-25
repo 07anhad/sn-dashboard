@@ -675,10 +675,38 @@ tbody td {
   .filters-bar {
     grid-template-columns: 1fr;
   }
+
+  /* Registration links card — fix overflow & button alignment */
+  .reg-link-card {
+    word-break: break-all;
+  }
+  .reg-link-url {
+    white-space: normal;
+    word-break: break-all;
+  }
+  .reg-link-card > div[style*="display:flex"][style*="gap:6px"] {
+    flex-wrap: wrap;
+  }
+  .reg-link-card .tbl-btn {
+    flex: 1 1 auto;
+    text-align: center;
+    min-width: 80px;
+  }
+
+  /* Prevent iOS zoom on input focus — font-size must be >= 16px */
+  input, select, textarea,
+  .form-field input, .form-field select, .form-field textarea,
+  .input-wrap input, .filters-bar input, .filters-bar select {
+    font-size: 16px !important;
+  }
 }
 @media (max-width: 400px) {
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+  .reg-link-meta {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -1111,4 +1139,4 @@ td code [data-pending] , code.uid-pending {
   background: #2a2d3a;
   color: var(--txt-secondary);
   border-color: var(--border);
-}
+}}
