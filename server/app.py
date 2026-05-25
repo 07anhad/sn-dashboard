@@ -26,8 +26,29 @@ from db import query, execute
 app = Flask(__name__, static_folder=None)
 CORS(app)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB upload limit
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-insecure-key')
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
+
+# ═══════════════════════════════════════════
+# Auto-initialise DB schema on startup
+# ═══════════════════════════════════════════
+def _init_db():
+    schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+    try:
+        with open(schema_path, 'r', encoding='utf-8') as f:
+            sql = f.read()
+        from db import get_conn
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(sql)
+        conn.commit()
+        conn.close()
+        print('[startup] DB schema initialised OK')
+    except Exception as e:
+        print(f'[startup] DB init error: {e}')
+
+_init_db()
 
 # ═══════════════════════════════════════════
 # Email configuration — set these env vars or edit defaults
