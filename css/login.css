@@ -303,6 +303,13 @@
   .login-toggle { margin-bottom: var(--sp-lg); }
   .login-form { gap: var(--sp-sm); }
   .login-btn { padding: 13px; font-size: 0.95rem; }
+
+  /* Prevent iOS auto-zoom on input focus (requires font-size >= 16px) */
+  .input-wrap input,
+  .input-wrap select,
+  .input-wrap textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* Shake animation for errors */
