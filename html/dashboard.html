@@ -207,10 +207,38 @@
   <script src="/js/router.js?v=8"></script>
   <!-- Body-level portal for ⋮ dropdown — must be outside all tables/scroll containers -->
   <div id="act-portal"></div>
+
+  <!-- iOS PWA install banner -->
+  <div id="iosBanner" style="
+    display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;
+    background:#1c1f2e;color:#fff;padding:16px 20px 20px;
+    box-shadow:0 -4px 24px rgba(0,0,0,.35);
+    font-family:Outfit,sans-serif;font-size:0.88rem;line-height:1.5;
+  ">
+    <button onclick="document.getElementById('iosBanner').style.display='none';localStorage.setItem('pwa-banner-dismissed','1')" style="
+      float:right;background:none;border:none;color:#aaa;font-size:1.4rem;
+      cursor:pointer;margin:-4px -4px 0 12px;line-height:1;
+    ">&times;</button>
+    <strong style="font-size:0.95rem;color:#e07b29;">Install this app on your iPhone</strong><br>
+    Tap the <strong>Share</strong> button
+    <svg style="vertical-align:middle;margin:0 2px" width="18" height="18" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M25 33V5M15 15l10-10 10 10" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><rect x="7" y="25" width="36" height="20" rx="4" stroke="#fff" stroke-width="4"/></svg>
+    in Safari, then tap <strong>"Add to Home Screen"</strong>.
+  </div>
+
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(console.error);
     }
+    // Show iOS install banner: iOS + Safari + not already installed + not dismissed
+    (function () {
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isStandalone = window.navigator.standalone === true;
+      const dismissed = localStorage.getItem('pwa-banner-dismissed');
+      if (isIOS && isSafari && !isStandalone && !dismissed) {
+        document.getElementById('iosBanner').style.display = 'block';
+      }
+    })();
   </script>
 </body>
 </html>
