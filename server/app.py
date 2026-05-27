@@ -759,7 +759,26 @@ def delete_announcement(id):
 # ═══════════════════════════════════════════
 @app.route('/api/attendance/esatsang')
 def get_esatsang():
-    return jsonify(query("SELECT * FROM esatsang_attendance ORDER BY attendance_date DESC NULLS LAST, id DESC"))
+    uid      = request.args.get('uid', '').strip()
+    page     = max(1, int(request.args.get('page', 1)))
+    per_page = min(500, max(1, int(request.args.get('per_page', 200))))
+    offset   = (page - 1) * per_page
+
+    if uid:
+        # Member view: only their own records — no pagination needed (small set)
+        rows = query(
+            "SELECT * FROM esatsang_attendance WHERE member_uid = %s ORDER BY attendance_date DESC NULLS LAST, id DESC",
+            (uid,)
+        )
+        return jsonify({'rows': rows, 'total': len(rows), 'page': 1, 'pages': 1})
+
+    # Count total for pagination metadata
+    total = query("SELECT COUNT(*) AS n FROM esatsang_attendance", one=True)['n']
+    rows  = query(
+        "SELECT * FROM esatsang_attendance ORDER BY attendance_date DESC NULLS LAST, id DESC LIMIT %s OFFSET %s",
+        (per_page, offset)
+    )
+    return jsonify({'rows': rows, 'total': total, 'page': page, 'pages': -(-total // per_page)})
 
 @app.route('/api/attendance/esatsang/upload', methods=['POST'])
 def upload_esatsang_attendance():
