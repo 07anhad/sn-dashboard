@@ -29,8 +29,8 @@ async function loadMemberOwnAttendance() {
     return;
   }
   try {
-    const raw = await apiGet('/api/attendance/esatsang');
-    attData = mapRows(raw).filter(r => r.uid === memberUid);
+    const resp = await apiGet(`/api/attendance/esatsang?uid=${encodeURIComponent(memberUid)}`);
+    attData = mapRows(resp.rows ?? resp);
   } catch (e) {
     attData = [];
   }
@@ -43,8 +43,8 @@ async function loadAttendanceData() {
   const container = document.getElementById('attendanceContent');
   container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt-muted)">Loading\u2026</div>';
   try {
-    const raw = await apiGet('/api/attendance/esatsang');
-    attData = mapRows(raw);
+    const resp = await apiGet('/api/attendance/esatsang?per_page=200');
+    attData = mapRows(resp.rows ?? resp);
   } catch (e) {
     attData = [];
   }
