@@ -43,7 +43,7 @@ async function loadAttendanceData() {
   const container = document.getElementById('attendanceContent');
   container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt-muted)">Loading\u2026</div>';
   try {
-    const resp = await apiGet('/api/attendance/esatsang?per_page=200');
+    const resp = await apiGet('/api/attendance/esatsang');
     attData = mapRows(resp.rows ?? resp);
   } catch (e) {
     attData = [];
