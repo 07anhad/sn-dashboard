@@ -241,6 +241,12 @@ CREATE TABLE IF NOT EXISTS esatsang_attendance (
     attendance_type VARCHAR(50)
 );
 
+-- Indexes for esatsang_attendance (speed up ORDER BY date, member UID lookups)
+CREATE INDEX IF NOT EXISTS idx_esatsang_date     ON esatsang_attendance (attendance_date DESC);
+CREATE INDEX IF NOT EXISTS idx_esatsang_uid      ON esatsang_attendance (member_uid);
+CREATE INDEX IF NOT EXISTS idx_esatsang_member   ON esatsang_attendance (member_id);
+CREATE INDEX IF NOT EXISTS idx_esatsang_branch   ON esatsang_attendance (branch_name);
+
 -- Branch Attendance
 CREATE TABLE IF NOT EXISTS branch_attendance (
     id                  SERIAL PRIMARY KEY,
