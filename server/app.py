@@ -139,6 +139,21 @@ def js_files(filename):
 def dataset_files(filename):
     return send_from_directory(os.path.join(ROOT, 'dataset'), filename)
 
+@app.route('/manifest.json')
+def manifest():
+    return send_from_directory(ROOT, 'manifest.json', mimetype='application/manifest+json')
+
+@app.route('/sw.js')
+def service_worker():
+    resp = send_from_directory(ROOT, 'sw.js', mimetype='application/javascript')
+    resp.headers['Service-Worker-Allowed'] = '/'
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
+
+@app.route('/icons/<path:filename>')
+def icon_files(filename):
+    return send_from_directory(os.path.join(ROOT, 'icons'), filename)
+
 # ═══════════════════════════════════════════
 # AUTH API
 # ═══════════════════════════════════════════
