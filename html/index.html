@@ -8,6 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="/css/login.css" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#e07b29" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
 </head>
 <body class="login-body">
 
@@ -169,5 +172,10 @@
 
   <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
+    }
+  </script>
 </body>
 </html>
