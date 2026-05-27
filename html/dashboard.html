@@ -9,6 +9,9 @@
   <link rel="stylesheet" href="/css/style.css?v=9" />
   <link rel="stylesheet" href="/css/dashboard.css?v=9" />
   <link rel="stylesheet" href="/css/components.css?v=9" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#e07b29" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
 </head>
 <body class="dash-body">
 
@@ -204,5 +207,10 @@
   <script src="/js/router.js?v=8"></script>
   <!-- Body-level portal for ⋮ dropdown — must be outside all tables/scroll containers -->
   <div id="act-portal"></div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
+    }
+  </script>
 </body>
 </html>
