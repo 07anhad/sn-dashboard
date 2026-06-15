@@ -1,4 +1,4 @@
-# SN Dashboard — Setup Guide
+# SN Dashboard
 
 ## Requirements
 - Python 3.10+
@@ -19,7 +19,7 @@ Open **pgAdmin** (or psql) and run:
 ```sql
 CREATE DATABASE satsang_portal;
 ```
-The user/password defaults to `postgres` / `anhad12345`.  
+The user/password defaults to `postgres`.  
 To use different credentials, set environment variables before starting the server:
 ```
 DB_USER=postgres
@@ -53,14 +53,6 @@ pip install -r requirements.txt
 .venv/bin/python server/app.py
 ```
 
-The server starts at **http://localhost:5000**  
-On first run it automatically:
-- Creates all tables (`schema.sql`)
-- Seeds initial data (admin user, member types, etc.)
-
-### 5. Open in browser
-Go to **http://localhost:5000**
-
 ---
 
 ## Notes
@@ -91,3 +83,66 @@ Go to **Dashboard → Haazri** and click **"Upload Excel / CSV"**.
 - Accepts `.xlsx` or `.csv` files
 - Required columns: Attendance Date, Member ID, Event Name
 - Duplicates (same date + member + event) are automatically skipped
+
+---
+
+## Production Deployment
+
+### Platform
+Configured for **Railway** (also works on Render, Heroku, any Linux VPS).
+
+### Tech Stack
+| | |
+|---|---|
+| Language | Python 3.11.4 |
+| Web framework | Flask + Gunicorn |
+| Database | PostgreSQL |
+| Start command | `gunicorn --bind 0.0.0.0:$PORT --workers 4 --threads 2 server.app:app` |
+
+### Environment Variables
+Set these in the platform's dashboard (e.g. Railway → Variables tab):
+
+| Variable | Value | Notes |
+|---|---|---|
+| `DATABASE_URL` | `postgres://user:password@host:port/dbname` | Platform usually provides this automatically when you add a Postgres plugin |
+| `SECRET_KEY` | any random 32+ character string | Used for Flask session signing |
+
+If `DATABASE_URL` is not available as a single URL, these individual vars are also supported:
+
+| Variable | Example |
+|---|---|
+| `DB_HOST` | `localhost` |
+| `DB_PORT` | `5432` |
+| `DB_USER` | `postgres` |
+| `DB_PASSWORD` | *(your db password)* |
+| `DB_NAME` | `satsang_portal` |
+
+### Database Setup
+After the PostgreSQL database is created on the platform, run the schema once to create all tables:
+```bash
+psql -h <host> -U <user> -d <dbname> -f server/schema.sql
+```
+Or open the platform's DB shell and paste the contents of `server/schema.sql`.
+
+### Files to deploy (entire repo)
+```
+server/app.py        ← main application
+server/db.py         ← database helper
+server/schema.sql    ← run once to create tables
+manifest.json        ← PWA manifest
+sw.js                ← service worker
+icons/               ← app icons
+html/ css/ js/       ← frontend
+Procfile             ← start command (Railway/Heroku reads this automatically)
+requirements.txt
+runtime.txt
+```
+
+### PWA / Mobile App
+This app is a Progressive Web App (PWA). Members can install it on their phones:
+- **Android (Chrome)**: Browser will show an "Add to Home Screen" prompt automatically
+- **iPhone (Safari only)**: Tap the Share button → "Add to Home Screen"
+  _(must use Safari, not Chrome, on iPhone)_
+
+> **Security note**: Never share your actual `SECRET_KEY` or `DB_PASSWORD` over chat/email. Enter them directly into the platform's environment variable settings.
+
