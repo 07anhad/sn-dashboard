@@ -137,12 +137,3 @@ Procfile             ← start command (Railway/Heroku reads this automatically)
 requirements.txt
 runtime.txt
 ```
-
-### PWA / Mobile App
-This app is a Progressive Web App (PWA). Members can install it on their phones:
-- **Android (Chrome)**: Browser will show an "Add to Home Screen" prompt automatically
-- **iPhone (Safari only)**: Tap the Share button → "Add to Home Screen"
-  _(must use Safari, not Chrome, on iPhone)_
-
-> **Security note**: Never share your actual `SECRET_KEY` or `DB_PASSWORD` over chat/email. Enter them directly into the platform's environment variable settings.
-
