@@ -6,7 +6,7 @@
 
 ---
 
-## First-time setup on a new machine
+## setup on a new machine
 
 ### 1. Clone the repo
 ```
@@ -58,7 +58,6 @@ pip install -r requirements.txt
 ## Notes
 - **Attendance data** lives in `esatsang_attendance` table — upload via the Haazri tab
 - **Member data** lives in `member_details` table — upload via the Members tab (Excel/CSV upload button)
-- The `.venv/` folder is gitignored — never commit it
 
 ## Importing Data
 
@@ -69,7 +68,6 @@ Go to **Dashboard → Members** and click **"Upload Excel / CSV"** at the top.
 - **Required column**: UID
 - All other columns are auto-detected from Excel headers (e.g., Name, Mobile-1, Email-1, City, etc.)
 - Existing records (matching UID) are updated; new UIDs are inserted
-- No Python environment needed — works entirely from the browser
 
 ### Superhumane (Sant-Su Children)
 Go to **Dashboard → Members → Superhumane (Sant-Su)** tab and click **"Upload Excel / CSV"**.
@@ -89,7 +87,6 @@ Go to **Dashboard → Haazri** and click **"Upload Excel / CSV"**.
 ## Production Deployment
 
 ### Platform
-Configured for **Railway** (also works on Render, Heroku, any Linux VPS).
 
 ### Tech Stack
 | | |
