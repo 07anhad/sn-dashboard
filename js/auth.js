@@ -41,7 +41,10 @@ function togglePass() {
   input.type = input.type === 'password' ? 'text' : 'password';
 }
 
-// ── Handle login form submission ──────────
+// ── Temp store credentials across OTP step ─
+let _otpCredentials = null;
+
+// ── Handle login form submission — sends OTP ─
 function handleLogin(e) {
   e.preventDefault();
   const id   = document.getElementById('loginId').value.trim();
@@ -50,12 +53,60 @@ function handleLogin(e) {
   const err  = document.getElementById('loginError');
 
   btn.disabled = true;
-  btn.querySelector('.btn-text').textContent = 'Signing in…';
+  btn.querySelector('.btn-text').textContent = 'Sending code…';
 
-  fetch('/api/auth/login', {
+  fetch('/api/auth/send-otp', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: id, password: pass, role: currentRole })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      // Store credentials temporarily for the verify step
+      _otpCredentials = { username: id, password: pass, role: currentRole };
+      // Show OTP step
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('otpForm').style.display   = 'block';
+      document.getElementById('otpMaskedEmail').textContent = data.maskedEmail;
+      document.getElementById('otpCode').value = '';
+      document.getElementById('otpError').style.display = 'none';
+      setTimeout(() => document.getElementById('otpCode').focus(), 100);
+    } else {
+      err.textContent = data.error || 'Invalid credentials. Please try again.';
+      err.style.display = 'block';
+    }
+  })
+  .catch(() => {
+    err.textContent = 'Server error. Please try again later.';
+    err.style.display = 'block';
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Sign In';
+  });
+}
+
+// ── Verify OTP code ───────────────────────
+function handleVerifyOtp() {
+  const code = (document.getElementById('otpCode').value || '').trim();
+  const btn  = document.getElementById('otpVerifyBtn');
+  const err  = document.getElementById('otpError');
+
+  if (code.length !== 6) {
+    err.textContent = 'Please enter the 6-digit code from your email.';
+    err.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.querySelector('.btn-text').textContent = 'Verifying…';
+  err.style.display = 'none';
+
+  fetch('/api/auth/verify-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ..._otpCredentials, code })
   })
   .then(r => r.json())
   .then(data => {
@@ -68,26 +119,53 @@ function handleLogin(e) {
         memberId:  data.user.member_id  || null,
         memberUid: data.user.member_uid || null
       };
-      // Write to both storages — sessionStorage is cleared by Safari on macOS
-      // when a tab suspends or restores from the back-forward cache.
-      // localStorage persists across those events and is the reliable fallback.
       sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
       localStorage.setItem('currentUser',   JSON.stringify(userPayload));
+      _otpCredentials = null;
       window.location.href = 'dashboard.html';
     } else {
-      err.textContent = currentRole === 'admin'
-        ? 'Invalid admin credentials. Please try again.'
-        : 'Invalid member credentials. Please try again.';
+      err.textContent = data.error || 'Invalid or expired code.';
       err.style.display = 'block';
       btn.disabled = false;
-      btn.querySelector('.btn-text').textContent = 'Sign In';
+      btn.querySelector('.btn-text').textContent = 'Verify & Sign In';
     }
   })
   .catch(() => {
-    err.textContent = 'Server error. Please try again later.';
+    err.textContent = 'Server error. Please try again.';
     err.style.display = 'block';
     btn.disabled = false;
-    btn.querySelector('.btn-text').textContent = 'Sign In';
+    btn.querySelector('.btn-text').textContent = 'Verify & Sign In';
+  });
+}
+
+// ── Resend OTP ────────────────────────────
+function handleResendOtp(e) {
+  e.preventDefault();
+  if (!_otpCredentials) { showLoginForm(e); return; }
+  const err = document.getElementById('otpError');
+  err.style.display = 'none';
+  document.getElementById('otpCode').value = '';
+
+  fetch('/api/auth/send-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(_otpCredentials)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      document.getElementById('otpMaskedEmail').textContent = data.maskedEmail;
+      err.style.cssText = 'display:block;background:rgba(34,197,94,0.15);color:#22c55e;border-color:rgba(34,197,94,0.3)';
+      err.textContent = 'New code sent!';
+      setTimeout(() => { err.style.display = 'none'; err.removeAttribute('style'); }, 3000);
+    } else {
+      err.textContent = data.error || 'Failed to resend. Please go back and try again.';
+      err.style.display = 'block';
+    }
+  })
+  .catch(() => {
+    err.textContent = 'Server error. Please try again.';
+    err.style.display = 'block';
   });
 }
 
@@ -179,14 +257,16 @@ function showForgotPassword(e) {
 
 function showLoginForm(e) {
   e.preventDefault();
+  _otpCredentials = null;
   document.getElementById('loginForm').style.display  = 'flex';
   document.getElementById('signupForm').style.display = 'none';
   document.getElementById('forgotForm').style.display = 'none';
+  document.getElementById('otpForm').style.display    = 'none';
   const hint = document.getElementById('loginHint');
   if (hint) hint.style.display = 'none';
   document.querySelector('.login-toggle').style.display = 'flex';
   // Clear messages
-  ['signupError', 'signupSuccess', 'forgotError', 'forgotSuccess'].forEach(id => {
+  ['signupError', 'signupSuccess', 'forgotError', 'forgotSuccess', 'loginError', 'otpError'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
