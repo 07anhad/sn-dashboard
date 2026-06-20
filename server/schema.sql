@@ -416,3 +416,14 @@ CREATE TABLE IF NOT EXISTS superhumane_details (
     date_entry_scheme   DATE,
     date_exit_scheme    DATE
 );
+
+-- OTP tokens for email-based login verification
+CREATE TABLE IF NOT EXISTS otp_tokens (
+    id         SERIAL PRIMARY KEY,
+    email      VARCHAR(200) NOT NULL,
+    code       VARCHAR(6)   NOT NULL,
+    expires_at TIMESTAMP    NOT NULL,
+    used       BOOLEAN      DEFAULT FALSE,
+    created_at TIMESTAMP    DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_tokens (email);
