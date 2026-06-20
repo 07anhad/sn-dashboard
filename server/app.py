@@ -307,6 +307,13 @@ def verify_otp():
         return jsonify({'ok': False, 'error': 'Invalid credentials.'}), 401
 
     email = (user.get('email') or '').strip()
+    # Debug: log what we're checking
+    logging.warning(f"[OTP DEBUG] email={email!r} code={code!r}")
+    latest = query(
+        "SELECT id, code, used, expires_at FROM otp_tokens WHERE email=%s ORDER BY created_at DESC LIMIT 1",
+        (email,), one=True
+    )
+    logging.warning(f"[OTP DEBUG] latest token={latest}")
     token = query(
         "SELECT id FROM otp_tokens WHERE email=%s AND code=%s AND used=FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
         (email, code), one=True
