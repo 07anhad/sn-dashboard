@@ -156,7 +156,7 @@
       </form>
 
       <!-- FORGOT PASSWORD FORM (hidden by default) -->
-      <form class="login-form" id="forgotForm" style="display:none;" onsubmit="handleForgotPassword(event)">
+      <form class="login-form" id="forgotForm" style="display:none;" onsubmit="handleForgotStep1(event)">
         <div class="form-group">
           <label for="forgotUsername">Username</label>
           <div class="input-wrap">
@@ -164,33 +164,61 @@
             <input type="text" id="forgotUsername" placeholder="Enter your username" required autocomplete="off" />
           </div>
         </div>
+
+        <div id="forgotError" class="login-error" style="display:none;"></div>
+        <div id="forgotSuccess" class="login-success" style="display:none;"></div>
+
+        <button type="submit" class="login-btn" id="forgotBtn">
+          <span class="btn-text">Send OTP</span>
+          <span class="btn-arrow">→</span>
+        </button>
+        <div class="login-links">
+          <a href="#" onclick="showLoginForm(event)">← Back to Sign In</a>
+        </div>
+      </form>
+
+      <!-- FORGOT PASSWORD STEP 2: OTP + new password -->
+      <div class="login-form" id="forgotOtpForm" style="display:none;">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:2rem;margin-bottom:8px">📧</div>
+          <div style="color:rgba(255,255,255,0.9);font-size:0.95rem;font-weight:600;margin-bottom:6px">Verify your identity</div>
+          <div style="color:rgba(255,255,255,0.55);font-size:0.82rem">Code sent to <span id="forgotMaskedEmail" style="color:rgba(255,255,255,0.8);font-weight:600"></span></div>
+        </div>
+        <div class="form-group">
+          <label for="forgotOtpCode">6-digit code</label>
+          <div class="input-wrap">
+            <span class="input-icon">◉</span>
+            <input type="text" id="forgotOtpCode" placeholder="e.g. 483920" maxlength="6"
+                   inputmode="numeric" autocomplete="one-time-code"
+                   style="letter-spacing:8px;font-size:1.2rem;text-align:center"
+                   oninput="this.value=this.value.replace(/\D/g,'')" />
+          </div>
+        </div>
         <div class="form-group">
           <label for="forgotNewPass">New Password</label>
           <div class="input-wrap">
             <span class="input-icon">◉</span>
-            <input type="password" id="forgotNewPass" placeholder="New password" required minlength="6" />
+            <input type="password" id="forgotNewPass" placeholder="New password" minlength="6" />
           </div>
         </div>
         <div class="form-group">
           <label for="forgotConfirm">Confirm New Password</label>
           <div class="input-wrap">
             <span class="input-icon">◉</span>
-            <input type="password" id="forgotConfirm" placeholder="Re-enter new password" required minlength="6" />
+            <input type="password" id="forgotConfirm" placeholder="Re-enter new password" minlength="6" />
           </div>
         </div>
-
-        <div id="forgotError" class="login-error" style="display:none;"></div>
-        <div id="forgotSuccess" class="login-success" style="display:none;"></div>
-
-        <button type="submit" class="login-btn" id="forgotBtn">
+        <div id="forgotOtpError" class="login-error" style="display:none;"></div>
+        <button type="button" class="login-btn" id="forgotOtpBtn" onclick="handleForgotStep2()">
           <span class="btn-text">Reset Password</span>
           <span class="btn-arrow">→</span>
         </button>
-
         <div class="login-links">
-          <a href="#" onclick="showLoginForm(event)">← Back to Sign In</a>
+          <a href="#" onclick="handleForgotResend(event)">Resend code</a>
+          <span class="link-sep">·</span>
+          <a href="#" onclick="showForgotPassword(event)">← Back</a>
         </div>
-      </form>
+      </div>
 
       <div class="login-hint" style="display:none;">
         <p id="loginHint"></p>
