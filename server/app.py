@@ -263,9 +263,11 @@ def send_otp():
     # Invalidate any existing unused codes for this email
     execute("UPDATE otp_tokens SET used=TRUE WHERE email=%s AND used=FALSE", (email,))
 
-    code       = str(random.randint(100000, 999999))
-    expires_at = _dt.datetime.utcnow() + _dt.timedelta(minutes=10)
-    execute("INSERT INTO otp_tokens (email, code, expires_at) VALUES (%s, %s, %s)", (email, code, expires_at))
+    code = str(random.randint(100000, 999999))
+    execute(
+        "INSERT INTO otp_tokens (email, code, expires_at) VALUES (%s, %s, NOW() + INTERVAL '10 minutes')",
+        (email, code)
+    )
 
     try:
         _send_otp_email(email, code)
@@ -411,9 +413,11 @@ def forgot_send_otp():
         return jsonify({'ok': False, 'error': 'No email address linked to this account. Contact an administrator.'}), 400
 
     execute("UPDATE otp_tokens SET used=TRUE WHERE email=%s AND used=FALSE", (email,))
-    code       = str(random.randint(100000, 999999))
-    expires_at = _dt.datetime.utcnow() + _dt.timedelta(minutes=10)
-    execute("INSERT INTO otp_tokens (email, code, expires_at) VALUES (%s, %s, %s)", (email, code, expires_at))
+    code = str(random.randint(100000, 999999))
+    execute(
+        "INSERT INTO otp_tokens (email, code, expires_at) VALUES (%s, %s, NOW() + INTERVAL '10 minutes')",
+        (email, code)
+    )
 
     try:
         _send_otp_email(email, code)
