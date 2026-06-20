@@ -336,17 +336,45 @@ function handleSignup(e) {
     btn.disabled = false;
     btn.querySelector('.btn-text').textContent = 'Create Account';
     if (data.ok) {
-      succEl.innerHTML = '✓ Account created! Redirecting to sign in…';
-      succEl.style.display = 'block';
-      document.getElementById('signupForm').reset();
-      setTimeout(() => {
-        showLoginForm({ preventDefault: () => {} });
-        const loginIdEl = document.getElementById('loginId');
-        if (loginIdEl) {
-          loginIdEl.value = username;
-          document.getElementById('loginPass')?.focus();
+      // Account created — now send OTP and go straight to verify step
+      btn.querySelector('.btn-text').textContent = 'Sending code…';
+      btn.disabled = true;
+      fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password: pass, role: 'member' })
+      })
+      .then(r => r.json())
+      .then(otpData => {
+        btn.disabled = false;
+        btn.querySelector('.btn-text').textContent = 'Create Account';
+        document.getElementById('signupForm').reset();
+        if (otpData.ok) {
+          _otpCredentials = { username, password: pass, role: 'member' };
+          document.getElementById('signupForm').style.display = 'none';
+          document.getElementById('otpForm').style.display    = 'block';
+          document.getElementById('otpMaskedEmail').textContent = otpData.maskedEmail;
+          document.getElementById('otpCode').value = '';
+          document.getElementById('otpError').style.display = 'none';
+          setTimeout(() => document.getElementById('otpCode').focus(), 100);
+        } else {
+          // Email failed — fall back to login form
+          succEl.innerHTML = '✓ Account created! Please sign in.';
+          succEl.style.display = 'block';
+          setTimeout(() => {
+            showLoginForm({ preventDefault: () => {} });
+            const loginIdEl = document.getElementById('loginId');
+            if (loginIdEl) { loginIdEl.value = username; document.getElementById('loginPass')?.focus(); }
+          }, 1800);
         }
-      }, 1800);
+      })
+      .catch(() => {
+        btn.disabled = false;
+        btn.querySelector('.btn-text').textContent = 'Create Account';
+        succEl.innerHTML = '✓ Account created! Please sign in.';
+        succEl.style.display = 'block';
+        setTimeout(() => showLoginForm({ preventDefault: () => {} }), 1800);
+      });
     } else {
       errEl.textContent = data.error || 'Signup failed. Please try again.';
       errEl.style.display = 'block';
