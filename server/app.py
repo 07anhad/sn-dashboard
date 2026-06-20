@@ -271,7 +271,11 @@ def send_otp():
         _send_otp_email(email, code)
     except Exception as ex:
         logging.error(f"OTP email failed: {ex}")
-        return jsonify({'ok': False, 'error': 'Failed to send email. Please try again or contact admin.'}), 500
+        if not SMTP_PASSWORD:
+            # Dev mode: no Gmail password set — log code to console so local testing works
+            logging.warning(f"[DEV] OTP for {email}: {code}")
+        else:
+            return jsonify({'ok': False, 'error': 'Failed to send email. Please try again or contact admin.'}), 500
 
     # Return masked email so frontend can display it
     parts  = email.split('@')
