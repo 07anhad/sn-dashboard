@@ -68,6 +68,35 @@
         </div>
       </form>
 
+      <!-- OTP VERIFICATION STEP (hidden by default) -->
+      <div class="login-form" id="otpForm" style="display:none;">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="font-size:2rem;margin-bottom:8px">📧</div>
+          <div style="color:rgba(255,255,255,0.9);font-size:0.95rem;font-weight:600;margin-bottom:6px">Check your email</div>
+          <div style="color:rgba(255,255,255,0.55);font-size:0.82rem">A 6-digit code was sent to<br><span id="otpMaskedEmail" style="color:rgba(255,255,255,0.8);font-weight:600"></span></div>
+        </div>
+        <div class="form-group">
+          <label for="otpCode">Enter 6-digit code</label>
+          <div class="input-wrap">
+            <span class="input-icon">◉</span>
+            <input type="text" id="otpCode" placeholder="e.g. 483920" maxlength="6"
+                   inputmode="numeric" autocomplete="one-time-code"
+                   style="letter-spacing:8px;font-size:1.2rem;text-align:center"
+                   oninput="this.value=this.value.replace(/\D/g,'')" />
+          </div>
+        </div>
+        <div id="otpError" class="login-error" style="display:none;"></div>
+        <button type="button" class="login-btn" id="otpVerifyBtn" onclick="handleVerifyOtp()">
+          <span class="btn-text">Verify & Sign In</span>
+          <span class="btn-arrow">→</span>
+        </button>
+        <div class="login-links" style="margin-top:16px">
+          <a href="#" onclick="handleResendOtp(event)">Resend code</a>
+          <span class="link-sep">·</span>
+          <a href="#" onclick="showLoginForm(event)">← Back</a>
+        </div>
+      </div>
+
       <!-- SIGNUP FORM (hidden by default) -->
       <form class="login-form" id="signupForm" style="display:none;" onsubmit="handleSignup(event)">
         <div class="form-group">
