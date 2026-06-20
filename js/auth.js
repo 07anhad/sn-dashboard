@@ -248,25 +248,32 @@ function showSignup(e) {
 
 function showForgotPassword(e) {
   e.preventDefault();
-  document.getElementById('loginForm').style.display  = 'none';
-  document.getElementById('signupForm').style.display = 'none';
-  document.getElementById('forgotForm').style.display = 'flex';
-  document.getElementById('loginHint').style.display  = 'none';
-  document.querySelector('.login-toggle').style.display = 'none';
+  _forgotUsername = null;
+  document.getElementById('loginForm').style.display      = 'none';
+  document.getElementById('signupForm').style.display     = 'none';
+  document.getElementById('forgotForm').style.display     = 'flex';
+  document.getElementById('forgotOtpForm').style.display  = 'none';
+  document.getElementById('otpForm').style.display        = 'none';
+  document.getElementById('loginHint').style.display      = 'none';
+  document.querySelector('.login-toggle').style.display   = 'none';
+  ['forgotError','forgotSuccess','forgotOtpError'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
 }
 
 function showLoginForm(e) {
   e.preventDefault();
   _otpCredentials = null;
-  document.getElementById('loginForm').style.display  = 'flex';
-  document.getElementById('signupForm').style.display = 'none';
-  document.getElementById('forgotForm').style.display = 'none';
-  document.getElementById('otpForm').style.display    = 'none';
+  _forgotUsername = null;
+  document.getElementById('loginForm').style.display     = 'flex';
+  document.getElementById('signupForm').style.display    = 'none';
+  document.getElementById('forgotForm').style.display    = 'none';
+  document.getElementById('forgotOtpForm').style.display = 'none';
+  document.getElementById('otpForm').style.display       = 'none';
   const hint = document.getElementById('loginHint');
   if (hint) hint.style.display = 'none';
   document.querySelector('.login-toggle').style.display = 'flex';
-  // Clear messages
-  ['signupError', 'signupSuccess', 'forgotError', 'forgotSuccess', 'loginError', 'otpError'].forEach(id => {
+  ['signupError', 'signupSuccess', 'forgotError', 'forgotSuccess', 'forgotOtpError', 'loginError', 'otpError'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -389,35 +396,65 @@ function handleSignup(e) {
 }
 
 // ── Forgot password handler ───────────────
-function handleForgotPassword(e) {
+// ── Forgot password step 1: send OTP ─────
+let _forgotUsername = null;
+
+function handleForgotStep1(e) {
   e.preventDefault();
   const username = document.getElementById('forgotUsername').value.trim().toLowerCase();
-  const newPass  = document.getElementById('forgotNewPass').value;
-  const confirm  = document.getElementById('forgotConfirm').value;
   const errEl    = document.getElementById('forgotError');
-  const succEl   = document.getElementById('forgotSuccess');
   const btn      = document.getElementById('forgotBtn');
 
-  errEl.style.display  = 'none';
-  succEl.style.display = 'none';
+  errEl.style.display = 'none';
+  if (!username) { errEl.textContent = 'Please enter your username.'; errEl.style.display = 'block'; return; }
 
-  if (!username) {
-    errEl.textContent = 'Please enter your username.';
+  btn.disabled = true;
+  btn.querySelector('.btn-text').textContent = 'Sending code…';
+
+  fetch('/api/auth/forgot-send-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username })
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Send OTP';
+    if (data.ok) {
+      _forgotUsername = username;
+      document.getElementById('forgotForm').style.display     = 'none';
+      document.getElementById('forgotOtpForm').style.display  = 'block';
+      document.getElementById('forgotMaskedEmail').textContent = data.maskedEmail;
+      document.getElementById('forgotOtpCode').value  = '';
+      document.getElementById('forgotNewPass').value  = '';
+      document.getElementById('forgotConfirm').value  = '';
+      document.getElementById('forgotOtpError').style.display = 'none';
+      setTimeout(() => document.getElementById('forgotOtpCode').focus(), 100);
+    } else {
+      errEl.textContent = data.error || 'Failed to send code.';
+      errEl.style.display = 'block';
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Send OTP';
+    errEl.textContent = 'Server error. Please try again.';
     errEl.style.display = 'block';
-    document.getElementById('forgotUsername').focus();
-    return;
-  }
-  if (newPass.length < 6) {
-    errEl.textContent = 'New password must be at least 6 characters.';
-    errEl.style.display = 'block';
-    return;
-  }
-  if (newPass !== confirm) {
-    errEl.textContent = 'Passwords do not match.';
-    errEl.style.display = 'block';
-    document.getElementById('forgotConfirm').focus();
-    return;
-  }
+  });
+}
+
+// ── Forgot password step 2: verify OTP + reset ─
+function handleForgotStep2() {
+  const code    = (document.getElementById('forgotOtpCode').value  || '').trim();
+  const newPass = (document.getElementById('forgotNewPass').value  || '');
+  const confirm = (document.getElementById('forgotConfirm').value  || '');
+  const errEl   = document.getElementById('forgotOtpError');
+  const btn     = document.getElementById('forgotOtpBtn');
+
+  errEl.style.display = 'none';
+  if (code.length !== 6)    { errEl.textContent = 'Enter the 6-digit code from your email.'; errEl.style.display = 'block'; return; }
+  if (newPass.length < 6)   { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = 'block'; return; }
+  if (newPass !== confirm)  { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
 
   btn.disabled = true;
   btn.querySelector('.btn-text').textContent = 'Resetting…';
@@ -425,33 +462,59 @@ function handleForgotPassword(e) {
   fetch('/api/auth/reset-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, newPassword: newPass })
+    body: JSON.stringify({ username: _forgotUsername, newPassword: newPass, code })
   })
   .then(r => r.json())
   .then(data => {
     btn.disabled = false;
     btn.querySelector('.btn-text').textContent = 'Reset Password';
     if (data.ok) {
-      succEl.textContent = '✓ Password updated! Redirecting to sign in…';
-      succEl.style.display = 'block';
+      _forgotUsername = null;
+      document.getElementById('forgotOtpForm').style.display = 'none';
+      document.getElementById('forgotSuccess').textContent   = '✓ Password updated! Redirecting to sign in…';
+      document.getElementById('forgotSuccess').style.display = 'block';
+      document.getElementById('forgotForm').style.display    = 'block';
       document.getElementById('forgotForm').reset();
       setTimeout(() => {
         showLoginForm({ preventDefault: () => {} });
         const loginIdEl = document.getElementById('loginId');
-        if (loginIdEl) {
-          loginIdEl.value = username;
-          document.getElementById('loginPass')?.focus();
-        }
+        if (loginIdEl) { loginIdEl.focus(); }
       }, 1800);
     } else {
-      errEl.textContent = data.error || 'Reset failed. Check your username.';
+      errEl.textContent = data.error || 'Reset failed.';
       errEl.style.display = 'block';
     }
   })
   .catch(() => {
     btn.disabled = false;
     btn.querySelector('.btn-text').textContent = 'Reset Password';
-    errEl.textContent = 'Server error. Please try again later.';
+    errEl.textContent = 'Server error. Please try again.';
     errEl.style.display = 'block';
   });
+}
+
+// ── Resend OTP on forgot form ─────────────
+function handleForgotResend(e) {
+  e.preventDefault();
+  if (!_forgotUsername) { showForgotPassword(e); return; }
+  const errEl = document.getElementById('forgotOtpError');
+  errEl.style.display = 'none';
+  fetch('/api/auth/forgot-send-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: _forgotUsername })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      document.getElementById('forgotMaskedEmail').textContent = data.maskedEmail;
+      errEl.style.cssText = 'display:block;background:rgba(34,197,94,0.15);color:#22c55e;border-color:rgba(34,197,94,0.3)';
+      errEl.textContent = 'New code sent!';
+      setTimeout(() => { errEl.style.display = 'none'; errEl.removeAttribute('style'); }, 3000);
+    } else {
+      errEl.textContent = data.error || 'Failed to resend.';
+      errEl.style.display = 'block';
+    }
+  })
+  .catch(() => { errEl.textContent = 'Server error.'; errEl.style.display = 'block'; });
 }
