@@ -207,6 +207,125 @@ def login():
     audit('LOGIN_FAILED', f"username={username} attempted_role={role}")
     return jsonify({'ok': False, 'error': 'Invalid credentials'}), 401
 
+# ── OTP: send code to email ───────────────────────────────────────────────────
+SMTP_HOST     = 'smtp.gmail.com'
+SMTP_PORT     = 587
+SMTP_USER     = 'soaminagarbranch@gmail.com'
+SMTP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')  # set this env var on Railway
+
+def _send_otp_email(to_email, code):
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = f'{code} — Your Soaminagar Branch login code'
+    msg['From']    = f'Soaminagar Branch Delhi <{SMTP_USER}>'
+    msg['To']      = to_email
+    body = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#f4f6fb;border-radius:12px">
+      <h2 style="color:#e07b29;margin:0 0 8px">Soaminagar Branch Delhi</h2>
+      <p style="color:#444;margin:0 0 24px">Your one-time login code:</p>
+      <div style="font-size:2.5rem;font-weight:700;letter-spacing:12px;color:#1c1f2e;text-align:center;
+                  background:#fff;border-radius:8px;padding:20px 0;margin-bottom:24px">{code}</div>
+      <p style="color:#777;font-size:0.85rem;margin:0">This code expires in 10 minutes.<br>
+      If you did not request this, please ignore this email.</p>
+    </div>"""
+    msg.attach(MIMEText(body, 'html'))
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
+        s.starttls()
+        s.login(SMTP_USER, SMTP_PASSWORD)
+        s.sendmail(SMTP_USER, to_email, msg.as_string())
+
+@app.route('/api/auth/send-otp', methods=['POST'])
+def send_otp():
+    import random
+    data     = request.json or {}
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    role     = (data.get('role') or '').strip()
+
+    # Validate credentials first (same logic as login)
+    if role == 'admin':
+        user = query(
+            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role IN ('admin','superadmin')",
+            (username, username, password), one=True
+        )
+    else:
+        user = query(
+            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role=%s",
+            (username, username, password, role), one=True
+        )
+
+    if not user:
+        return jsonify({'ok': False, 'error': 'Invalid credentials.'}), 401
+
+    email = (user.get('email') or '').strip()
+    if not email:
+        return jsonify({'ok': False, 'error': 'No email address linked to this account. Contact an administrator.'}), 400
+
+    # Invalidate any existing unused codes for this email
+    execute("UPDATE otp_tokens SET used=TRUE WHERE email=%s AND used=FALSE", (email,))
+
+    code       = str(random.randint(100000, 999999))
+    expires_at = _dt.datetime.utcnow() + _dt.timedelta(minutes=10)
+    execute("INSERT INTO otp_tokens (email, code, expires_at) VALUES (%s, %s, %s)", (email, code, expires_at))
+
+    try:
+        _send_otp_email(email, code)
+    except Exception as ex:
+        logging.error(f"OTP email failed: {ex}")
+        return jsonify({'ok': False, 'error': 'Failed to send email. Please try again or contact admin.'}), 500
+
+    # Return masked email so frontend can display it
+    parts  = email.split('@')
+    masked = parts[0][:2] + '***@' + parts[1]
+    audit('OTP_SENT', f"username={username} email={masked}")
+    return jsonify({'ok': True, 'maskedEmail': masked})
+
+@app.route('/api/auth/verify-otp', methods=['POST'])
+def verify_otp():
+    data     = request.json or {}
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    role     = (data.get('role') or '').strip()
+    code     = (data.get('code') or '').strip()
+
+    # Re-validate credentials
+    if role == 'admin':
+        user = query(
+            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role IN ('admin','superadmin')",
+            (username, username, password), one=True
+        )
+    else:
+        user = query(
+            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role=%s",
+            (username, username, password, role), one=True
+        )
+
+    if not user:
+        return jsonify({'ok': False, 'error': 'Invalid credentials.'}), 401
+
+    email = (user.get('email') or '').strip()
+    token = query(
+        "SELECT id FROM otp_tokens WHERE email=%s AND code=%s AND used=FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
+        (email, code), one=True
+    )
+    if not token:
+        return jsonify({'ok': False, 'error': 'Invalid or expired code. Please try again.'}), 401
+
+    # Mark token used
+    execute("UPDATE otp_tokens SET used=TRUE WHERE id=%s", (token['id'],))
+
+    user_dict = dict(user)
+    if user_dict['role'] == 'member' and email:
+        email_lower = email.lower()
+        md = query("SELECT uid FROM member_details WHERE LOWER(TRIM(email1))=%s", (email_lower,), one=True)
+        if not md:
+            md = query("SELECT uid FROM member_details WHERE LOWER(TRIM(email2))=%s", (email_lower,), one=True)
+        user_dict['member_uid'] = md['uid'] if md else None
+    else:
+        user_dict['member_uid'] = None
+
+    audit('OTP_LOGIN_SUCCESS', f"username={username} role={user_dict['role']}")
+    return jsonify({'ok': True, 'user': user_dict})
+
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
     data = request.json or {}
