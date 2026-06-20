@@ -107,6 +107,17 @@ function _renderMembersListTab() {
           ${MEMBER_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
         </select>
       </div>
+      <div class="filter-group">
+        <label>Zone</label>
+        <select id="filterZone" onchange="filterMembers()">
+          <option value="">All Zones</option>
+          ${[...new Set(MEMBERS.map(m => m.zone).filter(Boolean))].sort().map(z => `<option value="${z}">${z}</option>`).join('')}
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Pincode</label>
+        <input type="text" id="filterPincode" placeholder="e.g. 110001…" oninput="filterMembers()" />
+      </div>
       <div class="filter-group filter-reset">
         <button class="btn btn-outline btn-sm" onclick="clearMemberFilters()">✕ Reset</button>
       </div>
@@ -822,14 +833,18 @@ async function saveNewSuperhumane() {
 }
 
 function filterMembers() {
-  const name   = (document.getElementById('filterName')?.value   || '').toLowerCase();
-  const mobile = (document.getElementById('filterMobile')?.value || '');
-  const type   = (document.getElementById('filterType')?.value   || '');
+  const name    = (document.getElementById('filterName')?.value    || '').toLowerCase();
+  const mobile  = (document.getElementById('filterMobile')?.value  || '');
+  const type    = (document.getElementById('filterType')?.value    || '');
+  const zone    = (document.getElementById('filterZone')?.value    || '');
+  const pincode = (document.getElementById('filterPincode')?.value || '').trim();
 
   membersData = MEMBERS.filter(m => {
-    if (name   && !(m.name   || '').toLowerCase().includes(name)) return false;
-    if (mobile && !(m.mobile || '').includes(mobile))             return false;
-    if (type   && m.type !== type)                                return false;
+    if (name    && !(m.name    || '').toLowerCase().includes(name))   return false;
+    if (mobile  && !(m.mobile  || '').includes(mobile))               return false;
+    if (type    && m.type !== type)                                    return false;
+    if (zone    && (m.zone    || '') !== zone)                         return false;
+    if (pincode && !(m.pincode || '').includes(pincode))               return false;
     return true;
   }).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
   membersData.forEach((m, i) => { m.sl = i + 1; });
@@ -839,7 +854,7 @@ function filterMembers() {
 }
 
 function clearMemberFilters() {
-  ['filterName', 'filterMobile', 'filterType'].forEach(id => {
+  ['filterName', 'filterMobile', 'filterType', 'filterZone', 'filterPincode'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
