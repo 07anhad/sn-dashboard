@@ -361,19 +361,66 @@ def signup():
 @app.route('/api/auth/reset-password', methods=['POST'])
 def reset_password():
     data = request.json or {}
-    username = (data.get('username') or '').strip().lower()
+    username    = (data.get('username') or '').strip().lower()
     new_password = data.get('newPassword') or ''
+    code        = (data.get('code') or '').strip()
 
     if len(new_password) < 6:
         return jsonify({'ok': False, 'error': 'Password min 6 chars.'}), 400
 
-    user = query("SELECT id FROM users WHERE username=%s", (username,), one=True)
+    user = query("SELECT id, email FROM users WHERE username=%s", (username,), one=True)
     if not user:
         return jsonify({'ok': False, 'error': 'Username not found.'}), 404
+
+    # If code provided, verify OTP
+    if code:
+        email = (user.get('email') or '').strip()
+        if not email:
+            return jsonify({'ok': False, 'error': 'No email linked to this account.'}), 400
+        token = query(
+            "SELECT id FROM otp_tokens WHERE email=%s AND code=%s AND used=FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
+            (email, code), one=True
+        )
+        if not token:
+            return jsonify({'ok': False, 'error': 'Invalid or expired code.'}), 401
+        execute("UPDATE otp_tokens SET used=TRUE WHERE id=%s", (token['id'],))
 
     execute("UPDATE users SET password=%s WHERE username=%s", (new_password, username))
     audit('RESET_PASSWORD', f"target_user={username}")
     return jsonify({'ok': True})
+
+@app.route('/api/auth/forgot-send-otp', methods=['POST'])
+def forgot_send_otp():
+    import random
+    data     = request.json or {}
+    username = (data.get('username') or '').strip().lower()
+
+    user = query("SELECT id, email FROM users WHERE username=%s", (username,), one=True)
+    if not user:
+        return jsonify({'ok': False, 'error': 'Username not found.'}), 404
+
+    email = (user.get('email') or '').strip()
+    if not email:
+        return jsonify({'ok': False, 'error': 'No email address linked to this account. Contact an administrator.'}), 400
+
+    execute("UPDATE otp_tokens SET used=TRUE WHERE email=%s AND used=FALSE", (email,))
+    code       = str(random.randint(100000, 999999))
+    expires_at = _dt.datetime.utcnow() + _dt.timedelta(minutes=10)
+    execute("INSERT INTO otp_tokens (email, code, expires_at) VALUES (%s, %s, %s)", (email, code, expires_at))
+
+    try:
+        _send_otp_email(email, code)
+    except Exception as ex:
+        logging.error(f"Forgot OTP email failed: {ex}")
+        if not SMTP_PASSWORD:
+            logging.warning(f"[DEV] Forgot OTP for {email}: {code}")
+        else:
+            return jsonify({'ok': False, 'error': 'Failed to send email. Please try again.'}), 500
+
+    parts  = email.split('@')
+    masked = parts[0][:2] + '***@' + parts[1]
+    audit('FORGOT_OTP_SENT', f"username={username} email={masked}")
+    return jsonify({'ok': True, 'maskedEmail': masked})
 
 # ═══════════════════════════════════════════
 # ZONES API
