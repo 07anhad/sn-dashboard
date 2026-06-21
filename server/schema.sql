@@ -171,7 +171,8 @@ CREATE TABLE IF NOT EXISTS pending_members (
     ref2_phone                  VARCHAR(30),
     ref2_branch                 VARCHAR(200),
     ref2_relation               VARCHAR(100),
-    notes                       TEXT
+    notes                       TEXT,
+    seva_interests              TEXT
 );
 
 -- Migrate: add new columns to pending_members if upgrading from an older schema
