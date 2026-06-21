@@ -647,7 +647,67 @@
         </div>
       </div>
 
-      <!-- 10. Notes -->
+      <!-- 10. Seva Interests -->
+      <div class="sec-card">
+        <div class="sec-head" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Seva Interests</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-optional">Optional</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body">
+          <div class="field" style="grid-column:1/-1">
+            <label>Select one or more seva you are interested in</label>
+            <div id="sevaList" style="display:flex;flex-direction:column;gap:10px;margin-top:4px"></div>
+            <script>
+              const SEVA_OPTIONS = [
+                { category: 'Dayalbagh Field Security', activity: '1 Week Seva Duty in Dayalbagh Fields',  frequency: 'As Desired',    timings: 'As per Schedule' },
+                { category: 'Horticulture',             activity: 'Seva in Satsang Hall Grounds',          frequency: 'Daily',         timings: '6:15 AM – 7:00 AM' },
+                { category: 'Night Pehna',              activity: 'Patrolling of Satsang Institutions',    frequency: 'Bi-Weekly',     timings: '11:00 PM – 5:00 AM' },
+                { category: 'Medical Assistance',       activity: 'Blood Donation',                        frequency: 'As Required',   timings: 'As Required' },
+                { category: 'Medical Assistance',       activity: 'Duties at Hospitals',                   frequency: 'As Required',   timings: 'As Required' },
+                { category: 'Medical Assistance',       activity: 'Pick & Drop',                           frequency: 'As Required',   timings: 'As Required' },
+                { category: 'Medical Assistance',       activity: 'Other (As Required)',                   frequency: 'As Required',   timings: 'As Required' },
+                { category: 'Communication Grid',       activity: 'Pick & Drop',                           frequency: 'As Required',   timings: 'As Required' },
+                { category: 'Communication Grid',       activity: 'Assistance to Senior Satsangis',        frequency: 'As Required',   timings: 'As Required' },
+                { category: 'Communication Grid',       activity: 'Other (As Required)',                   frequency: 'As Required',   timings: 'As Required' },
+                { category: 'Youth Association',        activity: 'As per Defined Guidelines',             frequency: 'Daily / Weekly',timings: 'As Required' },
+                { category: 'Youth Association',        activity: 'As Advised by BS',                      frequency: 'Daily / Weekly',timings: 'As Required' },
+                { category: 'Mahila Association',       activity: 'As per Requirement',                    frequency: 'Daily / Weekly',timings: 'As Required' },
+                { category: 'Mahila Association',       activity: 'As per Requirement (Secretary role)',   frequency: 'Daily / Weekly',timings: 'As Required' },
+                { category: 'Data Management',          activity: 'Data Entry in System',                  frequency: 'Weekly',        timings: '9:45 AM – 11:00 AM' },
+                { category: 'MCREIC',                   activity: 'Course Facilitator',                    frequency: 'Weekly',        timings: '5:50 AM – 7:30 AM' },
+                { category: 'MCREIC',                   activity: 'Attendance Management',                 frequency: 'Weekly',        timings: '5:50 AM – 7:30 AM' },
+                { category: 'DEI Distance Education',   activity: 'Teaching & Coordinating',               frequency: 'Daily / Weekly',timings: 'As Required' },
+                { category: 'CRC',                      activity: 'As per Defined Guidelines',             frequency: 'As Required',   timings: 'As Required' },
+              ];
+              const sevaList = document.getElementById('sevaList');
+              SEVA_OPTIONS.forEach((s, i) => {
+                const val = `${s.category}: ${s.activity}`;
+                sevaList.innerHTML += `
+                  <label style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;background:#fafbff;transition:background 0.15s"
+                         onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='#fafbff'">
+                    <input type="checkbox" name="seva" value="${val}"
+                           style="margin-top:3px;width:16px;height:16px;accent-color:#e07b29;flex-shrink:0" />
+                    <div>
+                      <div style="font-weight:600;font-size:0.88rem;color:#1e293b">${s.category}</div>
+                      <div style="font-size:0.83rem;color:#334155;margin-top:1px">${s.activity}</div>
+                      <div style="font-size:0.78rem;color:#64748b;margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">
+                        <span>🔄 ${s.frequency}</span>
+                        <span>🕐 ${s.timings}</span>
+                      </div>
+                    </div>
+                  </label>`;
+              });
+            </script>
+          </div>
+        </div>
+      </div>
+
+      <!-- 11. Notes -->
       <div class="sec-card">
         <div class="sec-head" onclick="toggleSec(this)">
           <div class="sec-head-left">
@@ -784,6 +844,7 @@
         ref2Name: g('rf_ref2Name'), ref2Relation: g('rf_ref2Relation'), ref2Phone: g('rf_ref2Phone'),
         ref2Email: g('rf_ref2Email'), ref2Branch: g('rf_ref2Branch'), ref2Address: g('rf_ref2Address'),
         notes: g('rf_notes'),
+        sevaInterests: Array.from(document.querySelectorAll('input[name="seva"]:checked')).map(c => c.value).join(', '),
       };
 
       try {
