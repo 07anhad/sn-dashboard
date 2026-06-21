@@ -171,6 +171,7 @@ function viewPending(id) {
         ${p.ref2_name ? f('Ref 2 — Name', p.ref2_name) + f('Relation', p.ref2_relation) + f('Phone', p.ref2_phone) + f('Email', p.ref2_email) + f('Branch', p.ref2_branch) : ''}
 
         ${p.notes ? sec('Notes') + `<div style="grid-column:1/-1;color:rgba(255,255,255,0.8);font-size:0.87rem">${p.notes}</div>` : ''}
+        ${p.seva_interests ? sec('Seva Interests') + `<div style="grid-column:1/-1;color:rgba(255,255,255,0.8);font-size:0.87rem">${p.seva_interests}</div>` : ''}
 
         ${sec('Submission Info')}
         ${f('Status', p.status)}
