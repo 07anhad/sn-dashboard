@@ -2,7 +2,6 @@
 app.py — Flask server: serves static frontend + REST API
 """
 import os, sys, logging, shutil, smtplib
-import datetime as _dt
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from logging.handlers import TimedRotatingFileHandler
@@ -51,28 +50,29 @@ def _init_db():
 _init_db()
 
 # ═══════════════════════════════════════════
-# Email configuration — set these env vars or edit defaults
+# Email — Gmail SMTP
+# Set GMAIL_APP_PASSWORD env var (Gmail App Password for soaminagarbranch@gmail.com)
 # ═══════════════════════════════════════════
-SMTP_HOST     = os.environ.get('SMTP_HOST',     'smtp.gmail.com')
-SMTP_PORT     = int(os.environ.get('SMTP_PORT', 465))
-SMTP_USER     = os.environ.get('SMTP_USER',     'anhadparashar07@gmail.com')
-SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
-SMTP_FROM     = os.environ.get('SMTP_FROM',     SMTP_USER)
+GMAIL_USER     = 'soaminagarbranch@gmail.com'
+GMAIL_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
 
 def send_email(to_addr, subject, html_body):
-    """Send an HTML email. Silently logs on failure so server never crashes."""
-    if not SMTP_USER or not SMTP_PASSWORD or not to_addr:
-        logging.getLogger('audit').warning(f"EMAIL_SKIPPED: missing creds or to_addr")
+    """Send an HTML email via Gmail SMTP. Logs on failure, never crashes server."""
+    if not to_addr:
+        return
+    if not GMAIL_PASSWORD:
+        print(f"[EMAIL DEV] Would send to {to_addr}: {subject}", flush=True)
         return
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
-        msg['From']    = SMTP_FROM
+        msg['From']    = f'Soaminagar Branch Delhi <{GMAIL_USER}>'
         msg['To']      = to_addr
         msg.attach(MIMEText(html_body, 'html', 'utf-8'))
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10) as s:
-            s.login(SMTP_USER, SMTP_PASSWORD)
-            s.sendmail(SMTP_FROM, [to_addr], msg.as_string())
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as s:
+            s.starttls()
+            s.login(GMAIL_USER, GMAIL_PASSWORD)
+            s.sendmail(GMAIL_USER, [to_addr], msg.as_string())
         logging.getLogger('audit').info(f"EMAIL_SENT to={to_addr} subject={subject}")
         print(f"[EMAIL] Sent to {to_addr}", flush=True)
     except Exception as e:
@@ -81,9 +81,9 @@ def send_email(to_addr, subject, html_body):
 
 @app.route('/api/test-email')
 def test_email():
-    """Dev-only: send a test email to the configured SMTP_USER."""
-    send_email(SMTP_USER, 'Test Email — Satsang Portal', '<h2>It works!</h2><p>Email sending is configured correctly.</p>')
-    return jsonify({'ok': True, 'to': SMTP_USER, 'from': SMTP_FROM})
+    """Dev-only: send a test email."""
+    send_email(GMAIL_USER, 'Test Email — Satsang Portal', '<h2>It works!</h2><p>Gmail SMTP is configured correctly.</p>')
+    return jsonify({'ok': True, 'gmail_password_set': bool(GMAIL_PASSWORD)})
 
 # ═══════════════════════════════════════════
 # Audit logger — writes to logs/audit_YYYY-MM-DD.log
@@ -207,18 +207,16 @@ def login():
     audit('LOGIN_FAILED', f"username={username} attempted_role={role}")
     return jsonify({'ok': False, 'error': 'Invalid credentials'}), 401
 
-# ── OTP: send code to email ───────────────────────────────────────────────────
-SMTP_HOST     = 'smtp.gmail.com'
-SMTP_PORT     = 587
-SMTP_USER     = 'soaminagarbranch@gmail.com'
-SMTP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')  # set this env var on Railway
-
+# ── OTP email helper (uses shared send_email / Gmail) ────────────────────────
 def _send_otp_email(to_email, code):
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = f'{code} — Your Soaminagar Branch login code'
-    msg['From']    = f'Soaminagar Branch Delhi <{SMTP_USER}>'
-    msg['To']      = to_email
-    body = f"""
+    if not GMAIL_PASSWORD:
+        # Dev mode: no App Password set — print code to console for local testing
+        print(f"[OTP DEV] Code for {to_email}: {code}", flush=True)
+        return
+    send_email(
+        to_addr   = to_email,
+        subject   = f'{code} — Your Soaminagar Branch login code',
+        html_body = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;background:#f4f6fb;border-radius:12px">
       <h2 style="color:#e07b29;margin:0 0 8px">Soaminagar Branch Delhi</h2>
       <p style="color:#444;margin:0 0 24px">Your one-time login code:</p>
@@ -227,11 +225,7 @@ def _send_otp_email(to_email, code):
       <p style="color:#777;font-size:0.85rem;margin:0">This code expires in 10 minutes.<br>
       If you did not request this, please ignore this email.</p>
     </div>"""
-    msg.attach(MIMEText(body, 'html'))
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-        s.starttls()
-        s.login(SMTP_USER, SMTP_PASSWORD)
-        s.sendmail(SMTP_USER, to_email, msg.as_string())
+    )
 
 @app.route('/api/auth/send-otp', methods=['POST'])
 def send_otp():
@@ -269,15 +263,7 @@ def send_otp():
         (email, code)
     )
 
-    try:
-        _send_otp_email(email, code)
-    except Exception as ex:
-        logging.error(f"OTP email failed: {ex}")
-        if not SMTP_PASSWORD:
-            # Dev mode: no Gmail password set — log code to console so local testing works
-            logging.warning(f"[DEV] OTP for {email}: {code}")
-        else:
-            return jsonify({'ok': False, 'error': 'Failed to send email. Please try again or contact admin.'}), 500
+    _send_otp_email(email, code)
 
     # Return masked email so frontend can display it
     parts  = email.split('@')
@@ -419,14 +405,7 @@ def forgot_send_otp():
         (email, code)
     )
 
-    try:
-        _send_otp_email(email, code)
-    except Exception as ex:
-        logging.error(f"Forgot OTP email failed: {ex}")
-        if not SMTP_PASSWORD:
-            logging.warning(f"[DEV] Forgot OTP for {email}: {code}")
-        else:
-            return jsonify({'ok': False, 'error': 'Failed to send email. Please try again.'}), 500
+    _send_otp_email(email, code)
 
     parts  = email.split('@')
     masked = parts[0][:2] + '***@' + parts[1]
