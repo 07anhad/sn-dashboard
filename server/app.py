@@ -2,6 +2,7 @@
 app.py — Flask server: serves static frontend + REST API
 """
 import os, sys, logging, shutil, smtplib
+import datetime as _dt
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from logging.handlers import TimedRotatingFileHandler
