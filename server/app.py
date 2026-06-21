@@ -708,7 +708,7 @@ def submit_registration(code):
             crc_member, cca_member, sant_su_member,
             ref1_name, ref1_address, ref1_email, ref1_phone, ref1_branch, ref1_relation,
             ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
-            notes
+            notes, seva_interests
         ) VALUES (
             %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,
@@ -721,7 +721,7 @@ def submit_registration(code):
             %s,%s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,
-            %s
+            %s,%s
         )
     """, (
         code, name, n('uid'), n('dateOfInitiation'), n('dateOfRegistrationJigyasu'),
@@ -742,7 +742,7 @@ def submit_registration(code):
         n('crcMember'), n('ccaMember'), n('santSuMember'),
         n('ref1Name'), n('ref1Address'), n('ref1Email'), n('ref1Phone'), n('ref1Branch'), n('ref1Relation'),
         n('ref2Name'), n('ref2Address'), n('ref2Email'), n('ref2Phone'), n('ref2Branch'), n('ref2Relation'),
-        n('notes')
+        n('notes'), n('sevaInterests')
     ))
     execute("UPDATE reg_links SET used_count=used_count+1 WHERE code=%s", (code,))
     audit('REGISTRATION_SUBMIT', f"code={code} name={name}")
@@ -871,15 +871,10 @@ def approve_pending_member(id):
         <strong style="color:#16a34a">approved</strong>. Your details are below for your records.
       </p>
 
-      <!-- UID highlight -->
-      <div style="background:#f0f7ff;border-left:4px solid #1a2d5a;padding:14px 18px;border-radius:6px;margin-bottom:28px">
-        <p style="margin:0 0 4px;color:#666;font-size:0.75rem;text-transform:uppercase;letter-spacing:.05em">Your Member UID</p>
-        <p style="margin:0;font-size:1.5rem;font-weight:700;color:#1a2d5a;letter-spacing:.08em">{uid}</p>
-      </div>
-
       <!-- Personal Details -->
       <p style="margin:0 0 8px;font-weight:600;color:#1a2d5a;font-size:0.85rem;text-transform:uppercase;letter-spacing:.04em">Personal Details</p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fafafa;border-radius:8px">
+        {_row('Member UID', uid)}
         {_row('Full Name', _r('name'))}
         {_row('Date of Birth', _date('date_of_birth'))}
         {_row('Blood Group', _r('blood_group'))}
@@ -919,6 +914,9 @@ def approve_pending_member(id):
       <p style="color:#888;font-size:0.82rem;margin:0">
         Please keep your Member UID safe. If any details are incorrect, contact your branch secretary.
       </p>
+
+      <!-- Seva Interests -->
+      {'<p style="margin:24px 0 8px;font-weight:600;color:#1a2d5a;font-size:0.85rem;text-transform:uppercase;letter-spacing:.04em">Seva Interests</p><div style="background:#fff8f0;border-left:4px solid #e07b29;padding:12px 16px;border-radius:6px;color:#555;font-size:0.85rem">' + _r('seva_interests') + '</div>' if row.get('seva_interests') else ''}
     </td></tr>
     <!-- Footer -->
     <tr><td style="background:#f8f8f8;padding:16px 36px;border-top:1px solid #eee;text-align:center">
