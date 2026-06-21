@@ -44,7 +44,9 @@ function togglePass() {
 // ── Temp store credentials across OTP step ─
 let _otpCredentials = null;
 
-// ── Handle login form submission — sends OTP ─
+// ── Handle login form submission ─────────────
+// Admin/superadmin: direct login (no OTP)
+// Member: OTP verification required
 function handleLogin(e) {
   e.preventDefault();
   const id   = document.getElementById('loginId').value.trim();
@@ -53,8 +55,47 @@ function handleLogin(e) {
   const err  = document.getElementById('loginError');
 
   btn.disabled = true;
-  btn.querySelector('.btn-text').textContent = 'Sending code…';
 
+  // ── Admin: direct login, no OTP ──
+  if (currentRole === 'admin') {
+    btn.querySelector('.btn-text').textContent = 'Signing in…';
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: id, password: pass, role: currentRole })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        const userPayload = {
+          username:  data.user.username,
+          name:      data.user.name,
+          role:      data.user.role,
+          email:     data.user.email,
+          memberId:  data.user.member_id  || null,
+          memberUid: data.user.member_uid || null
+        };
+        sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
+        localStorage.setItem('currentUser',   JSON.stringify(userPayload));
+        window.location.href = 'dashboard.html';
+      } else {
+        err.textContent = 'Invalid admin credentials. Please try again.';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.querySelector('.btn-text').textContent = 'Sign In';
+      }
+    })
+    .catch(() => {
+      err.textContent = 'Server error. Please try again later.';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.querySelector('.btn-text').textContent = 'Sign In';
+    });
+    return;
+  }
+
+  // ── Member: OTP flow ──
+  btn.querySelector('.btn-text').textContent = 'Sending code…';
   fetch('/api/auth/send-otp', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
