@@ -831,6 +831,22 @@ def approve_pending_member(id):
     # Send approval email if applicant provided an email
     to_email = row.get('email1') or row.get('email2')
     if to_email:
+        def _r(field): return row.get(field) or '—'
+        def _date(field):
+            v = row.get(field)
+            return str(v)[:10] if v else '—'
+        def _row(label, value):
+            if not value or value == '—': return ''
+            return f'<tr><td style="padding:6px 12px;color:#666;font-size:0.82rem;white-space:nowrap;vertical-align:top">{label}</td><td style="padding:6px 12px;color:#222;font-size:0.82rem">{value}</td></tr>'
+
+        addr_parts = [row.get('address_line1'), row.get('address_line2'), row.get('address_line3'),
+                      row.get('city'), row.get('state'), row.get('pincode'), row.get('country')]
+        address = ', '.join(p for p in addr_parts if p)
+
+        father_name = ' '.join(filter(None, [row.get('father_title'), row.get('father_first_name'), row.get('father_middle_name'), row.get('father_last_name')]))
+        mother_name = ' '.join(filter(None, [row.get('mother_title'), row.get('mother_first_name'), row.get('mother_middle_name'), row.get('mother_last_name')]))
+        spouse_name = ' '.join(filter(None, [row.get('spouse_title'), row.get('spouse_first_name'), row.get('spouse_middle_name'), row.get('spouse_last_name')]))
+
         send_email(
             to_addr  = to_email,
             subject  = 'Your Registration is Approved — Soaminagar Branch Delhi',
@@ -840,42 +856,73 @@ def approve_pending_member(id):
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:'Segoe UI',Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr><td align="center" style="padding:40px 20px">
-  <table width="560" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
+  <table width="600" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
     <!-- Header -->
     <tr><td style="background:#1a2d5a;padding:32px;text-align:center">
       <div style="font-size:2rem">🙏</div>
-      <h1 style="color:#f4a124;font-size:1.4rem;margin:10px 0 4px;font-family:Georgia,serif">
-        Soaminagar Branch Delhi
-      </h1>
+      <h1 style="color:#f4a124;font-size:1.4rem;margin:10px 0 4px;font-family:Georgia,serif">Soaminagar Branch Delhi</h1>
       <p style="color:rgba(255,255,255,0.7);margin:0;font-size:0.85rem">Ra Dha Sva Aa Mi</p>
     </td></tr>
     <!-- Body -->
-    <tr><td style="padding:36px 40px">
-      <h2 style="color:#1a2d5a;margin:0 0 16px;font-size:1.25rem">Registration Approved ✅</h2>
-      <p style="color:#444;line-height:1.6;margin:0 0 12px">
-        Dear <strong>{row['name']}</strong>,
-      </p>
-      <p style="color:#444;line-height:1.6;margin:0 0 20px">
-        We are pleased to inform you that your membership registration with
-        <strong>Soaminagar Branch Delhi</strong> has been <strong style="color:#16a34a">approved</strong>.
-      </p>
-      <div style="background:#f0f7ff;border-left:4px solid #1a2d5a;padding:16px 20px;border-radius:6px;margin-bottom:24px">
-        <p style="margin:0 0 6px;color:#666;font-size:0.8rem;text-transform:uppercase;letter-spacing:.05em">Your Member UID</p>
-        <p style="margin:0;font-size:1.4rem;font-weight:700;color:#1a2d5a;letter-spacing:.05em">{uid}</p>
-      </div>
+    <tr><td style="padding:32px 36px">
+      <h2 style="color:#1a2d5a;margin:0 0 8px;font-size:1.2rem">Registration Approved ✅</h2>
       <p style="color:#444;line-height:1.6;margin:0 0 24px">
-        Please keep your Member UID safe — it uniquely identifies you in our system.
-        You may be asked to provide it at satsang events and programmes.
+        Dear <strong>{_r('name')}</strong>, your membership registration has been
+        <strong style="color:#16a34a">approved</strong>. Your details are below for your records.
       </p>
-      <p style="color:#888;font-size:0.85rem;line-height:1.6;margin:0">
-        If you have any questions, please contact your branch secretary.
+
+      <!-- UID highlight -->
+      <div style="background:#f0f7ff;border-left:4px solid #1a2d5a;padding:14px 18px;border-radius:6px;margin-bottom:28px">
+        <p style="margin:0 0 4px;color:#666;font-size:0.75rem;text-transform:uppercase;letter-spacing:.05em">Your Member UID</p>
+        <p style="margin:0;font-size:1.5rem;font-weight:700;color:#1a2d5a;letter-spacing:.08em">{uid}</p>
+      </div>
+
+      <!-- Personal Details -->
+      <p style="margin:0 0 8px;font-weight:600;color:#1a2d5a;font-size:0.85rem;text-transform:uppercase;letter-spacing:.04em">Personal Details</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fafafa;border-radius:8px">
+        {_row('Full Name', _r('name'))}
+        {_row('Date of Birth', _date('date_of_birth'))}
+        {_row('Blood Group', _r('blood_group'))}
+        {_row('Caste', _r('caste'))}
+        {_row('Nationality', _r('nationality'))}
+        {_row('Profession', _r('profession'))}
+        {_row('Ashram', _r('ashram'))}
+        {_row('Date of Initiation', _date('date_of_initiation'))}
+        {_row('Date of Reg. (Jigyasu)', _date('date_of_registration_jigyasu'))}
+        {_row('Date of 1st Initiation', _date('date_of_first_initiation'))}
+        {_row('Date of 2nd Initiation', _date('date_of_second_initiation'))}
+      </table>
+
+      <!-- Contact -->
+      <p style="margin:0 0 8px;font-weight:600;color:#1a2d5a;font-size:0.85rem;text-transform:uppercase;letter-spacing:.04em">Contact</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fafafa;border-radius:8px">
+        {_row('Mobile 1', _r('mobile1'))}
+        {_row('Mobile 2', _r('mobile2'))}
+        {_row('Landline', _r('landline'))}
+        {_row('Email 1', _r('email1'))}
+        {_row('Email 2', _r('email2'))}
+        {_row('Address', address or '—')}
+      </table>
+
+      <!-- Professional -->
+      <p style="margin:0 0 8px;font-weight:600;color:#1a2d5a;font-size:0.85rem;text-transform:uppercase;letter-spacing:.04em">Professional</p>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fafafa;border-radius:8px">
+        {_row('Qualification', _r('qualification'))}
+        {_row('Occupation', _r('occupation'))}
+        {_row('Designation', _r('designation'))}
+        {_row('Organization', _r('organization'))}
+      </table>
+
+      <!-- Family -->
+      {'<p style="margin:0 0 8px;font-weight:600;color:#1a2d5a;font-size:0.85rem;text-transform:uppercase;letter-spacing:.04em">Family</p><table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fafafa;border-radius:8px">' + _row("Father", father_name or '—') + _row("Father UID", _r('father_uid')) + _row("Mother", mother_name or '—') + _row("Mother UID", _r('mother_uid')) + _row("Spouse", spouse_name or '—') + _row("Spouse UID", _r('spouse_uid')) + '</table>' if any([father_name, mother_name, spouse_name]) else ''}
+
+      <p style="color:#888;font-size:0.82rem;margin:0">
+        Please keep your Member UID safe. If any details are incorrect, contact your branch secretary.
       </p>
     </td></tr>
     <!-- Footer -->
-    <tr><td style="background:#f8f8f8;padding:20px 40px;border-top:1px solid #eee;text-align:center">
-      <p style="color:#aaa;font-size:0.78rem;margin:0">
-        This is an automated message from Soaminagar Branch Delhi portal.
-      </p>
+    <tr><td style="background:#f8f8f8;padding:16px 36px;border-top:1px solid #eee;text-align:center">
+      <p style="color:#aaa;font-size:0.76rem;margin:0">Automated message from Soaminagar Branch Delhi portal.</p>
     </td></tr>
   </table>
 </td></tr>
