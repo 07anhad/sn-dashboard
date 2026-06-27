@@ -181,6 +181,7 @@ ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_initiation         
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_registration_jigyasu DATE;
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_first_initiation    DATE;
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_second_initiation   DATE;
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS member_type                  VARCHAR(50);
 
 -- Contributions
 CREATE TABLE IF NOT EXISTS contributions (
