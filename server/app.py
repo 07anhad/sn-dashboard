@@ -113,6 +113,65 @@ def audit(action: str, detail: str = ''):
     _audit_logger.info(msg)
 
 # ═══════════════════════════════════════════
+# BSL (Branch Serial Number) Auto-Assignment
+# Pattern: Initiated=1xxx/2xxx, Jigyasu=3xxx, Superhumane=4xxx
+# ═══════════════════════════════════════════
+def determine_member_category(row):
+    """Determine member category based on registration data."""
+    # First check if member_type was explicitly selected in the form
+    if row.get('member_type'):
+        return row['member_type']
+    # Fallback: infer from dates if member_type not set
+    if row.get('date_of_initiation'):
+        return 'Initiated'
+    if row.get('date_of_registration_jigyasu'):
+        return 'Jigyasu'
+    # Default to Jigyasu for new registrations without initiation
+    return 'Jigyasu'
+
+def get_next_bsl(category):
+    """
+    Generate the next BSL number based on member category.
+    BSL Pattern:
+      - Initiated: starts with 1 or 2 (we use the next available in 1000-2999 range)
+      - Jigyasu: starts with 3 (3000-3999 range)
+      - Superhumane: starts with 4 (4000-4999 range)
+    """
+    if category == 'Initiated':
+        # Initiated members use 1xxx and 2xxx range
+        # Find max BSL starting with 1 or 2 from member_details
+        result = query("""
+            SELECT MAX(CAST(bsl AS INTEGER)) as max_bsl 
+            FROM member_details 
+            WHERE bsl ~ '^[12][0-9]{3}$'
+        """, one=True)
+        max_bsl = result['max_bsl'] if result and result['max_bsl'] else 999
+        return str(max_bsl + 1)
+    
+    elif category == 'Jigyasu':
+        # Jigyasu members use 3xxx range
+        result = query("""
+            SELECT MAX(CAST(bsl AS INTEGER)) as max_bsl 
+            FROM member_details 
+            WHERE bsl ~ '^3[0-9]{3}$'
+        """, one=True)
+        max_bsl = result['max_bsl'] if result and result['max_bsl'] else 2999
+        return str(max_bsl + 1)
+    
+    elif category == 'Superhumane':
+        # Superhumane use 4xxx range
+        result = query("""
+            SELECT MAX(CAST(bsl AS INTEGER)) as max_bsl 
+            FROM superhumane_details 
+            WHERE bsl ~ '^4[0-9]{3}$'
+        """, one=True)
+        max_bsl = result['max_bsl'] if result and result['max_bsl'] else 3999
+        return str(max_bsl + 1)
+    
+    # Fallback: return a high number in 9xxx range
+    return '9001'
+
+# ═══════════════════════════════════════════
 # Static file serving
 # ═══════════════════════════════════════════
 @app.route('/')
@@ -690,7 +749,7 @@ def submit_registration(code):
     n = lambda k: d.get(k) or None
     execute("""
         INSERT INTO pending_members (
-            reg_link_code, name, uid, date_of_initiation, date_of_registration_jigyasu,
+            reg_link_code, name, member_type, uid, date_of_initiation, date_of_registration_jigyasu,
             date_of_first_initiation, date_of_second_initiation,
             date_of_birth, blood_group, caste, nationality, profession, ashram,
             mobile1, mobile2, landline, office_phone, email1, email2,
@@ -710,7 +769,7 @@ def submit_registration(code):
             ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
             notes, seva_interests
         ) VALUES (
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,
@@ -724,7 +783,7 @@ def submit_registration(code):
             %s,%s
         )
     """, (
-        code, name, n('uid'), n('dateOfInitiation'), n('dateOfRegistrationJigyasu'),
+        code, name, n('memberType'), n('uid'), n('dateOfInitiation'), n('dateOfRegistrationJigyasu'),
         n('dateOfFirstInitiation'), n('dateOfSecondInitiation'),
         n('dateOfBirth'), n('bloodGroup'), n('caste'), n('nationality'), n('profession'), n('ashram'),
         n('mobile1'), n('mobile2'), n('landline'), n('officePhone'), n('email1'), n('email2'),
@@ -762,71 +821,111 @@ def approve_pending_member(id):
     
     uid = (row.get('uid') or '').strip() or f"PENDING-{id}"
 
-    # if a real uid is given check if its already taken. 
+    # Auto-assign BSL and category
+    category = determine_member_category(row)
+    bsl = get_next_bsl(category)
     
-    if not uid.startswith('PENDING-')and query("SELECT 1 FROM member_details WHERE uid=%s",(uid,)):
-        return jsonify({'ok':False,'error':f"UID '{uid}' id already in use"}),409
+    # Check UID uniqueness based on member type
+    if category == 'Superhumane':
+        if not uid.startswith('PENDING-') and query("SELECT 1 FROM superhumane_details WHERE uid=%s", (uid,)):
+            return jsonify({'ok': False, 'error': f"UID '{uid}' is already in use in Superhumane records"}), 409
+        
+        # Build address from parts
+        addr_parts = [row.get('address_line1'), row.get('address_line2'), row.get('address_line3'),
+                      row.get('city'), row.get('state'), row.get('pincode'), row.get('country')]
+        full_address = ', '.join(p for p in addr_parts if p) or None
+        
+        # Build father name from parts
+        father_name = ' '.join(filter(None, [row.get('father_title'), row.get('father_first_name'), 
+                                              row.get('father_middle_name'), row.get('father_last_name')])) or None
+        mother_name = ' '.join(filter(None, [row.get('mother_title'), row.get('mother_first_name'), 
+                                              row.get('mother_middle_name'), row.get('mother_last_name')])) or None
+        
+        execute("""
+            INSERT INTO superhumane_details (
+                uid, bsl, name, date_of_birth, gender,
+                father_name, father_contact, father_uid, father_doi,
+                mother_name, mother_contact, mother_uid, mother_doi,
+                address, member_type, branch
+            ) VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s
+            )
+        """, (
+            uid, bsl, row['name'], row['date_of_birth'], None,
+            father_name, row.get('father_phone'), row.get('father_uid'), row.get('father_doi'),
+            mother_name, row.get('mother_phone'), row.get('mother_uid'), row.get('mother_doi'),
+            full_address, 'Superhumane', 'Soaminagar Branch Delhi'
+        ))
+    else:
+        # Initiated or Jigyasu → member_details
+        if not uid.startswith('PENDING-') and query("SELECT 1 FROM member_details WHERE uid=%s", (uid,)):
+            return jsonify({'ok': False, 'error': f"UID '{uid}' is already in use"}), 409
+        
+        execute("""
+            INSERT INTO member_details (
+                uid, name, date_of_initiation, date_of_registration_jigyasu,
+                date_of_first_initiation, date_of_second_initiation,
+                date_of_birth, blood_group, caste, nationality, profession, ashram,
+                mobile1, mobile2, landline, office_phone, email1, email2,
+                address_line1, address_line2, address_line3, city, pincode, state, country,
+                qualification, occupation, designation, organization,
+                father_title, father_first_name, father_middle_name, father_last_name,
+                father_branch, father_bslno, father_uid, father_doi, father_phone, father_city, father_state,
+                mother_title, mother_first_name, mother_middle_name, mother_last_name,
+                mother_branch, mother_bslno, mother_uid, mother_doi, mother_phone, mother_city, mother_state,
+                spouse_title, spouse_first_name, spouse_middle_name, spouse_last_name,
+                spouse_branch, spouse_bslno, spouse_uid, spouse_doi, spouse_phone, spouse_city, spouse_state,
+                nee_first_name, nee_middle_name, nee_last_name,
+                mahila_association_member, youth_member, associate_youth_member,
+                junior_pre_initiate_member, senior_pre_initiate_member,
+                crc_member, cca_member, sant_su_member,
+                ref1_name, ref1_address, ref1_email, ref1_phone, ref1_branch, ref1_relation,
+                ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
+                record_status, bsl, category
+            ) VALUES (
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,
+                'Activated', %s, %s
+            )
+        """, (
+            uid, row['name'], row.get('date_of_initiation'), row.get('date_of_registration_jigyasu'),
+            row.get('date_of_first_initiation'), row.get('date_of_second_initiation'),
+            row['date_of_birth'], row['blood_group'], row['caste'], row['nationality'], row['profession'], row['ashram'],
+            row['mobile1'], row['mobile2'], row['landline'], row['office_phone'], row['email1'], row['email2'],
+            row['address_line1'], row['address_line2'], row['address_line3'], row['city'], row['pincode'], row['state'], row['country'],
+            row['qualification'], row['occupation'], row['designation'], row['organization'],
+            row['father_title'], row['father_first_name'], row['father_middle_name'], row['father_last_name'],
+            row['father_branch'], row['father_bslno'], row['father_uid'], row['father_doi'], row['father_phone'], row['father_city'], row['father_state'],
+            row['mother_title'], row['mother_first_name'], row['mother_middle_name'], row['mother_last_name'],
+            row['mother_branch'], row['mother_bslno'], row['mother_uid'], row['mother_doi'], row['mother_phone'], row['mother_city'], row['mother_state'],
+            row['spouse_title'], row['spouse_first_name'], row['spouse_middle_name'], row['spouse_last_name'],
+            row['spouse_branch'], row['spouse_bslno'], row['spouse_uid'], row['spouse_doi'], row['spouse_phone'], row['spouse_city'], row['spouse_state'],
+            row['nee_first_name'], row['nee_middle_name'], row['nee_last_name'],
+            row['mahila_association_member'], row['youth_member'], row['associate_youth_member'],
+            row['junior_pre_initiate_member'], row['senior_pre_initiate_member'],
+            row['crc_member'], row['cca_member'], row['sant_su_member'],
+            row['ref1_name'], row['ref1_address'], row['ref1_email'], row['ref1_phone'], row['ref1_branch'], row['ref1_relation'],
+            row['ref2_name'], row['ref2_address'], row['ref2_email'], row['ref2_phone'], row['ref2_branch'], row['ref2_relation'],
+            bsl, category
+        ))
     
-    execute("""
-        INSERT INTO member_details (
-            uid, name, date_of_initiation, date_of_registration_jigyasu,
-            date_of_first_initiation, date_of_second_initiation,
-            date_of_birth, blood_group, caste, nationality, profession, ashram,
-            mobile1, mobile2, landline, office_phone, email1, email2,
-            address_line1, address_line2, address_line3, city, pincode, state, country,
-            qualification, occupation, designation, organization,
-            father_title, father_first_name, father_middle_name, father_last_name,
-            father_branch, father_bslno, father_uid, father_doi, father_phone, father_city, father_state,
-            mother_title, mother_first_name, mother_middle_name, mother_last_name,
-            mother_branch, mother_bslno, mother_uid, mother_doi, mother_phone, mother_city, mother_state,
-            spouse_title, spouse_first_name, spouse_middle_name, spouse_last_name,
-            spouse_branch, spouse_bslno, spouse_uid, spouse_doi, spouse_phone, spouse_city, spouse_state,
-            nee_first_name, nee_middle_name, nee_last_name,
-            mahila_association_member, youth_member, associate_youth_member,
-            junior_pre_initiate_member, senior_pre_initiate_member,
-            crc_member, cca_member, sant_su_member,
-            ref1_name, ref1_address, ref1_email, ref1_phone, ref1_branch, ref1_relation,
-            ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
-            record_status
-        ) VALUES (
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-            %s,%s,%s,
-            %s,%s,%s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,
-            'Activated'
-        )
-    """, (
-        uid, row['name'], row.get('date_of_initiation'), row.get('date_of_registration_jigyasu'),
-        row.get('date_of_first_initiation'), row.get('date_of_second_initiation'),
-        row['date_of_birth'], row['blood_group'], row['caste'], row['nationality'], row['profession'], row['ashram'],
-        row['mobile1'], row['mobile2'], row['landline'], row['office_phone'], row['email1'], row['email2'],
-        row['address_line1'], row['address_line2'], row['address_line3'], row['city'], row['pincode'], row['state'], row['country'],
-        row['qualification'], row['occupation'], row['designation'], row['organization'],
-        row['father_title'], row['father_first_name'], row['father_middle_name'], row['father_last_name'],
-        row['father_branch'], row['father_bslno'], row['father_uid'], row['father_doi'], row['father_phone'], row['father_city'], row['father_state'],
-        row['mother_title'], row['mother_first_name'], row['mother_middle_name'], row['mother_last_name'],
-        row['mother_branch'], row['mother_bslno'], row['mother_uid'], row['mother_doi'], row['mother_phone'], row['mother_city'], row['mother_state'],
-        row['spouse_title'], row['spouse_first_name'], row['spouse_middle_name'], row['spouse_last_name'],
-        row['spouse_branch'], row['spouse_bslno'], row['spouse_uid'], row['spouse_doi'], row['spouse_phone'], row['spouse_city'], row['spouse_state'],
-        row['nee_first_name'], row['nee_middle_name'], row['nee_last_name'],
-        row['mahila_association_member'], row['youth_member'], row['associate_youth_member'],
-        row['junior_pre_initiate_member'], row['senior_pre_initiate_member'],
-        row['crc_member'], row['cca_member'], row['sant_su_member'],
-        row['ref1_name'], row['ref1_address'], row['ref1_email'], row['ref1_phone'], row['ref1_branch'], row['ref1_relation'],
-        row['ref2_name'], row['ref2_address'], row['ref2_email'], row['ref2_phone'], row['ref2_branch'], row['ref2_relation']
-    ))
     execute(
         "UPDATE pending_members SET status='approved', reviewed_at=NOW(), reviewed_by=%s WHERE id=%s",
         (actor, id)
     )
-    audit('APPROVE_REGISTRATION', f"id={id} name={row['name']} uid={uid or 'pending'}")
+    audit('APPROVE_REGISTRATION', f"id={id} name={row['name']} uid={uid or 'pending'} bsl={bsl} category={category}")
 
     # Send approval email if applicant provided an email
     to_email = row.get('email1') or row.get('email2')
@@ -875,6 +974,8 @@ def approve_pending_member(id):
       <p style="margin:0 0 8px;font-weight:600;color:#1a2d5a;font-size:0.85rem;text-transform:uppercase;letter-spacing:.04em">Personal Details</p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;background:#fafafa;border-radius:8px">
         {_row('Member UID', uid)}
+        {_row('Branch Serial No.', bsl)}
+        {_row('Member Type', category)}
         {_row('Full Name', _r('name'))}
         {_row('Date of Birth', _date('date_of_birth'))}
         {_row('Blood Group', _r('blood_group'))}
