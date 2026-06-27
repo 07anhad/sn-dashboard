@@ -299,6 +299,15 @@
               <input id="rf_uid" placeholder="e.g. SND2024XXXXXX" />
             </div>
             <div class="field">
+              <label>Member Type <span class="req-star">*</span></label>
+              <select id="rf_memberType" required>
+                <option value="">Select Member Type</option>
+                <option value="Initiated">Initiated (Naam-daan received)</option>
+                <option value="Jigyasu">Jigyasu (Seeker / Pre-initiate)</option>
+                <option value="Superhumane">Superhumane (Sant-Su scheme child)</option>
+              </select>
+            </div>
+            <div class="field">
               <label>Date of Initiation</label>
               <input id="rf_doi" type="date" />
             </div>
@@ -797,8 +806,10 @@
       e.preventDefault();
       const name = g('rf_name');
       const mobile1 = g('rf_mobile1');
-      if (!name)   { showInlineErr('Full Name is required.'); scrollTo(0,0); return; }
-      if (!mobile1){ showInlineErr('Mobile 1 is required.'); scrollTo(0,0); return; }
+      const memberType = g('rf_memberType');
+      if (!name)       { showInlineErr('Full Name is required.'); scrollTo(0,0); return; }
+      if (!memberType) { showInlineErr('Please select your Member Type.'); scrollTo(0,0); return; }
+      if (!mobile1)    { showInlineErr('Mobile 1 is required.'); scrollTo(0,0); return; }
 
       const btn = document.getElementById('regSubmitBtn');
       btn.disabled = true;
@@ -806,7 +817,7 @@
       document.getElementById('inlineMsg').style.display = 'none';
 
       const payload = {
-        name, dateOfBirth: g('rf_dob'), bloodGroup: g('rf_blood'),
+        name, memberType, dateOfBirth: g('rf_dob'), bloodGroup: g('rf_blood'),
         uid: g('rf_uid'), dateOfInitiation: g('rf_doi'),
         dateOfRegistrationJigyasu: g('rf_dor_jigyasu'),
         dateOfFirstInitiation: g('rf_doi_first'),
