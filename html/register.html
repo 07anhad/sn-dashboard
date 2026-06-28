@@ -697,10 +697,10 @@
               SEVA_OPTIONS.forEach((s, i) => {
                 const val = `${s.category}: ${s.activity}`;
                 sevaList.innerHTML += `
-                  <label style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;background:#fafbff;transition:background 0.15s"
-                         onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background='#fafbff'">
+                  <label class="seva-item" style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;cursor:pointer;background:#fafbff;transition:background 0.15s, border-color 0.15s">
                     <input type="checkbox" name="seva" value="${val}"
-                           style="margin-top:3px;width:16px;height:16px;accent-color:#e07b29;flex-shrink:0" />
+                           style="margin-top:3px;width:16px;height:16px;accent-color:#e07b29;flex-shrink:0"
+                           onchange="this.parentElement.style.background = this.checked ? '#fff8f2' : '#fafbff'; this.parentElement.style.borderColor = this.checked ? '#e8832a' : '#e2e8f0';" />
                     <div>
                       <div style="font-weight:600;font-size:0.88rem;color:#1e293b">${s.category}</div>
                       <div style="font-size:0.83rem;color:#334155;margin-top:1px">${s.activity}</div>
