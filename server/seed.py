@@ -189,3 +189,74 @@ def seed():
 
 if __name__ == '__main__':
     seed()
+
+
+
+'''
+frontend/config.js
+
+/* ============================================================
+   CONFIG.JS — Frontend Configuration
+   ============================================================
+   
+   Change API_BASE to your backend server URL:
+   - For local development: 'http://localhost:5000'
+   - For production with ngrok: 'https://your-subdomain.ngrok-free.app'
+   - For production with Cloudflare Tunnel: 'https://your-domain.com'
+   ============================================================ */
+
+'use strict';
+
+// ⚠️ CHANGE THIS to your backend server URL
+const API_BASE = 'http://localhost:5000';
+
+// Example configurations:
+// const API_BASE = 'http://192.168.1.100:5000';           // Local network IP
+// const API_BASE = 'https://your-app.ngrok-free.app';    // ngrok tunnel
+// const API_BASE = 'https://api.yourdomain.com';         // Custom domain
+
+
+
+
+frontend/netlify.toml
+
+# Netlify configuration for SN-Dashboard Frontend
+# ================================================
+
+[build]
+  # No build command needed - static HTML/CSS/JS
+  command = ""
+  publish = "."
+
+# Redirect all routes to index.html for SPA-like behavior
+# But also keep direct access to actual files
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  conditions = {Role = ["admin", "member"]}
+
+# Headers for security and CORS
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+
+
+frontend/_redirects
+
+# Netlify redirects for SPA routing
+# Allow direct access to all existing files (HTML, CSS, JS, icons)
+# This ensures dashboard.html, register.html work directly
+
+# Catch-all for non-existent routes → fallback to login
+/*    /index.html   200
+
+
+
+
+'''
