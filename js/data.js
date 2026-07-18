@@ -32,7 +32,8 @@ async function loadAllData() {
     DASH_STATS = stats;
     ZONES = zones;
     MEMBER_TYPES = memberTypes;
-    MEMBERS = members.map((m, i) => ({
+    const memberRows = members.members || members;
+    MEMBERS = memberRows.map((m, i) => ({
       // identity
       sl: i + 1, uid: m.uid, bslno: m.bsl, name: m.name,
       // initiation dates
@@ -161,7 +162,8 @@ async function loadAllData() {
 // ── Reload a single collection ────────────
 async function reloadZones()         { ZONES = await apiGet('/api/zones'); }
 async function reloadMembers() {
-  const members = await apiGet('/api/members');
+  const res = await apiGet('/api/members');
+  const members = res.members || res;
   MEMBERS = members.map((m, i) => ({
     sl: i + 1, uid: m.uid, bslno: m.bsl, name: m.name,
     dateOfInitiation: m.date_of_initiation, dateOfBirth: m.date_of_birth,
