@@ -514,7 +514,29 @@ def delete_zone(id):
 # ═══════════════════════════════════════════
 @app.route('/api/members')
 def get_members():
-    return jsonify(query("SELECT * FROM member_details ORDER BY name"))
+    search = (request.args.get('q') or '').strip()
+    page   = max(1, int(request.args.get('page', 1)))
+    limit  = min(200, int(request.args.get('limit', 100)))
+    offset = (page - 1) * limit
+
+    if search:
+        like = f'%{search}%'
+        rows = query(
+            """SELECT * FROM member_details
+               WHERE name ILIKE %s OR uid ILIKE %s OR mobile1 ILIKE %s OR bsl ILIKE %s
+               ORDER BY name LIMIT %s OFFSET %s""",
+            (like, like, like, like, limit, offset)
+        )
+        total = query(
+            """SELECT count(*) as c FROM member_details
+               WHERE name ILIKE %s OR uid ILIKE %s OR mobile1 ILIKE %s OR bsl ILIKE %s""",
+            (like, like, like, like), one=True
+        )['c']
+    else:
+        rows  = query("SELECT * FROM member_details ORDER BY name LIMIT %s OFFSET %s", (limit, offset))
+        total = query("SELECT count(*) as c FROM member_details", one=True)['c']
+
+    return jsonify({'members': rows, 'total': total, 'page': page, 'limit': limit})
 
 @app.route('/api/member-types')
 def get_member_types():
