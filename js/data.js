@@ -22,15 +22,18 @@ async function _fetchMembersWithCache() {
     const raw = sessionStorage.getItem('sn_members_v1');
     if (raw) {
       const c = JSON.parse(raw);
-      if (Date.now() - c.ts < 10 * 60 * 1000) {
-        return { members: c.members }; // serve from cache
+      // Only use cache if it's a non-empty array and within TTL
+      if (Array.isArray(c.members) && c.members.length > 0 && Date.now() - c.ts < 10 * 60 * 1000) {
+        return c.members; // return array directly
       }
     }
   } catch {}
+  // Clear any stale/bad cache entry before fetching fresh
+  try { sessionStorage.removeItem('sn_members_v1'); } catch {}
   const res  = await apiGet('/api/members?limit=5000');
-  const rows = res.members || res;
+  const rows = Array.isArray(res.members) ? res.members : (Array.isArray(res) ? res : []);
   try { sessionStorage.setItem('sn_members_v1', JSON.stringify({ ts: Date.now(), members: rows })); } catch {}
-  return { members: rows };
+  return rows;
 }
 
 // ── Load all data from backend ────────────
@@ -49,7 +52,7 @@ async function loadAllData() {
     DASH_STATS = stats;
     ZONES = zones;
     MEMBER_TYPES = memberTypes;
-    const memberRows = members.members || members;
+    const memberRows = members; // _fetchMembersWithCache always returns a plain array
     MEMBERS = memberRows.map((m, i) => ({
       // identity
       sl: i + 1, uid: m.uid, bslno: m.bsl, name: m.name,
