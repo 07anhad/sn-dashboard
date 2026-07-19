@@ -516,7 +516,7 @@ def delete_zone(id):
 def get_members():
     search = (request.args.get('q') or '').strip()
     page   = max(1, int(request.args.get('page', 1)))
-    limit  = min(200, int(request.args.get('limit', 100)))
+    limit  = min(10000, int(request.args.get('limit', 5000)))
     offset = (page - 1) * limit
 
     if search:
