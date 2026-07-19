@@ -258,8 +258,30 @@ function regLinkCard(l) {
 }
 
 function copyLink(url) {
-  navigator.clipboard?.writeText(url).then(() => showToast('Link copied to clipboard!', 'success'))
-    .catch(() => showToast('Could not copy — try manually.', ''));
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url)
+      .then(() => showToast('Link copied to clipboard!', 'success'))
+      .catch(() => _fallbackCopy(url));
+  } else {
+    _fallbackCopy(url);
+  }
+}
+
+function _fallbackCopy(url) {
+  const ta = document.createElement('textarea');
+  ta.value = url;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast('Link copied to clipboard!', 'success');
+  } catch {
+    showToast('Could not copy — copy manually: ' + url, '');
+  }
+  document.body.removeChild(ta);
 }
 
 function openAddLinkModal() {
