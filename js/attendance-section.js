@@ -4,10 +4,14 @@
 
 'use strict';
 
-let attData     = [];
-let filteredAtt = [];
-let attPage     = 1;
-const ATT_PER_PAGE = 10;
+let attData     = [];        // current page rows (mapped)
+let attPage     = 1;         // current page number
+let attTotal    = 0;         // total matching records (from server)
+let attStats    = { audio: 0, video: 0, branches: 0, minDate: '', maxDate: '' };
+let attEvents   = [];        // unique event names (from server)
+let attBranches = [];        // unique branch names (from server)
+let _attSearchTimer = null;
+const ATT_PER_PAGE = 50;
 
 // ── Entry point (called by router) ─────────
 function renderAttendance() {
@@ -30,25 +34,66 @@ async function loadMemberOwnAttendance() {
   }
   try {
     const resp = await apiGet(`/api/attendance/esatsang?uid=${encodeURIComponent(memberUid)}`);
-    attData = mapRows(resp.rows ?? resp);
+    attData  = mapRows(resp.rows ?? resp);
+    attTotal = attData.length;
+    attStats = {
+      audio:    attData.filter(r => (r.type || '').toUpperCase() === 'AUDIO').length,
+      video:    attData.filter(r => (r.type || '').toUpperCase() === 'VIDEO').length,
+      branches: new Set(attData.map(r => r.branch).filter(Boolean)).size,
+      minDate:  [...attData.map(r => r.date).filter(Boolean)].sort()[0]      || '',
+      maxDate:  [...attData.map(r => r.date).filter(Boolean)].sort().at(-1)  || '',
+    };
+    attEvents   = [];
+    attBranches = [];
   } catch (e) {
-    attData = [];
+    attData = []; attTotal = 0;
   }
-  filteredAtt = [...attData];
   renderAttUI();
 }
 
-// ── Load from DB ───────────────────────────
+// ── Fetch a page from server with current filters ───
+async function _fetchAttPage(page) {
+  const q        = (document.getElementById('attSearch')?.value         || '').trim();
+  const event    = (document.getElementById('attFilterEvent')?.value    || '');
+  const branch   = (document.getElementById('attFilterBranch')?.value   || '');
+  const type     = (document.getElementById('attFilterType')?.value     || '');
+  const dateFrom = (document.getElementById('attFilterFromDate')?.value || '');
+  const dateTo   = (document.getElementById('attFilterToDate')?.value   || '');
+
+  const p = new URLSearchParams({ page, per_page: ATT_PER_PAGE });
+  if (q)        p.set('search', q);
+  if (event)    p.set('event', event);
+  if (branch)   p.set('branch', branch);
+  if (type)     p.set('type', type);
+  if (dateFrom) p.set('date_from', dateFrom);
+  if (dateTo)   p.set('date_to', dateTo);
+  // Only ask server for dropdown metadata if we don't have it yet
+  if (!attEvents.length)   p.set('need_meta', '1');
+
+  const resp = await apiGet(`/api/attendance/esatsang?${p}`);
+  attData    = mapRows(resp.rows || []);
+  attTotal   = resp.total  || 0;
+  attPage    = resp.page   || page;
+  attStats   = {
+    audio:    resp.audio_count  || 0,
+    video:    resp.video_count  || 0,
+    branches: resp.branch_count || 0,
+    minDate:  resp.min_date     || '',
+    maxDate:  resp.max_date     || '',
+  };
+  if (resp.events)   attEvents   = resp.events;
+  if (resp.branches) attBranches = resp.branches;
+}
+
+// ── Load from DB ───────────────────────
 async function loadAttendanceData() {
   const container = document.getElementById('attendanceContent');
-  container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt-muted)">Loading\u2026</div>';
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt-muted)">Loading…</div>';
   try {
-    const resp = await apiGet('/api/attendance/esatsang');
-    attData = mapRows(resp.rows ?? resp);
+    await _fetchAttPage(1);
   } catch (e) {
-    attData = [];
+    attData = []; attTotal = 0;
   }
-  filteredAtt = [...attData];
   renderAttUI();
 }
 
@@ -80,15 +125,14 @@ function mapRows(raw) {
 // ── Main render ────────────────────────────
 function renderAttUI() {
   const container = document.getElementById('attendanceContent');
-  const total = attData.length;
-  const audio = attData.filter(r => (r.type || '').toUpperCase() === 'AUDIO').length;
-  const video = attData.filter(r => (r.type || '').toUpperCase() === 'VIDEO').length;
-  const uniqueBranches = [...new Set(attData.map(r => r.branch).filter(Boolean))].sort();
-  const uniqueEvents   = [...new Set(attData.map(r => r.event).filter(Boolean))].sort();
+  const total          = attTotal;
+  const audio          = attStats.audio;
+  const video          = attStats.video;
+  const uniqueBranches = attBranches;
+  const uniqueEvents   = attEvents;
 
-  const dates = attData.map(r => r.date).filter(Boolean).sort();
-  const dateRangeMsg = dates.length
-    ? `📅 Records available from <strong>${dates[0]}</strong> to <strong>${dates[dates.length - 1]}</strong>`
+  const dateRangeMsg = (attStats.minDate && attStats.maxDate)
+    ? `📅 Records available from <strong>${attStats.minDate}</strong> to <strong>${attStats.maxDate}</strong>`
     : '';
 
   container.innerHTML = `
@@ -222,41 +266,31 @@ function renderAttUI() {
   if (total > 0) renderAttTable();
 }
 
-// ── Filter ─────────────────────────────────
+// ── Filter (debounced → server-side) ───────
 function filterAtt() {
-  const q      = (document.getElementById('attSearch')?.value || '').toLowerCase();
-  const event  = document.getElementById('attFilterEvent')?.value  || '';
-  const branch = document.getElementById('attFilterBranch')?.value || '';
-  const type   = (document.getElementById('attFilterType')?.value  || '').toUpperCase();
-  const dateFrom = document.getElementById('attFilterFromDate')?.value || ''; // yyyy-mm-dd
-  const dateTo   = document.getElementById('attFilterToDate')?.value   || ''; // yyyy-mm-dd
+  clearTimeout(_attSearchTimer);
+  _attSearchTimer = setTimeout(_doFilterAtt, 300);
+}
 
-  filteredAtt = attData.filter(r => {
-    if (q && !r.name.toLowerCase().includes(q) &&
-             !r.uid.toLowerCase().includes(q) &&
-             !r.memberId.toLowerCase().includes(q)) return false;
-    if (event  && r.event  !== event)                    return false;
-    if (branch && r.branch !== branch)                   return false;
-    if (type   && (r.type || '').toUpperCase() !== type) return false;
-    if (dateFrom && r.date < dateFrom)                  return false;
-    if (dateTo   && r.date > dateTo)                    return false;
-    return true;
-  });
+async function _doFilterAtt() {
   attPage = 1;
-
-  const fTotal    = filteredAtt.length;
-  const fAudio    = filteredAtt.filter(r => (r.type || '').toUpperCase() === 'AUDIO').length;
-  const fVideo    = filteredAtt.filter(r => (r.type || '').toUpperCase() === 'VIDEO').length;
-  const fBranches = new Set(filteredAtt.map(r => r.branch).filter(Boolean)).size;
-  const el = id => document.getElementById(id);
-  if (el('attStatTotal'))    el('attStatTotal').textContent    = fTotal.toLocaleString();
-  if (el('attStatAudio'))    el('attStatAudio').textContent    = fAudio.toLocaleString();
-  if (el('attStatAudioPct')) el('attStatAudioPct').textContent = (fTotal ? Math.round(fAudio / fTotal * 100) : 0) + '%';
-  if (el('attStatVideo'))    el('attStatVideo').textContent    = fVideo.toLocaleString();
-  if (el('attStatVideoPct')) el('attStatVideoPct').textContent = (fTotal ? Math.round(fVideo / fTotal * 100) : 0) + '%';
-  if (el('attStatBranches')) el('attStatBranches').textContent = fBranches.toLocaleString();
-
+  const tbody = document.getElementById('attTableBody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--txt-muted)">Loading\u2026</td></tr>';
+  try { await _fetchAttPage(1); } catch {}
   renderAttTable();
+  _updateAttStats();
+}
+
+function _updateAttStats() {
+  const el = id => document.getElementById(id);
+  if (el('attStatTotal'))    el('attStatTotal').textContent    = attTotal.toLocaleString();
+  if (el('attStatAudio'))    el('attStatAudio').textContent    = attStats.audio.toLocaleString();
+  if (el('attStatAudioPct')) el('attStatAudioPct').textContent = (attTotal ? Math.round(attStats.audio / attTotal * 100) : 0) + '%';
+  if (el('attStatVideo'))    el('attStatVideo').textContent    = attStats.video.toLocaleString();
+  if (el('attStatVideoPct')) el('attStatVideoPct').textContent = (attTotal ? Math.round(attStats.video / attTotal * 100) : 0) + '%';
+  if (el('attStatBranches')) el('attStatBranches').textContent = attStats.branches.toLocaleString();
+  const countEl = document.getElementById('attCount');
+  if (countEl) countEl.textContent = attTotal.toLocaleString() + ' records';
 }
 
 function clearAttFilters() {
@@ -272,11 +306,9 @@ function renderAttTable() {
   const countEl = document.getElementById('attCount');
   if (!tbody) return;
 
-  const total = filteredAtt.length;
-  if (countEl) countEl.textContent = total.toLocaleString() + ' records';
+  if (countEl) countEl.textContent = attTotal.toLocaleString() + ' records';
 
   const start = (attPage - 1) * ATT_PER_PAGE;
-  const page  = filteredAtt.slice(start, start + ATT_PER_PAGE);
 
   const typeBadge = t => {
     const u = (t || '').toUpperCase();
@@ -284,7 +316,7 @@ function renderAttTable() {
     return t ? `<span class="badge ${cls}" style="font-size:0.75rem">${t}</span>` : '\u2014';
   };
 
-  tbody.innerHTML = page.map((r, i) => `
+  tbody.innerHTML = attData.map((r, i) => `
     <tr>
       <td style="color:var(--txt-muted);font-size:0.82rem">${start + i + 1}</td>
       <td style="font-size:0.82rem;white-space:nowrap">${r.date || '\u2014'}</td>
@@ -298,12 +330,15 @@ function renderAttTable() {
     </tr>
   `).join('') || '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--txt-muted)">No matching records.</td></tr>';
 
-  renderAttPagination(total);
+  renderAttPagination(attTotal);
 }
 
-function gotoAttPage(p) {
-  const pages = Math.ceil(filteredAtt.length / ATT_PER_PAGE);
-  attPage = Math.max(1, Math.min(p, pages));
+async function gotoAttPage(p) {
+  const pages = Math.ceil(attTotal / ATT_PER_PAGE);
+  p = Math.max(1, Math.min(p, pages));
+  const tbody = document.getElementById('attTableBody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--txt-muted)">Loading\u2026</td></tr>';
+  try { await _fetchAttPage(p); } catch {}
   renderAttTable();
 }
 
@@ -378,9 +413,7 @@ function handleAttUpload(event) {
       showToast('Imported ' + data.count.toLocaleString() + ' records!', 'success');
       if (status) status.innerHTML = '<span style="color:var(--clr-green)">✅ ' + data.count.toLocaleString() + ' new records imported' + (data.skipped ? ', ' + data.skipped + ' skipped (duplicates)' : '') + '.</span>';
 
-      const fresh = await apiGet('/api/attendance/esatsang');
-      attData     = mapRows(fresh);
-      filteredAtt = [...attData];
+      await _fetchAttPage(1);
       renderAttUI();
     } catch (e) {
       if (status) status.innerHTML = '<span style="color:var(--clr-red)">Invalid server response.</span>';
@@ -400,16 +433,36 @@ function handleAttUpload(event) {
 }
 
 // ── Export ─────────────────────────────────
-function exportAtt() {
-  const headers = ['Date', 'Member ID', 'UID', 'Name', 'Event', 'Branch', 'Location', 'Type'];
-  const rows = filteredAtt.map(r =>
-    [r.date, r.memberId, r.uid, '"' + r.name + '"', '"' + r.event + '"', '"' + r.branch + '"', '"' + r.location + '"', r.type].join(',')
-  );
-  const csv  = '\uFEFF' + [headers.join(','), ...rows].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'attendance_export.csv'; a.click();
-  URL.revokeObjectURL(url);
-  showToast('Exported attendance_export.csv', 'success');
+async function exportAtt() {
+  showToast('Preparing export…', '');
+  try {
+    const q        = (document.getElementById('attSearch')?.value         || '').trim();
+    const event    = (document.getElementById('attFilterEvent')?.value    || '');
+    const branch   = (document.getElementById('attFilterBranch')?.value   || '');
+    const type     = (document.getElementById('attFilterType')?.value     || '');
+    const dateFrom = (document.getElementById('attFilterFromDate')?.value || '');
+    const dateTo   = (document.getElementById('attFilterToDate')?.value   || '');
+    const p = new URLSearchParams();
+    if (q)        p.set('search', q);
+    if (event)    p.set('event', event);
+    if (branch)   p.set('branch', branch);
+    if (type)     p.set('type', type);
+    if (dateFrom) p.set('date_from', dateFrom);
+    if (dateTo)   p.set('date_to', dateTo);
+    const resp = await apiGet(`/api/attendance/esatsang?${p}`);
+    const rows = mapRows(resp.rows || []);
+    const headers = ['Date', 'Member ID', 'UID', 'Name', 'Event', 'Branch', 'Location', 'Type'];
+    const csvRows = rows.map(r =>
+      [r.date, r.memberId, r.uid, '"' + r.name + '"', '"' + r.event + '"', '"' + r.branch + '"', '"' + r.location + '"', r.type].join(',')
+    );
+    const csv  = '\uFEFF' + [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'attendance_export.csv'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exported ' + rows.length.toLocaleString() + ' records', 'success');
+  } catch (e) {
+    showToast('Export failed: ' + e.message, 'error');
+  }
 }
