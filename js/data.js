@@ -16,6 +16,23 @@ let ANNOUNCEMENTS = [];
 
 let dataLoaded = false;
 
+// ── Members sessionStorage cache (TTL: 10 min) ───
+async function _fetchMembersWithCache() {
+  try {
+    const raw = sessionStorage.getItem('sn_members_v1');
+    if (raw) {
+      const c = JSON.parse(raw);
+      if (Date.now() - c.ts < 10 * 60 * 1000) {
+        return { members: c.members }; // serve from cache
+      }
+    }
+  } catch {}
+  const res  = await apiGet('/api/members?limit=5000');
+  const rows = res.members || res;
+  try { sessionStorage.setItem('sn_members_v1', JSON.stringify({ ts: Date.now(), members: rows })); } catch {}
+  return { members: rows };
+}
+
 // ── Load all data from backend ────────────
 async function loadAllData() {
   try {
@@ -23,7 +40,7 @@ async function loadAllData() {
       apiGet('/api/dashboard/stats'),
       apiGet('/api/zones'),
       apiGet('/api/member-types'),
-      apiGet('/api/members?limit=5000'),
+      _fetchMembersWithCache(),
       apiGet('/api/all-superhumane'),
       apiGet('/api/reg-links'),
       apiGet('/api/announcements'),
@@ -164,6 +181,8 @@ async function reloadZones()         { ZONES = await apiGet('/api/zones'); }
 async function reloadMembers() {
   const res = await apiGet('/api/members?limit=5000');
   const members = res.members || res;
+  // Refresh the cache so next page load is fast
+  try { sessionStorage.setItem('sn_members_v1', JSON.stringify({ ts: Date.now(), members })); } catch {}
   MEMBERS = members.map((m, i) => ({
     sl: i + 1, uid: m.uid, bslno: m.bsl, name: m.name,
     dateOfInitiation: m.date_of_initiation, dateOfBirth: m.date_of_birth,
