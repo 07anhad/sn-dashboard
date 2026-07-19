@@ -23,7 +23,7 @@ async function loadAllData() {
       apiGet('/api/dashboard/stats'),
       apiGet('/api/zones'),
       apiGet('/api/member-types'),
-      apiGet('/api/members'),
+      apiGet('/api/members?limit=5000'),
       apiGet('/api/all-superhumane'),
       apiGet('/api/reg-links'),
       apiGet('/api/announcements'),
@@ -162,7 +162,7 @@ async function loadAllData() {
 // ── Reload a single collection ────────────
 async function reloadZones()         { ZONES = await apiGet('/api/zones'); }
 async function reloadMembers() {
-  const res = await apiGet('/api/members');
+  const res = await apiGet('/api/members?limit=5000');
   const members = res.members || res;
   MEMBERS = members.map((m, i) => ({
     sl: i + 1, uid: m.uid, bslno: m.bsl, name: m.name,
