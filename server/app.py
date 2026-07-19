@@ -519,7 +519,7 @@ def get_members():
     limit  = min(10000, int(request.args.get('limit', 5000)))
     offset = (page - 1) * limit
 
-    if search:
+    if search:  
         like = f'%{search}%'
         rows = query(
             """SELECT * FROM member_details
@@ -1103,9 +1103,15 @@ def delete_announcement(id):
 # ═══════════════════════════════════════════
 @app.route('/api/attendance/esatsang')
 def get_esatsang():
-    uid      = request.args.get('uid', '').strip()
-    page     = request.args.get('page')
-    per_page = request.args.get('per_page')
+    uid        = request.args.get('uid', '').strip()
+    page       = request.args.get('page')
+    per_page   = request.args.get('per_page')
+    search     = request.args.get('search', '').strip()
+    evt_filter = request.args.get('event', '').strip()
+    br_filter  = request.args.get('branch', '').strip()
+    tp_filter  = request.args.get('type', '').strip().upper()
+    date_from  = request.args.get('date_from', '').strip()
+    date_to    = request.args.get('date_to', '').strip()
 
     if uid:
         # Member view: only their own records
@@ -1115,20 +1121,81 @@ def get_esatsang():
         )
         return jsonify({'rows': rows, 'total': len(rows), 'page': 1, 'pages': 1})
 
-    if page is not None and per_page is not None:
-        # Paginated fetch
-        page     = max(1, int(page))
-        per_page = max(1, int(per_page))
-        offset   = (page - 1) * per_page
-        total    = query("SELECT COUNT(*) AS n FROM esatsang_attendance", one=True)['n']
-        rows     = query(
-            "SELECT * FROM esatsang_attendance ORDER BY attendance_date DESC NULLS LAST, id DESC LIMIT %s OFFSET %s",
-            (per_page, offset)
+    # Build WHERE clause from optional filters
+    conds, params = [], []
+    if search:
+        conds.append(
+            "(LOWER(COALESCE(first_name,'') || ' ' || COALESCE(middle_name,'') || ' ' || COALESCE(last_name,'')) LIKE %s"
+            " OR LOWER(COALESCE(member_uid,'')) LIKE %s"
+            " OR LOWER(COALESCE(member_id,'')) LIKE %s)"
         )
-        return jsonify({'rows': rows, 'total': total, 'page': page, 'pages': -(-total // per_page)})
+        s = f'%{search.lower()}%'
+        params.extend([s, s, s])
+    if evt_filter:
+        conds.append("event_name = %s");  params.append(evt_filter)
+    if br_filter:
+        conds.append("branch_name = %s"); params.append(br_filter)
+    if tp_filter:
+        conds.append("UPPER(COALESCE(attendance_type,'')) = %s"); params.append(tp_filter)
+    if date_from:
+        conds.append("attendance_date >= %s"); params.append(date_from)
+    if date_to:
+        conds.append("attendance_date <= %s"); params.append(date_to)
 
-    # No pagination params — return all records
-    rows = query("SELECT * FROM esatsang_attendance ORDER BY attendance_date DESC NULLS LAST, id DESC")
+    where      = ('WHERE ' + ' AND '.join(conds)) if conds else ''
+    params_tup = tuple(params)
+
+    # Only fetch dropdown metadata (events/branches) when the client needs it
+    need_meta = request.args.get('need_meta') == '1'
+    if need_meta:
+        events   = [r['event_name']  for r in query(
+            "SELECT DISTINCT event_name  FROM esatsang_attendance WHERE event_name  IS NOT NULL ORDER BY event_name")]
+        branches = [r['branch_name'] for r in query(
+            "SELECT DISTINCT branch_name FROM esatsang_attendance WHERE branch_name IS NOT NULL ORDER BY branch_name")]
+    else:
+        events, branches = None, None
+
+    if page is not None and per_page is not None:
+        page     = max(1, int(page))
+        per_page = max(1, min(500, int(per_page)))
+        offset   = (page - 1) * per_page
+
+        # Aggregate stats for the matching records
+        stats = query(
+            f"""SELECT COUNT(*) AS total,
+                       SUM(CASE WHEN UPPER(COALESCE(attendance_type,''))='AUDIO' THEN 1 ELSE 0 END) AS audio_count,
+                       SUM(CASE WHEN UPPER(COALESCE(attendance_type,''))='VIDEO' THEN 1 ELSE 0 END) AS video_count,
+                       COUNT(DISTINCT branch_name) AS branch_count,
+                       MIN(attendance_date) AS min_date,
+                       MAX(attendance_date) AS max_date
+                FROM esatsang_attendance {where}""",
+            params_tup or None, one=True
+        )
+        rows = query(
+            f"SELECT * FROM esatsang_attendance {where} ORDER BY attendance_date DESC NULLS LAST, id DESC LIMIT %s OFFSET %s",
+            params_tup + (per_page, offset)
+        )
+        total = int(stats['total'] or 0)
+        resp  = {
+            'rows':         rows,
+            'total':        total,
+            'page':         page,
+            'pages':        -(-total // per_page) if per_page else 1,
+            'audio_count':  int(stats['audio_count']  or 0),
+            'video_count':  int(stats['video_count']  or 0),
+            'branch_count': int(stats['branch_count'] or 0),
+            'min_date':     str(stats['min_date'])[:10] if stats['min_date'] else '',
+            'max_date':     str(stats['max_date'])[:10] if stats['max_date'] else '',
+        }
+        if events   is not None: resp['events']   = events
+        if branches is not None: resp['branches'] = branches
+        return jsonify(resp)
+
+    # No pagination params — return all records (used by export)
+    rows = query(
+        f"SELECT * FROM esatsang_attendance {where} ORDER BY attendance_date DESC NULLS LAST, id DESC",
+        params_tup or None
+    )
     return jsonify({'rows': rows, 'total': len(rows), 'page': 1, 'pages': 1})
 
 @app.route('/api/attendance/esatsang/upload', methods=['POST'])
