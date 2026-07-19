@@ -134,10 +134,3 @@ Procfile             ← start command (Railway/Heroku reads this automatically)
 requirements.txt
 runtime.txt
 ```
-
-
-
-DATABASE_URL=postgresql://snuser:SoamiNagar@2025@localhost:5432/sn_dashboard
-SECRET_KEY=sn-dashboard-secret-key-2025-soaminagar-delhi-branch
-GMAIL_USER=soaminagarbranch@gmail.com
-GMAIL_PASS=your-gmail-app-password
