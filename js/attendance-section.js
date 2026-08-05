@@ -11,6 +11,8 @@ let attStats    = { audio: 0, video: 0, branches: 0, minDate: '', maxDate: '' };
 let attEvents   = [];        // unique event names (from server)
 let attBranches = [];        // unique branch names (from server)
 let _attSearchTimer = null;
+let _attOwnUid     = null;  // set for member-view; locks fetches to that uid only
+let _attOwnAllData = [];    // full unfiltered own-records for local filtering
 const ATT_PER_PAGE = 50;
 
 // ── Entry point (called by router) ─────────
@@ -32,9 +34,11 @@ async function loadMemberOwnAttendance() {
     container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--txt-muted);font-size:1rem;">No attendance record found linked to your account. Please contact an administrator.</div>';
     return;
   }
+  _attOwnUid = memberUid;
   try {
     const resp = await apiGet(`/api/attendance/esatsang?uid=${encodeURIComponent(memberUid)}`);
-    attData  = mapRows(resp.rows ?? resp);
+    _attOwnAllData = mapRows(resp.rows ?? resp); // keep full set for local filtering
+    attData  = [..._attOwnAllData];
     attTotal = attData.length;
     attStats = {
       audio:    attData.filter(r => (r.type || '').toUpperCase() === 'AUDIO').length,
@@ -60,15 +64,17 @@ async function _fetchAttPage(page) {
   const dateFrom = (document.getElementById('attFilterFromDate')?.value || '');
   const dateTo   = (document.getElementById('attFilterToDate')?.value   || '');
 
-  const p = new URLSearchParams({ page, per_page: ATT_PER_PAGE });
-  if (q)        p.set('search', q);
-  if (event)    p.set('event', event);
-  if (branch)   p.set('branch', branch);
-  if (type)     p.set('type', type);
-  if (dateFrom) p.set('date_from', dateFrom);
-  if (dateTo)   p.set('date_to', dateTo);
-  // Only ask server for dropdown metadata if we don't have it yet
-  if (!attEvents.length)   p.set('need_meta', '1');
+  const p = new URLSearchParams(_attOwnUid ? { uid: _attOwnUid } : { page, per_page: ATT_PER_PAGE });
+  // For member own-view, uid is the filter — no search/filter params needed (local filtering is done below)
+  if (!_attOwnUid) {
+    if (q)        p.set('search', q);
+    if (event)    p.set('event', event);
+    if (branch)   p.set('branch', branch);
+    if (type)     p.set('type', type);
+    if (dateFrom) p.set('date_from', dateFrom);
+    if (dateTo)   p.set('date_to', dateTo);
+    if (!attEvents.length) p.set('need_meta', '1');
+  }
 
   const resp = await apiGet(`/api/attendance/esatsang?${p}`);
   attData    = mapRows(resp.rows || []);
@@ -85,8 +91,10 @@ async function _fetchAttPage(page) {
   if (resp.branches) attBranches = resp.branches;
 }
 
-// ── Load from DB ───────────────────────
+// ── Load from DB (admin) ───────────────────
 async function loadAttendanceData() {
+  _attOwnUid     = null;
+  _attOwnAllData = [];
   const container = document.getElementById('attendanceContent');
   container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt-muted)">Loading…</div>';
   try {
@@ -276,7 +284,37 @@ async function _doFilterAtt() {
   attPage = 1;
   const tbody = document.getElementById('attTableBody');
   if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--txt-muted)">Loading\u2026</td></tr>';
-  try { await _fetchAttPage(1); } catch {}
+
+  if (_attOwnUid) {
+    // Member view — filter locally (no server round-trip needed)
+    const q        = (document.getElementById('attSearch')?.value         || '').trim().toLowerCase();
+    const event    = (document.getElementById('attFilterEvent')?.value    || '');
+    const branch   = (document.getElementById('attFilterBranch')?.value   || '');
+    const type     = (document.getElementById('attFilterType')?.value     || '').toUpperCase();
+    const dateFrom = (document.getElementById('attFilterFromDate')?.value || '');
+    const dateTo   = (document.getElementById('attFilterToDate')?.value   || '');
+    const filtered = _attOwnAllData.filter(r => {
+      if (q      && !r.name.toLowerCase().includes(q) && !r.uid.toLowerCase().includes(q) && !r.memberId.toLowerCase().includes(q)) return false;
+      if (event  && r.event  !== event)                         return false;
+      if (branch && r.branch !== branch)                        return false;
+      if (type   && (r.type || '').toUpperCase() !== type)      return false;
+      if (dateFrom && r.date < dateFrom)                        return false;
+      if (dateTo   && r.date > dateTo)                          return false;
+      return true;
+    });
+    attData  = filtered;
+    attTotal = filtered.length;
+    attStats = {
+      audio:    filtered.filter(r => (r.type || '').toUpperCase() === 'AUDIO').length,
+      video:    filtered.filter(r => (r.type || '').toUpperCase() === 'VIDEO').length,
+      branches: new Set(filtered.map(r => r.branch).filter(Boolean)).size,
+      minDate:  attStats.minDate,
+      maxDate:  attStats.maxDate,
+    };
+  } else {
+    try { await _fetchAttPage(1); } catch {}
+  }
+
   renderAttTable();
   _updateAttStats();
 }
