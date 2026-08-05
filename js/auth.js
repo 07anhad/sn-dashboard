@@ -77,7 +77,7 @@ function handleLogin(e) {
         };
         sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
         localStorage.setItem('currentUser',   JSON.stringify(userPayload));
-        window.location.href = 'dashboard.html';
+        window.location.replace('dashboard.html');
       } else {
         err.textContent = 'Invalid admin credentials. Please try again.';
         err.style.display = 'block';
@@ -163,7 +163,7 @@ function handleVerifyOtp() {
       sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
       localStorage.setItem('currentUser',   JSON.stringify(userPayload));
       _otpCredentials = null;
-      window.location.href = 'dashboard.html';
+      window.location.replace('dashboard.html');
     } else {
       err.textContent = data.error || 'Invalid or expired code.';
       err.style.display = 'block';
@@ -214,14 +214,14 @@ function handleResendOtp(e) {
 function logout() {
   sessionStorage.removeItem('currentUser');
   localStorage.removeItem('currentUser');
-  window.location.href = 'index.html';
+  window.location.replace('index.html');
 }
 
 // ── Guard: redirect to login if not authed ─
 function requireAuth() {
   const user = getCurrentUser();
   if (!user) {
-    window.location.href = 'index.html';
+    window.location.replace('index.html');
     return null;
   }
   return user;
@@ -261,6 +261,12 @@ function isSuperAdmin() {
 // ── On dashboard.html: guard + init UI ────
 if (document.getElementById('userName')) {
   const user = requireAuth();
+
+  // Also fires on bfcache restore (back button on mobile/Safari)
+  window.addEventListener('pageshow', function() {
+    if (!getCurrentUser()) window.location.replace('index.html');
+  });
+
   if (user) {
     document.getElementById('userName').textContent   = user.name;
     document.getElementById('userRole').textContent   = user.role === 'superadmin'
@@ -274,7 +280,12 @@ if (document.getElementById('userName')) {
 // ── On login page: redirect if already logged in ─
 if (document.getElementById('loginForm')) {
   const user = getCurrentUser();
-  if (user) window.location.href = 'dashboard.html';
+  if (user) window.location.replace('dashboard.html');
+
+  // Also fires on bfcache restore (back button on mobile/Safari)
+  window.addEventListener('pageshow', function(e) {
+    if (getCurrentUser()) window.location.replace('dashboard.html');
+  });
 }
 
 // ── Form switching ────────────────────────
