@@ -364,3 +364,4 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeActMenus();
 });
 window.addEventListener('scroll', closeActMenus, true); // close on any scroll
+ 
