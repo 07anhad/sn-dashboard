@@ -840,7 +840,11 @@ function filterMembers() {
   const pincode = (document.getElementById('filterPincode')?.value || '').trim();
 
   membersData = MEMBERS.filter(m => {
-    if (name    && !(m.name    || '').toLowerCase().includes(name))   return false;
+    if (name) {
+      const words = name.split(/\s+/).filter(Boolean);
+      const mn = (m.name || '').toLowerCase();
+      if (!words.every(w => mn.includes(w))) return false;
+    }
     if (mobile  && !(m.mobile  || '').includes(mobile))               return false;
     if (type    && m.type !== type)                                    return false;
     if (zone    && (m.zone    || '') !== zone)                         return false;
@@ -1228,92 +1232,8 @@ function buildSelfProfileHTML(m) {
 }
 
 function editSelfProfileInline(uid) {
-  const m = MEMBERS.find(x => x.uid === uid);
-  if (!m) return;
-  const container = document.getElementById('membersContent');
-  const ea = v => String(v ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-  const fld = (id, label, val, type='text') =>
-    `<div class="form-field">
-       <label style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-muted);">${label}</label>
-       <input id="${id}" type="${type}" value="${ea(val)}" style="width:100%;" />
-     </div>`;
-  const sec = title =>
-    `<div style="grid-column:1/-1;font-weight:700;font-size:0.78rem;text-transform:uppercase;
-       letter-spacing:.06em;color:var(--clr-saffron,#e07b29);margin-top:18px;padding-top:12px;
-       border-top:1px solid var(--border);">${title}</div>`;
-
-  container.innerHTML = `
-    <div class="card" style="padding:var(--sp-lg);max-width:900px;margin:0 auto;">
-      <div class="edit-header-row" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
-        <div style="flex:1;">
-          <div style="font-size:1.1rem;font-weight:700;color:var(--txt-primary);">✏️ Edit Profile — ${ea(m.name)}</div>
-          <div style="font-size:0.8rem;color:var(--txt-muted);margin-top:2px;">You can update your contact, address and professional details.</div>
-        </div>
-        <button class="btn btn-outline" onclick="renderSelfProfileInline(MEMBERS.find(x=>x.uid==='${ea(uid)}'))">← Cancel</button>
-        <button class="btn btn-saffron" onclick="saveSelfMemberInline('${ea(uid)}')">Save Changes</button>
-      </div>
-
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 20px;">
-        ${sec('Contact')}
-        ${fld('sm_mobile',      'Mobile 1',     m.mobile)}
-        ${fld('sm_mobile2',     'Mobile 2',     m.mobile2)}
-        ${fld('sm_landline',    'Landline',     m.landline)}
-        ${fld('sm_officePhone', 'Office Phone', m.officePhone)}
-        ${fld('sm_email',       'Email 1',      m.email,  'email')}
-        ${fld('sm_email2',      'Email 2',      m.email2, 'email')}
-
-        ${sec('Address')}
-        ${fld('sm_addr1',   'Address Line 1', m.addressLine1)}
-        ${fld('sm_addr2',   'Address Line 2', m.addressLine2)}
-        ${fld('sm_addr3',   'Address Line 3', m.addressLine3)}
-        ${fld('sm_city',    'City',           m.city)}
-        ${fld('sm_pincode', 'Pincode',        m.pincode)}
-        ${fld('sm_state',   'State',          m.state)}
-        ${fld('sm_country', 'Country',        m.country)}
-
-        ${sec('Professional')}
-        ${fld('sm_qual',   'Qualification', m.qualification)}
-        ${fld('sm_occ',    'Occupation',    m.occupation)}
-        ${fld('sm_desig',  'Designation',   m.designation)}
-        ${fld('sm_org',    'Organization',  m.organization)}
-        ${fld('sm_prof',   'Profession',    m.profession)}
-      </div>
-
-      <div style="display:flex;gap:var(--sp-sm);justify-content:flex-end;margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
-        <button class="btn btn-outline" onclick="renderSelfProfileInline(MEMBERS.find(x=>x.uid==='${ea(uid)}'))">← Cancel</button>
-        <button class="btn btn-saffron" onclick="saveSelfMemberInline('${ea(uid)}')">Save Changes</button>
-      </div>
-    </div>`;
-}
-
-async function saveSelfMemberInline(uid) {
-  const g = id => (document.getElementById(id)?.value || '').trim();
-  try {
-    await apiPut('/api/members/' + uid + '/self', {
-      mobile:        g('sm_mobile'),
-      mobile2:       g('sm_mobile2'),
-      landline:      g('sm_landline'),
-      officePhone:   g('sm_officePhone'),
-      email:         g('sm_email'),
-      email2:        g('sm_email2'),
-      addressLine1:  g('sm_addr1'),
-      addressLine2:  g('sm_addr2'),
-      addressLine3:  g('sm_addr3'),
-      city:          g('sm_city'),
-      pincode:       g('sm_pincode'),
-      state:         g('sm_state'),
-      country:       g('sm_country'),
-      qualification: g('sm_qual'),
-      occupation:    g('sm_occ'),
-      designation:   g('sm_desig'),
-      organization:  g('sm_org'),
-      profession:    g('sm_prof'),
-    });
-    await reloadMembers();
-    showToast('Profile updated successfully!', 'success');
-    const m = MEMBERS.find(x => x.uid === uid);
-    if (m) renderSelfProfileInline(m);
-  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
+  // Open the full tabbed edit modal in self-edit mode
+  editMember(uid, true);
 }
 
 function viewMember(uid) {
@@ -1426,7 +1346,7 @@ function switchEditTab(name, btn) {
   if (btn) btn.classList.add('active');
 }
 
-function editMember(uid) {
+function editMember(uid, isSelfEdit = false) {
   const m = MEMBERS.find(x => x.uid === uid);
   if (!m) return;
 
@@ -1435,8 +1355,8 @@ function editMember(uid) {
   // Date fields: strip time component if present
   const dt = v => v ? String(v).split('T')[0] : '';
 
-  const fld = (id, label, val, type='text') =>
-    `<div class="form-field"><label>${label}</label><input id="${id}" type="${type}" value="${ea(type==='date' ? dt(val) : val)}" /></div>`;
+  const fld = (id, label, val, type='text', readonly=false) =>
+    `<div class="form-field"><label>${label}</label><input id="${id}" type="${type}" value="${ea(type==='date' ? dt(val) : val)}" ${readonly ? 'readonly style="opacity:0.5;cursor:not-allowed"' : ''}/></div>`;
 
   const sel = (id, label, val, opts) =>
     `<div class="form-field"><label>${label}</label><select id="${id}">${opts.map(o=>`<option value="${ea(o)}" ${String(val)===String(o)?'selected':''}>${o||'—'}</option>`).join('')}</select></div>`;
@@ -1613,12 +1533,12 @@ function editMember(uid) {
 
     <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end">
       <button class="btn btn-outline" onclick="closeForcedModal()">Cancel</button>
-      <button id="editMemberSaveBtn" class="btn btn-primary" onclick="saveMemberEdit('${ea(uid)}')">Save All Changes</button>
+      <button id="editMemberSaveBtn" class="btn btn-primary" onclick="saveMemberEdit('${ea(uid)}', ${isSelfEdit})">Save Changes</button>
     </div>
   `, true);
 }
 
-async function saveMemberEdit(uid) {
+async function saveMemberEdit(uid, isSelfEdit = false) {
   const name = document.getElementById('em_name')?.value.trim();
   if (!name) { showToast('Name is required!', 'error'); return; }
   const g = id => document.getElementById(id)?.value ?? '';
@@ -1626,7 +1546,7 @@ async function saveMemberEdit(uid) {
   const btn = document.getElementById('editMemberSaveBtn');
   setButtonLoading(btn, true, 'Saving…');
   try {
-    await apiPut('/api/members/' + uid, {
+    await apiPut('/api/members/' + uid + (isSelfEdit ? '/self' : ''), {
       name,
       bslno:                  g('em_bslno'),
       dateOfInitiation:       g('em_doi')          || null,
