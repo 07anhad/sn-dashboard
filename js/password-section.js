@@ -53,6 +53,13 @@ function renderChangePassword() {
           Logged in as: <strong style="color:var(--txt-secondary)">${user ? user.name : 'Unknown'}</strong> &nbsp;|&nbsp;
           Role: <strong style="color:var(--txt-secondary)">${user ? user.role : '—'}</strong>
         </p>
+        ${user && user.memberUid ? `
+        <div style="margin-top:var(--sp-md)">
+          <button class="btn btn-outline" onclick="editMember('${user.memberUid}', true)" style="font-size:0.9rem">
+            ✏️ Edit My Profile Details
+          </button>
+          <p style="font-size:0.78rem;color:var(--txt-muted);margin-top:6px">Update your personal, contact, family and other information.</p>
+        </div>` : ''}
       </div>
     </div>
   `;
