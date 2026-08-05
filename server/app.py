@@ -574,6 +574,33 @@ def update_member(uid):
     is_self_edit = request.path.endswith('/self')
 
     if is_self_edit:
+        # Verify the caller actually owns this uid.
+        # X-User header is "username(role)" — parse out the username.
+        x_user_header = request.headers.get('X-User', '')
+        caller_username = x_user_header.split('(')[0].strip() if '(' in x_user_header else x_user_header.strip()
+        if not caller_username:
+            audit('SELF_EDIT_DENIED', f"uid={uid} reason=missing_X-User")
+            return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
+
+        caller_row = query(
+            "SELECT email FROM users WHERE username=%s AND role='member'",
+            (caller_username,), one=True
+        )
+        if not caller_row:
+            audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} reason=user_not_found")
+            return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
+
+        # Resolve the member_details uid for this user (same logic as login)
+        caller_email = (caller_row['email'] or '').strip().lower()
+        md = query(
+            "SELECT uid FROM member_details WHERE LOWER(TRIM(email1))=%s OR LOWER(TRIM(email2))=%s",
+            (caller_email, caller_email), one=True
+        )
+        caller_uid = md['uid'].strip() if md else None
+        if caller_uid != uid.strip():
+            audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} caller_uid={caller_uid} reason=uid_mismatch")
+            return jsonify({'ok': False, 'error': 'Unauthorized: you can only edit your own profile'}), 403
+
         # Member self-edit: all fields including bsl and status
         or_none = lambda k: d.get(k) or None
         execute("""
