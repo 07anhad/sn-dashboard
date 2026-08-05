@@ -33,7 +33,7 @@ async function api(path, opts = {}) {
   if (res.status === 401) {
     sessionStorage.removeItem('currentUser');
     localStorage.removeItem('currentUser');
-    window.location.href = 'index.html';
+    window.location.replace('index.html');
     throw new Error('Session expired. Please log in again.');
   }
 
