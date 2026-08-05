@@ -574,30 +574,82 @@ def update_member(uid):
     is_self_edit = request.path.endswith('/self')
 
     if is_self_edit:
-        # Member self-edit: only allowed contact/address/professional fields
-        allowed = {
-            'mobile1':        d.get('mobile'),
-            'mobile2':        d.get('mobile2'),
-            'landline':       d.get('landline'),
-            'office_phone':   d.get('officePhone'),
-            'email1':         d.get('email'),
-            'email2':         d.get('email2'),
-            'address_line1':  d.get('addressLine1'),
-            'address_line2':  d.get('addressLine2'),
-            'address_line3':  d.get('addressLine3'),
-            'city':           d.get('city'),
-            'pincode':        d.get('pincode'),
-            'state':          d.get('state'),
-            'country':        d.get('country'),
-            'qualification':  d.get('qualification'),
-            'occupation':     d.get('occupation'),
-            'designation':    d.get('designation'),
-            'organization':   d.get('organization'),
-            'profession':     d.get('profession'),
-        }
-        set_clause = ', '.join(f"{col}=%s" for col in allowed)
-        values = list(allowed.values()) + [uid]
-        execute(f"UPDATE member_details SET {set_clause} WHERE uid=%s", values)
+        # Member self-edit: all fields including bsl and status
+        or_none = lambda k: d.get(k) or None
+        execute("""
+            UPDATE member_details SET
+              name=%s, bsl=%s, record_status=%s,
+              date_of_initiation=%s, date_of_birth=%s,
+              date_of_registration_jigyasu=%s,
+              date_of_first_initiation=%s, date_of_second_initiation=%s,
+              blood_group=%s, caste=%s, nationality=%s,
+              ashram=%s, sn_ext=%s, branch_id_card_received=%s,
+              mobile1=%s, mobile2=%s, landline=%s, office_phone=%s,
+              email1=%s, email2=%s,
+              address_line1=%s, address_line2=%s, address_line3=%s,
+              city=%s, pincode=%s, state=%s, country=%s,
+              qualification=%s, occupation=%s, designation=%s,
+              organization=%s, profession=%s,
+              profession_code=%s, communication_grid_code=%s,
+              mahila_association_member=%s, youth_member=%s, associate_youth_member=%s,
+              junior_pre_initiate_member=%s, senior_pre_initiate_member=%s,
+              crc_member=%s, cca_member=%s, sant_su_member=%s,
+              nee_first_name=%s, nee_middle_name=%s, nee_last_name=%s,
+              father_title=%s, father_first_name=%s, father_middle_name=%s, father_last_name=%s,
+              father_branch=%s, father_bslno=%s, father_uid=%s, father_doi=%s,
+              father_phone=%s, father_city=%s, father_state=%s,
+              mother_title=%s, mother_first_name=%s, mother_middle_name=%s, mother_last_name=%s,
+              mother_branch=%s, mother_bslno=%s, mother_uid=%s, mother_doi=%s,
+              mother_phone=%s, mother_city=%s, mother_state=%s,
+              spouse_title=%s, spouse_first_name=%s, spouse_middle_name=%s, spouse_last_name=%s,
+              spouse_branch=%s, spouse_bslno=%s, spouse_uid=%s, spouse_doi=%s,
+              spouse_phone=%s, spouse_city=%s, spouse_state=%s,
+              ref1_name=%s, ref1_address=%s, ref1_email=%s, ref1_phone=%s,
+              ref1_branch=%s, ref1_relation=%s,
+              ref2_name=%s, ref2_address=%s, ref2_email=%s, ref2_phone=%s,
+              ref2_branch=%s, ref2_relation=%s,
+              dor_youth=%s, date_of_initiation_new=%s,
+              date_transfer_in=%s, transfer_from_branch=%s,
+              date_transfer_out=%s, transfer_to_branch=%s,
+              date_of_expire=%s
+            WHERE uid=%s
+        """, (
+            d.get('name'),            d.get('bslno'),         d.get('status', 'Activated'),
+            or_none('dateOfInitiation'),      or_none('dateOfBirth'),
+            or_none('dateOfRegistration'),
+            or_none('dateOfFirstInitiation'), or_none('dateOfSecondInitiation'),
+            d.get('bloodGroup'),  d.get('caste'),        d.get('nationality'),
+            d.get('ashram'),      d.get('snExt'),         d.get('branchIdCard'),
+            d.get('mobile'),      d.get('mobile2'),       d.get('landline'),    d.get('officePhone'),
+            d.get('email'),       d.get('email2'),
+            d.get('addressLine1'),d.get('addressLine2'),  d.get('addressLine3'),
+            d.get('city'),        d.get('pincode'),       d.get('state'),       d.get('country'),
+            d.get('qualification'),d.get('occupation'),  d.get('designation'),
+            d.get('organization'),d.get('profession'),
+            d.get('professionCode'),d.get('commGridCode'),
+            d.get('mahila'),      d.get('youth'),         d.get('assocYouth'),
+            d.get('jrPreInit'),   d.get('srPreInit'),
+            d.get('crc'),         d.get('cca'),           d.get('santSu'),
+            d.get('neeFirst'),    d.get('neeMiddle'),     d.get('neeLast'),
+            d.get('fatherTitle'), d.get('fatherFirstName'),d.get('fatherMiddleName'),d.get('fatherLastName'),
+            d.get('fatherBranch'),d.get('fatherBslno'),  d.get('fatherUid'),   or_none('fatherDoi'),
+            d.get('fatherPhone'), d.get('fatherCity'),   d.get('fatherState'),
+            d.get('motherTitle'), d.get('motherFirstName'),d.get('motherMiddleName'),d.get('motherLastName'),
+            d.get('motherBranch'),d.get('motherBslno'),  d.get('motherUid'),   or_none('motherDoi'),
+            d.get('motherPhone'), d.get('motherCity'),   d.get('motherState'),
+            d.get('spouseTitle'), d.get('spouseFirstName'),d.get('spouseMiddleName'),d.get('spouseLastName'),
+            d.get('spouseBranch'),d.get('spouseBslno'),  d.get('spouseUid'),   or_none('spouseDoi'),
+            d.get('spousePhone'), d.get('spouseCity'),   d.get('spouseState'),
+            d.get('ref1Name'),    d.get('ref1Address'),  d.get('ref1Email'),   d.get('ref1Phone'),
+            d.get('ref1Branch'),  d.get('ref1Relation'),
+            d.get('ref2Name'),    d.get('ref2Address'),  d.get('ref2Email'),   d.get('ref2Phone'),
+            d.get('ref2Branch'),  d.get('ref2Relation'),
+            or_none('dorYouth'),          or_none('dateOfInitiationNew'),
+            or_none('dateTransferIn'),    d.get('transferFromBranch'),
+            or_none('dateTransferOut'),   d.get('transferToBranch'),
+            or_none('dateOfExpire'),
+            uid
+        ))
         audit('SELF_EDIT_MEMBER', f"uid={uid}")
         return jsonify({'ok': True})
 
