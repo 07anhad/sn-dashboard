@@ -1203,13 +1203,17 @@ def get_esatsang():
     # Build WHERE clause from optional filters
     conds, params = [], []
     if search:
-        conds.append(
-            "(LOWER(COALESCE(first_name,'') || ' ' || COALESCE(middle_name,'') || ' ' || COALESCE(last_name,'')) LIKE %s"
-            " OR LOWER(COALESCE(member_uid,'')) LIKE %s"
-            " OR LOWER(COALESCE(member_id,'')) LIKE %s)"
-        )
-        s = f'%{search.lower()}%'
-        params.extend([s, s, s])
+        # Split into words so "mohit taneja" matches "Mohit Kumar Taneja"
+        words = [w for w in search.lower().split() if w]
+        full_name = "LOWER(COALESCE(first_name,'') || ' ' || COALESCE(middle_name,'') || ' ' || COALESCE(last_name,''))"
+        for word in words:
+            w = f'%{word}%'
+            conds.append(
+                f"({full_name} LIKE %s"
+                " OR LOWER(COALESCE(member_uid,'')) LIKE %s"
+                " OR LOWER(COALESCE(member_id,'')) LIKE %s)"
+            )
+            params.extend([w, w, w])
     if evt_filter:
         conds.append("event_name = %s");  params.append(evt_filter)
     if br_filter:
