@@ -25,7 +25,7 @@ from db import query, execute
 
 app = Flask(__name__, static_folder=None)
 CORS(app)
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB upload limit
+app.config['MAX_CONTENT_LENGTH'] = 300 * 1024 * 1024  # 300 MB upload limit
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-insecure-key')
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
@@ -1279,93 +1279,100 @@ def get_esatsang():
 
 @app.route('/api/attendance/esatsang/upload', methods=['POST'])
 def upload_esatsang_attendance():
-    """Accept xlsx or csv, parse, and import into esatsang_attendance."""
+    """Accept xlsx or csv, parse, and import into esatsang_attendance.
+    Streams rows in batches to avoid OOM on large files (150k+ rows).
+    """
     if 'file' not in request.files:
         return jsonify({'ok': False, 'error': 'No file provided.'}), 400
     f = request.files['file']
     filename = f.filename.lower()
+
+    BATCH_SIZE = 5000
+
+    def find_col(hdrs, *keywords):
+        norm = lambda s: s.upper().replace(' ', '_').replace('-', '_')
+        for h in hdrs:
+            hn = norm(h)
+            if any(kw in hn for kw in keywords):
+                return h
+        return None
+
+    def sv(row, col):
+        return str(row.get(col, '') or '').strip() if col else ''
+
+    def row_to_tuple(r, cols):
+        col_date, col_mid, col_event, col_first, col_mid_nm, col_last, col_uid, col_branch, col_loc, col_type = cols
+        return (
+            sv(r, col_date) or None,
+            sv(r, col_mid),
+            sv(r, col_event),
+            sv(r, col_first),
+            sv(r, col_mid_nm),
+            sv(r, col_last),
+            sv(r, col_uid),
+            sv(r, col_branch),
+            sv(r, col_loc),
+            sv(r, col_type),
+        )
+
+    def iter_rows_csv(file_obj):
+        """Yield (headers, row_iter) without loading all rows into memory."""
+        import csv, io
+        wrapper = io.TextIOWrapper(file_obj.stream, encoding='utf-8-sig')
+        reader  = csv.DictReader(wrapper)
+        hdrs    = reader.fieldnames or []
+        # fieldnames are populated after first iteration starts
+        for row in reader:
+            if not hdrs:
+                hdrs = reader.fieldnames or []
+            yield hdrs, row
+
+    def iter_rows_excel(file_obj):
+        """Yield (headers, row_iter) using read_only streaming mode."""
+        import openpyxl, io
+        data = file_obj.read()
+        wb   = openpyxl.load_workbook(io.BytesIO(data), data_only=True, read_only=True)
+        ws   = wb.active
+        headers = None
+        for row in ws.iter_rows(values_only=True):
+            if headers is None:
+                headers = [str(h).strip() if h is not None else '' for h in row]
+                continue
+            yield headers, dict(zip(headers, [str(c).strip() if c is not None else '' for c in row]))
+        wb.close()
+
     try:
-        if filename.endswith('.csv'):
-            import csv, io
-            text = f.read().decode('utf-8-sig')
-            reader = csv.DictReader(io.StringIO(text))
-            raw = list(reader)
-            headers = list(reader.fieldnames or [])
-        elif filename.endswith(('.xlsx', '.xlsm', '.xls')):
-            import openpyxl, io
-            wb = openpyxl.load_workbook(io.BytesIO(f.read()), data_only=True)
-            ws = wb.active
-            all_rows = list(ws.iter_rows(values_only=True))
-            if not all_rows:
-                return jsonify({'ok': False, 'error': 'Empty workbook.'}), 400
-            headers = [str(h).strip() if h is not None else '' for h in all_rows[0]]
-            raw = [dict(zip(headers, [str(c).strip() if c is not None else '' for c in row])) for row in all_rows[1:]]
-        else:
-            return jsonify({'ok': False, 'error': 'Unsupported file type. Use .xlsx or .csv'}), 400
-
-        def find_col(headers, *keywords):
-            norm = lambda s: s.upper().replace(' ', '_').replace('-', '_')
-            for h in headers:
-                hn = norm(h)
-                if any(kw in hn for kw in keywords):
-                    return h
-            return None
-
-        col_date   = find_col(headers, 'ATTENDANCE_DATE', 'DATE', 'ATT_DATE')
-        col_mid    = find_col(headers, 'MEMBER_ID', 'MID', 'MEMB_ID', 'MEMBER_I')
-        col_event  = find_col(headers, 'EVENT_NAME', 'EVENT')
-        col_first  = find_col(headers, 'FIRST_NAME', 'FIRST')
-        col_mid_nm = find_col(headers, 'MIDDLE_NAME', 'MIDDLE')
-        col_last   = find_col(headers, 'LAST_NAME', 'LAST')
-        col_uid    = find_col(headers, 'MEMBER_UID', 'UID')
-        col_branch = find_col(headers, 'BRANCH_NAME', 'BRANCH')
-        col_loc    = find_col(headers, 'LOCATION', 'LOC')
-        col_type   = find_col(headers, 'ATTENDANCE_TYPE', 'ATT_TYPE', 'TYPE')
-
-        def sv(row, col):
-            return str(row.get(col, '') or '').strip() if col else ''
-
-        parsed = [
-            {
-                'date':      sv(r, col_date),
-                'memberId':  sv(r, col_mid),
-                'eventName': sv(r, col_event),
-                'firstName': sv(r, col_first),
-                'middleName':sv(r, col_mid_nm),
-                'lastName':  sv(r, col_last),
-                'memberUid': sv(r, col_uid),
-                'branchName':sv(r, col_branch),
-                'location':  sv(r, col_loc),
-                'type':      sv(r, col_type),
-            }
-            for r in raw
-            if sv(r, col_mid) or sv(r, col_first) or sv(r, col_uid)
-        ]
-        if not parsed:
-            return jsonify({'ok': False, 'error': 'No valid data rows found.'}), 400
-
-        # Bulk upsert — one DB round trip for all rows.
-        # ON CONFLICT DO NOTHING skips exact duplicates (date+member_id+event).
-        # Requires a unique index on those three columns (created if missing).
         from db import get_conn
         import psycopg2.extras, psycopg2
+
         conn = get_conn()
         try:
             with conn.cursor() as cur:
-                # Ensure unique index exists for dedup
                 cur.execute("""
                     CREATE UNIQUE INDEX IF NOT EXISTS uq_esatsang_date_member_event
                     ON esatsang_attendance (attendance_date, member_id, event_name)
                 """)
-                values = [
-                    (r['date'] or None, r['memberId'], r['eventName'],
-                     r['firstName'], r['middleName'], r['lastName'],
-                     r['memberUid'], r['branchName'], r['location'], r['type'])
-                    for r in parsed
-                ]
-                before = cur.execute("SELECT count(*) FROM esatsang_attendance") or 0
                 cur.execute("SELECT count(*) FROM esatsang_attendance")
                 before = cur.fetchone()[0]
+
+            conn.commit()
+
+            # --- stream and insert in batches ---
+            cols      = None
+            batch     = []
+            total_in  = 0
+            total_sk  = 0
+
+            if filename.endswith('.csv'):
+                row_iter = iter_rows_csv(f)
+            elif filename.endswith(('.xlsx', '.xlsm', '.xls')):
+                row_iter = iter_rows_excel(f)
+            else:
+                return jsonify({'ok': False, 'error': 'Unsupported file type. Use .xlsx or .csv'}), 400
+
+            def flush_batch(cur, batch):
+                if not batch:
+                    return 0
                 psycopg2.extras.execute_values(
                     cur,
                     """INSERT INTO esatsang_attendance
@@ -1373,15 +1380,54 @@ def upload_esatsang_attendance():
                         last_name, member_uid, branch_name, location, attendance_type)
                        VALUES %s
                        ON CONFLICT (attendance_date, member_id, event_name) DO NOTHING""",
-                    values,
-                    page_size=2000
+                    batch,
+                    page_size=BATCH_SIZE
                 )
-                cur.execute("SELECT count(*) FROM esatsang_attendance")
-                after = cur.fetchone()[0]
+                return cur.rowcount
+
+            with conn.cursor() as cur:
+                for item in row_iter:
+                    if filename.endswith('.csv'):
+                        hdrs, row = item
+                    else:
+                        hdrs, row = item
+
+                    if cols is None:
+                        col_date   = find_col(hdrs, 'ATTENDANCE_DATE', 'DATE', 'ATT_DATE')
+                        col_mid    = find_col(hdrs, 'MEMBER_ID', 'MID', 'MEMB_ID', 'MEMBER_I')
+                        col_event  = find_col(hdrs, 'EVENT_NAME', 'EVENT')
+                        col_first  = find_col(hdrs, 'FIRST_NAME', 'FIRST')
+                        col_mid_nm = find_col(hdrs, 'MIDDLE_NAME', 'MIDDLE')
+                        col_last   = find_col(hdrs, 'LAST_NAME', 'LAST')
+                        col_uid    = find_col(hdrs, 'MEMBER_UID', 'UID')
+                        col_branch = find_col(hdrs, 'BRANCH_NAME', 'BRANCH')
+                        col_loc    = find_col(hdrs, 'LOCATION', 'LOC')
+                        col_type   = find_col(hdrs, 'ATTENDANCE_TYPE', 'ATT_TYPE', 'TYPE')
+                        cols = (col_date, col_mid, col_event, col_first, col_mid_nm,
+                                col_last, col_uid, col_branch, col_loc, col_type)
+
+                    # skip empty rows
+                    if not (sv(row, col_mid) or sv(row, col_first) or sv(row, col_uid)):
+                        continue
+
+                    batch.append(row_to_tuple(row, cols))
+
+                    if len(batch) >= BATCH_SIZE:
+                        inserted = flush_batch(cur, batch)
+                        total_in += inserted
+                        total_sk += len(batch) - inserted
+                        batch = []
+
+                # flush remaining
+                if batch:
+                    inserted = flush_batch(cur, batch)
+                    total_in += inserted
+                    total_sk += len(batch) - inserted
+
             conn.commit()
-            inserted = after - before
-            audit('UPLOAD_ESATSANG_ATTENDANCE', f"file={f.filename} inserted={inserted} skipped={len(parsed)-inserted}")
-            return jsonify({'ok': True, 'count': inserted, 'skipped': len(parsed) - inserted}), 201
+            audit('UPLOAD_ESATSANG_ATTENDANCE', f"file={f.filename} inserted={total_in} skipped={total_sk}")
+            return jsonify({'ok': True, 'count': total_in, 'skipped': total_sk}), 201
+
         except Exception as e:
             conn.rollback()
             raise
