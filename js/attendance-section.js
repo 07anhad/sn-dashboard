@@ -11,8 +11,9 @@ let attStats    = { audio: 0, video: 0, branches: 0, minDate: '', maxDate: '' };
 let attEvents   = [];        // unique event names (from server)
 let attBranches = [];        // unique branch names (from server)
 let _attSearchTimer = null;
-let _attOwnUid     = null;  // set for member-view; locks fetches to that uid only
-let _attOwnAllData = [];    // full unfiltered own-records for local filtering
+let _attOwnUid        = null;  // set for member-view; locks fetches to that uid only
+let _attOwnAllData    = [];    // full unfiltered own-records for local filtering
+let _attOwnFilteredData = []; // filtered subset (for local pagination)
 const ATT_PER_PAGE = 50;
 
 // ── Entry point (called by router) ─────────
@@ -37,18 +38,21 @@ async function loadMemberOwnAttendance() {
   _attOwnUid = memberUid;
   try {
     const resp = await apiGet(`/api/attendance/esatsang?uid=${encodeURIComponent(memberUid)}`);
-    _attOwnAllData = mapRows(resp.rows ?? resp); // keep full set for local filtering
-    attData  = [..._attOwnAllData];
-    attTotal = attData.length;
+    _attOwnAllData      = mapRows(resp.rows ?? resp);
+    _attOwnFilteredData = [..._attOwnAllData];
+    attData   = _attOwnAllData.slice(0, ATT_PER_PAGE);
+    attTotal  = _attOwnAllData.length;
+    attPage   = 1;
     attStats = {
-      audio:    attData.filter(r => (r.type || '').toUpperCase() === 'AUDIO').length,
-      video:    attData.filter(r => (r.type || '').toUpperCase() === 'VIDEO').length,
-      branches: new Set(attData.map(r => r.branch).filter(Boolean)).size,
-      minDate:  [...attData.map(r => r.date).filter(Boolean)].sort()[0]      || '',
-      maxDate:  [...attData.map(r => r.date).filter(Boolean)].sort().at(-1)  || '',
+      audio:    _attOwnAllData.filter(r => (r.type || '').toUpperCase() === 'AUDIO').length,
+      video:    _attOwnAllData.filter(r => (r.type || '').toUpperCase() === 'VIDEO').length,
+      branches: new Set(_attOwnAllData.map(r => r.branch).filter(Boolean)).size,
+      minDate:  [..._attOwnAllData.map(r => r.date).filter(Boolean)].sort()[0]     || '',
+      maxDate:  [..._attOwnAllData.map(r => r.date).filter(Boolean)].sort().at(-1) || '',
     };
-    attEvents   = [];
-    attBranches = [];
+    // Populate event/branch dropdowns from own records
+    attEvents   = [...new Set(_attOwnAllData.map(r => r.event).filter(Boolean))].sort();
+    attBranches = [...new Set(_attOwnAllData.map(r => r.branch).filter(Boolean))].sort();
   } catch (e) {
     attData = []; attTotal = 0;
   }
@@ -93,8 +97,9 @@ async function _fetchAttPage(page) {
 
 // ── Load from DB (admin) ───────────────────
 async function loadAttendanceData() {
-  _attOwnUid     = null;
-  _attOwnAllData = [];
+  _attOwnUid          = null;
+  _attOwnAllData      = [];
+  _attOwnFilteredData = [];
   const container = document.getElementById('attendanceContent');
   container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt-muted)">Loading…</div>';
   try {
@@ -302,7 +307,8 @@ async function _doFilterAtt() {
       if (dateTo   && r.date > dateTo)                          return false;
       return true;
     });
-    attData  = filtered;
+    _attOwnFilteredData = filtered;
+    attData  = filtered.slice(0, ATT_PER_PAGE);
     attTotal = filtered.length;
     attStats = {
       audio:    filtered.filter(r => (r.type || '').toUpperCase() === 'AUDIO').length,
@@ -373,8 +379,14 @@ function renderAttTable() {
 
 async function gotoAttPage(p) {
   const pages = Math.ceil(attTotal / ATT_PER_PAGE);
-  p = Math.max(1, Math.min(p, pages));
-  const tbody = document.getElementById('attTableBody');
+  p = Math.max(1, Math.min(p, pages));  if (_attOwnUid) {
+    // Member view: slice local filtered data
+    attPage = p;
+    attData = _attOwnFilteredData.slice((p - 1) * ATT_PER_PAGE, p * ATT_PER_PAGE);
+    renderAttTable();
+    return;
+  }
+  // Admin view: fetch page from server  const tbody = document.getElementById('attTableBody');
   if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--txt-muted)">Loading\u2026</td></tr>';
   try { await _fetchAttPage(p); } catch {}
   renderAttTable();
