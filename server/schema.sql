@@ -429,3 +429,13 @@ CREATE TABLE IF NOT EXISTS otp_tokens (
     created_at TIMESTAMP    DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_tokens (email);
+
+CREATE TABLE IF NOT EXISTS member_edit_log (
+    id             SERIAL PRIMARY KEY,
+    member_uid     TEXT NOT NULL,
+    member_name    TEXT,
+    edited_by      TEXT,
+    edited_at      TIMESTAMPTZ DEFAULT NOW(),
+    fields_changed TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_mel_edited_at ON member_edit_log (edited_at DESC);
