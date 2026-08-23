@@ -7,7 +7,7 @@
 let membersData      = [...MEMBERS];
 let membersPage      = 1;
 const MEMBERS_PER_PAGE = 10;
-let membersActiveTab = 'members'; // 'members' | 'superhumane'
+let membersActiveTab = 'members'; // 'members' | 'superhumane' | 'edit-log'
 
 /* Superhumane tab state */
 let superhumaneAllData  = [];
@@ -40,18 +40,22 @@ function renderMembers() {
     }
     return;
   }
-  // ── Admin: Tab switcher (Members / Superhumane) ──
+  // ── Admin: Tab switcher ──
   container.innerHTML = `
     <div class="section-tabs">
       <button class="section-tab-btn ${membersActiveTab === 'members' ? 'active' : ''}"
               onclick="switchMembersTab('members')">Members</button>
       <button class="section-tab-btn ${membersActiveTab === 'superhumane' ? 'active' : ''}"
               onclick="switchMembersTab('superhumane')">Superhumane (Sant-Su)</button>
+      ${isSuperAdmin() ? `<button class="section-tab-btn ${membersActiveTab === 'edit-log' ? 'active' : ''}"
+              onclick="switchMembersTab('edit-log')">Profile Updates</button>` : ''}
     </div>
     <div id="membersTabContent"></div>
   `;
   if (membersActiveTab === 'members') {
     _renderMembersListTab();
+  } else if (membersActiveTab === 'edit-log') {
+    renderMemberEditLogTab();
   } else {
     renderSuperhumaneAdminTab();
   }
@@ -60,6 +64,53 @@ function renderMembers() {
 function switchMembersTab(tab) {
   membersActiveTab = tab;
   renderMembers();
+}
+
+async function renderMemberEditLogTab() {
+  const tabContent = document.getElementById('membersTabContent');
+  if (!tabContent) return;
+  tabContent.innerHTML = '<div style="padding:40px;text-align:center;color:var(--txt-muted)">Loading…</div>';
+  try {
+    const rows = await apiGet('/api/members/edit-log?limit=200');
+    if (!rows.length) {
+      tabContent.innerHTML = '<div class="card" style="padding:var(--sp-xl);text-align:center;color:var(--txt-muted)">No profile updates recorded yet.</div>';
+      return;
+    }
+    const fmt = iso => {
+      const d = new Date(iso);
+      return isNaN(d) ? iso : d.toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    };
+    tabContent.innerHTML = `
+      <div class="table-wrap">
+        <div class="table-toolbar">
+          <div>
+            <span class="table-title">Profile Updates</span>
+            <span class="table-count">${rows.length} update${rows.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Name</th><th>UID</th><th>Updated On</th><th>Fields Changed</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((r, i) => `
+                <tr>
+                  <td style="color:var(--txt-muted);font-size:0.82rem">${i + 1}</td>
+                  <td><a href="#" onclick="editMember('${ea(r.member_uid)}');return false;" style="font-weight:600">${r.member_name || '—'}</a></td>
+                  <td><code style="font-size:0.78rem">${r.member_uid}</code></td>
+                  <td style="font-size:0.82rem;white-space:nowrap">${fmt(r.edited_at)}</td>
+                  <td style="font-size:0.82rem;color:var(--txt-muted)">${r.fields_changed || '—'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch (e) {
+    tabContent.innerHTML = `<div class="card" style="padding:var(--sp-xl);text-align:center;color:var(--clr-red)">${e.message}</div>`;
+  }
 }
 
 function _renderMembersListTab() {
