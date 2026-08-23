@@ -611,6 +611,17 @@ def update_member(uid):
             audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} caller_uid={caller_uid} reason=uid_mismatch")
             return jsonify({'ok': False, 'error': 'Unauthorized: you can only edit your own profile'}), 403
 
+        # Fetch current values BEFORE the update so we can diff them
+        field_map = {
+            'name': 'name', 'bslno': 'bsl', 'mobile': 'mobile1', 'mobile2': 'mobile2',
+            'email': 'email1', 'email2': 'email2', 'addressLine1': 'address_line1',
+            'addressLine2': 'address_line2', 'city': 'city', 'pincode': 'pincode',
+            'state': 'state', 'country': 'country', 'occupation': 'occupation',
+            'designation': 'designation', 'organization': 'organization',
+            'bloodGroup': 'blood_group', 'qualification': 'qualification',
+        }
+        current = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
+
         # Member self-edit: all fields including bsl and status
         or_none = lambda k: d.get(k) or None
         execute("""
@@ -689,16 +700,7 @@ def update_member(uid):
         ))
         audit('SELF_EDIT_MEMBER', f"uid={uid}")
 
-        # Detect which fields actually changed for the edit log
-        field_map = {
-            'name': 'name', 'bslno': 'bsl', 'mobile': 'mobile1', 'mobile2': 'mobile2',
-            'email': 'email1', 'email2': 'email2', 'addressLine1': 'address_line1',
-            'addressLine2': 'address_line2', 'city': 'city', 'pincode': 'pincode',
-            'state': 'state', 'country': 'country', 'occupation': 'occupation',
-            'designation': 'designation', 'organization': 'organization',
-            'bloodGroup': 'blood_group', 'qualification': 'qualification',
-        }
-        current = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
+        # Compare against pre-update snapshot
         changed = [
             label for label, col in field_map.items()
             if str(d.get(label) or '').strip() != str(current.get(col) or '').strip()
