@@ -543,6 +543,16 @@ def get_member_types():
     rows = query("SELECT name FROM member_types ORDER BY id")
     return jsonify([r['name'] for r in rows])
 
+@app.route('/api/members/edit-log')
+def get_member_edit_log():
+    limit = min(int(request.args.get('limit', 200)), 500)
+    rows  = query(
+        "SELECT id, member_uid, member_name, edited_by, edited_at, fields_changed "
+        "FROM member_edit_log ORDER BY edited_at DESC LIMIT %s",
+        (limit,)
+    )
+    return jsonify([{**dict(r), 'edited_at': str(r['edited_at'])} for r in rows])
+
 @app.route('/api/members', methods=['POST'])
 def add_member():
     import psycopg2
@@ -678,6 +688,25 @@ def update_member(uid):
             uid
         ))
         audit('SELF_EDIT_MEMBER', f"uid={uid}")
+
+        # Detect which fields actually changed for the edit log
+        field_map = {
+            'name': 'name', 'bslno': 'bsl', 'mobile': 'mobile1', 'mobile2': 'mobile2',
+            'email': 'email1', 'email2': 'email2', 'addressLine1': 'address_line1',
+            'addressLine2': 'address_line2', 'city': 'city', 'pincode': 'pincode',
+            'state': 'state', 'country': 'country', 'occupation': 'occupation',
+            'designation': 'designation', 'organization': 'organization',
+            'bloodGroup': 'blood_group', 'qualification': 'qualification',
+        }
+        current = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
+        changed = [
+            label for label, col in field_map.items()
+            if str(d.get(label) or '').strip() != str(current.get(col) or '').strip()
+        ]
+        execute(
+            "INSERT INTO member_edit_log (member_uid, member_name, edited_by, fields_changed) VALUES (%s,%s,%s,%s)",
+            (uid, d.get('name') or current.get('name'), caller_username, ', '.join(changed) if changed else 'no changes')
+        )
         return jsonify({'ok': True})
 
     # Admin full update below
