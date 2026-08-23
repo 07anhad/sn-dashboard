@@ -99,7 +99,7 @@ async function renderMemberEditLogTab() {
               ${rows.map((r, i) => `
                 <tr>
                   <td style="color:var(--txt-muted);font-size:0.82rem">${i + 1}</td>
-                  <td><a href="#" onclick="editMember('${ea(r.member_uid)}');return false;" style="font-weight:600">${r.member_name || '—'}</a></td>
+                  <td><a href="#" onclick="editMember(this.dataset.uid);return false;" data-uid="${r.member_uid}" style="font-weight:600">${r.member_name || '—'}</a></td>
                   <td><code style="font-size:0.78rem">${r.member_uid}</code></td>
                   <td style="font-size:0.82rem;white-space:nowrap">${fmt(r.edited_at)}</td>
                   <td style="font-size:0.82rem;color:var(--txt-muted)">${r.fields_changed || '—'}</td>
