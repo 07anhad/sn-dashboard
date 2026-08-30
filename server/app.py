@@ -619,15 +619,111 @@ def update_member(uid):
             audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} caller_uid={caller_uid} reason=uid_mismatch")
             return jsonify({'ok': False, 'error': 'Unauthorized: you can only edit your own profile'}), 403
 
-        # Fetch current values BEFORE the update so we can diff them
-        field_map = {
-            'name': 'name', 'bslno': 'bsl', 'mobile': 'mobile1', 'mobile2': 'mobile2',
-            'email': 'email1', 'email2': 'email2', 'addressLine1': 'address_line1',
-            'addressLine2': 'address_line2', 'city': 'city', 'pincode': 'pincode',
-            'state': 'state', 'country': 'country', 'occupation': 'occupation',
-            'designation': 'designation', 'organization': 'organization',
-            'bloodGroup': 'blood_group', 'qualification': 'qualification',
-        }
+        # Fetch current values BEFORE the update so we can diff them.
+        # (payload key, member_details column, human label) — covers every editable field.
+        field_defs = [
+            ('name', 'name', 'Name'),
+            ('category', 'category', 'Category'),
+            ('gender', 'gender', 'Gender'),
+            ('maritalStatus', 'marital_status', 'Marital Status'),
+            ('previousBranch', 'previous_branch', 'Previous Branch'),
+            ('bslno', 'bsl', 'BSL No.'),
+            ('status', 'record_status', 'Record Status'),
+            ('dateOfInitiation', 'date_of_initiation', 'Date of Initiation'),
+            ('dateOfBirth', 'date_of_birth', 'Date of Birth'),
+            ('dateOfRegistration', 'date_of_registration_jigyasu', 'Date of Reg. (Jigyasu)'),
+            ('dateOfFirstInitiation', 'date_of_first_initiation', 'Date of 1st Initiation'),
+            ('dateOfSecondInitiation', 'date_of_second_initiation', 'Date of 2nd Initiation'),
+            ('bloodGroup', 'blood_group', 'Blood Group'),
+            ('caste', 'caste', 'Caste'),
+            ('nationality', 'nationality', 'Nationality'),
+            ('ashram', 'ashram', 'Ashram'),
+            ('snExt', 'sn_ext', 'SN/EXT'),
+            ('branchIdCard', 'branch_id_card_received', 'Branch ID Card'),
+            ('mobile', 'mobile1', 'Mobile 1'),
+            ('mobile2', 'mobile2', 'Mobile 2'),
+            ('landline', 'landline', 'Landline'),
+            ('officePhone', 'office_phone', 'Office Phone'),
+            ('email', 'email1', 'Email 1'),
+            ('email2', 'email2', 'Email 2'),
+            ('addressLine1', 'address_line1', 'Address Line 1'),
+            ('addressLine2', 'address_line2', 'Address Line 2'),
+            ('addressLine3', 'address_line3', 'Address Line 3'),
+            ('city', 'city', 'City'),
+            ('pincode', 'pincode', 'Pincode'),
+            ('state', 'state', 'State'),
+            ('country', 'country', 'Country'),
+            ('qualification', 'qualification', 'Qualification'),
+            ('occupation', 'occupation', 'Occupation'),
+            ('designation', 'designation', 'Designation'),
+            ('organization', 'organization', 'Organization'),
+            ('profession', 'profession', 'Profession'),
+            ('professionCode', 'profession_code', 'Profession Code'),
+            ('commGridCode', 'communication_grid_code', 'Comm. Grid Code'),
+            ('mahila', 'mahila_association_member', 'Mahila'),
+            ('youth', 'youth_member', 'Youth'),
+            ('assocYouth', 'associate_youth_member', 'Associate Youth'),
+            ('jrPreInit', 'junior_pre_initiate_member', 'Jr. Pre-Initiate'),
+            ('srPreInit', 'senior_pre_initiate_member', 'Sr. Pre-Initiate'),
+            ('crc', 'crc_member', 'CRC'),
+            ('cca', 'cca_member', 'CCA'),
+            ('santSu', 'sant_su_member', 'Sant-Su'),
+            ('neeFirst', 'nee_first_name', 'Nee First Name'),
+            ('neeMiddle', 'nee_middle_name', 'Nee Middle Name'),
+            ('neeLast', 'nee_last_name', 'Nee Last Name'),
+            ('fatherTitle', 'father_title', 'Father Title'),
+            ('fatherFirstName', 'father_first_name', 'Father First Name'),
+            ('fatherMiddleName', 'father_middle_name', 'Father Middle Name'),
+            ('fatherLastName', 'father_last_name', 'Father Last Name'),
+            ('fatherBranch', 'father_branch', 'Father Branch'),
+            ('fatherBslno', 'father_bslno', 'Father BSL'),
+            ('fatherUid', 'father_uid', 'Father UID'),
+            ('fatherDoi', 'father_doi', 'Father DOI'),
+            ('fatherPhone', 'father_phone', 'Father Phone'),
+            ('fatherCity', 'father_city', 'Father City'),
+            ('fatherState', 'father_state', 'Father State'),
+            ('motherTitle', 'mother_title', 'Mother Title'),
+            ('motherFirstName', 'mother_first_name', 'Mother First Name'),
+            ('motherMiddleName', 'mother_middle_name', 'Mother Middle Name'),
+            ('motherLastName', 'mother_last_name', 'Mother Last Name'),
+            ('motherBranch', 'mother_branch', 'Mother Branch'),
+            ('motherBslno', 'mother_bslno', 'Mother BSL'),
+            ('motherUid', 'mother_uid', 'Mother UID'),
+            ('motherDoi', 'mother_doi', 'Mother DOI'),
+            ('motherPhone', 'mother_phone', 'Mother Phone'),
+            ('motherCity', 'mother_city', 'Mother City'),
+            ('motherState', 'mother_state', 'Mother State'),
+            ('spouseTitle', 'spouse_title', 'Spouse Title'),
+            ('spouseFirstName', 'spouse_first_name', 'Spouse First Name'),
+            ('spouseMiddleName', 'spouse_middle_name', 'Spouse Middle Name'),
+            ('spouseLastName', 'spouse_last_name', 'Spouse Last Name'),
+            ('spouseBranch', 'spouse_branch', 'Spouse Branch'),
+            ('spouseBslno', 'spouse_bslno', 'Spouse BSL'),
+            ('spouseUid', 'spouse_uid', 'Spouse UID'),
+            ('spouseDoi', 'spouse_doi', 'Spouse DOI'),
+            ('spousePhone', 'spouse_phone', 'Spouse Phone'),
+            ('spouseCity', 'spouse_city', 'Spouse City'),
+            ('spouseState', 'spouse_state', 'Spouse State'),
+            ('ref1Name', 'ref1_name', 'Ref-1 Name'),
+            ('ref1Address', 'ref1_address', 'Ref-1 Address'),
+            ('ref1Email', 'ref1_email', 'Ref-1 Email'),
+            ('ref1Phone', 'ref1_phone', 'Ref-1 Phone'),
+            ('ref1Branch', 'ref1_branch', 'Ref-1 Branch'),
+            ('ref1Relation', 'ref1_relation', 'Ref-1 Relation'),
+            ('ref2Name', 'ref2_name', 'Ref-2 Name'),
+            ('ref2Address', 'ref2_address', 'Ref-2 Address'),
+            ('ref2Email', 'ref2_email', 'Ref-2 Email'),
+            ('ref2Phone', 'ref2_phone', 'Ref-2 Phone'),
+            ('ref2Branch', 'ref2_branch', 'Ref-2 Branch'),
+            ('ref2Relation', 'ref2_relation', 'Ref-2 Relation'),
+            ('dorYouth', 'dor_youth', 'DOR Youth'),
+            ('dateOfInitiationNew', 'date_of_initiation_new', 'DOI (New Initiate)'),
+            ('dateTransferIn', 'date_transfer_in', 'Date Transfer In'),
+            ('transferFromBranch', 'transfer_from_branch', 'Transfer From Branch'),
+            ('dateTransferOut', 'date_transfer_out', 'Date Transfer Out'),
+            ('transferToBranch', 'transfer_to_branch', 'Transfer To Branch'),
+            ('dateOfExpire', 'date_of_expire', 'Date of Expire'),
+        ]
         current = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
 
         # Member self-edit: all fields including bsl and status
@@ -713,9 +809,12 @@ def update_member(uid):
         audit('SELF_EDIT_MEMBER', f"uid={uid}")
 
         # Compare against pre-update snapshot
+        def _norm(v):
+            s = str(v).strip() if v is not None else ''
+            return s.split('T')[0] if 'T' in s else s
         changed = [
-            label for label, col in field_map.items()
-            if str(d.get(label) or '').strip() != str(current.get(col) or '').strip()
+            label for pk, col, label in field_defs
+            if _norm(d.get(pk)) != _norm(current.get(col))
         ]
         execute(
             "INSERT INTO member_edit_log (member_uid, member_name, edited_by, fields_changed) VALUES (%s,%s,%s,%s)",
