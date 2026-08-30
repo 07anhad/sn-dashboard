@@ -6,7 +6,7 @@
 
 function renderZones() {
   const container = document.getElementById('zonesContent');
-  if (!isAdmin()) { container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">⛔ Access Denied — Admin only.</div>'; return; }
+  if (!isAdmin()) { container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">Access Denied — Admin only.</div>'; return; }
   container.innerHTML = `
     <div class="table-wrap">
       <div class="table-toolbar">
@@ -68,7 +68,7 @@ function zonesRows() {
         <div class="act-menu" onclick="event.stopPropagation()">
           <button class="act-trigger" onclick="toggleActMenu(this)" title="Actions">⋮</button>
           <div class="act-dropdown">
-            ${isAdmin() ? `<button class="act-item act-edit" onclick="editZone(${z.id});closeActMenus()">✏ Edit</button>` : ''}
+            ${isAdmin() ? `<button class="act-item act-edit" onclick="editZone(${z.id});closeActMenus()">Edit</button>` : ''}
             ${isAdmin() ? `<button class="act-item ${z.active ? 'act-delete' : 'act-warn'}" onclick="toggleZoneStatus(${z.id});closeActMenus()">${z.active ? '⊘ Deactivate' : '↑ Activate'}</button>` : ''}
           </div>
         </div>
