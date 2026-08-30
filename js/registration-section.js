@@ -6,7 +6,7 @@
 
 async function renderRegistration() {
   const container = document.getElementById('registrationContent');
-  if (!isAdmin()) { container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">⛔ Access Denied — Admin only.</div>'; return; }
+  if (!isAdmin()) { container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--clr-red);font-size:1.1rem;">Access Denied — Admin only.</div>'; return; }
 
   // Load pending count
   let pending = [];
@@ -132,7 +132,7 @@ function viewPending(id) {
 
     openModal(`
       <div class="modal-header">
-        <h3>📋 Registration — ${p.name || '—'}</h3>
+        <h3>Registration — ${p.name || '—'}</h3>
         <button class="modal-close" onclick="closeForcedModal()">✕</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-sm) var(--sp-md);max-height:65vh;overflow-y:auto;padding-right:4px">
@@ -199,7 +199,7 @@ async function approvePending(id) {
     });
     const data = await res.json();
     if (data.ok) {
-      showToast('✅ Approved! Member UID: ' + data.uid, 'success');
+      showToast('Approved! Member UID: ' + data.uid, 'success');
       await reloadMembers();
       renderCache.delete('registration');
       renderCache.delete('members');
@@ -334,7 +334,7 @@ function editLink(id) {
   if (!l) return;
   openModal(`
     <div class="modal-header">
-      <h3>✏️ Edit Link — ${l.code}</h3>
+      <h3>Edit Link — ${l.code}</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div class="form-field"><label>Title</label><input id="el_title" value="${l.title}" /></div>
