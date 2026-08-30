@@ -52,11 +52,11 @@ function eventCard(e) {
       </div>
       <div class="event-card-body">
         <div style="display:flex;flex-direction:column;gap:6px">
-          <div style="font-size:0.85rem"><span style="color:var(--txt-muted)">📅</span> ${formatDate(e.date)} at ${e.time}</div>
-          <div style="font-size:0.85rem"><span style="color:var(--txt-muted)">📍</span> ${e.venue}</div>
+          <div style="font-size:0.85rem">${formatDate(e.date)} at ${e.time}</div>
+          <div style="font-size:0.85rem">${e.venue}</div>
           ${e.status === 'Completed'
-      ? `<div style="font-size:0.85rem"><span style="color:var(--txt-muted)">👥</span> ${e.attendees} attended</div>`
-      : `<div style="font-size:0.85rem"><span style="color:var(--txt-muted)">🎯</span> Max: ${e.maxAttendees}</div>`
+      ? `<div style="font-size:0.85rem">${e.attendees} attended</div>`
+      : `<div style="font-size:0.85rem">Max: ${e.maxAttendees}</div>`
     }
         </div>
       </div>
@@ -72,7 +72,7 @@ function eventCard(e) {
 function openAddEventModal() {
   openModal(`
     <div class="modal-header">
-      <h3>📅 Create New Event</h3>
+      <h3>Create New Event</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div class="form-field"><label>Event Title *</label><input id="ae_title" placeholder="Event name" /></div>
@@ -137,7 +137,7 @@ function editEvent(id) {
   if (!e) return;
   openModal(`
     <div class="modal-header">
-      <h3>✏️ Edit Event</h3>
+      <h3>Edit Event</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div class="form-field"><label>Title</label><input id="ee_title" value="${e.title}" /></div>
