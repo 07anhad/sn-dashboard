@@ -392,7 +392,7 @@
             <div class="field">
               <label>Father Title <span class="req-star">*</span></label>
               <select id="rf_fatherTitle">
-                <option value="">—</option><option>Sh.</option><option>Dr.</option><option>Er.</option><option>Prof.</option>
+                <option value="">—</option><option>Sh.</option><option>Dr.</option><option>Er.</option><option>Prof.</option><option>PB.</option>
               </select>
               <label class="na-toggle"><input type="checkbox" data-na="rf_fatherTitle" onchange="toggleNA(this)" /> N/A</label>
             </div>
@@ -605,7 +605,7 @@
             <div class="field">
               <label>Title</label>
               <select id="rf_motherTitle">
-                <option value="">—</option><option>Smt.</option><option>Dr.</option><option>Prof.</option>
+                <option value="">—</option><option>Smt.</option><option>Dr.</option><option>Prof.</option><option>PBn.</option>
               </select>
             </div>
             <div class="field"><label>First Name</label><input id="rf_motherFirstName" placeholder="First" /></div>
@@ -640,7 +640,7 @@
             <div class="field">
               <label>Title</label>
               <select id="rf_spouseTitle">
-                <option value="">—</option><option>Sh.</option><option>Smt.</option><option>Dr.</option>
+                <option value="">—</option><option>Sh.</option><option>Smt.</option><option>Dr.</option><option>PB.</option><option>PBn.</option>
               </select>
             </div>
             <div class="field"><label>First Name</label><input id="rf_spouseFirstName" placeholder="First" /></div>
@@ -772,8 +772,8 @@
                       <div style="font-weight:600;font-size:0.88rem;color:#1e293b">${s.category}</div>
                       <div style="font-size:0.83rem;color:#334155;margin-top:1px">${s.activity}</div>
                       <div style="font-size:0.78rem;color:#64748b;margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">
-                        <span>🔄 ${s.frequency}</span>
-                        <span>🕐 ${s.timings}</span>
+                        <span>${s.frequency}</span>
+                        <span>${s.timings}</span>
                       </div>
                     </div>
                   </label>`;
