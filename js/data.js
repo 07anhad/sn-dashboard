@@ -159,7 +159,7 @@ async function loadAllData() {
     if (loader) {
       loader.innerHTML = `
         <div style="text-align:center;padding:32px;max-width:400px">
-          <div style="font-size:2.5rem;margin-bottom:16px">⚠️</div>
+          <div style="font-size:2.5rem;margin-bottom:16px"></div>
           <h3 style="color:#e8eaf2;margin-bottom:10px;font-size:1.2rem">Failed to load data</h3>
           <p style="color:#8890b0;font-size:0.9rem;margin-bottom:24px;line-height:1.6">
             ${err.message && err.message.includes('Failed to fetch')
@@ -364,4 +364,3 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeActMenus();
 });
 window.addEventListener('scroll', closeActMenus, true); // close on any scroll
- 
