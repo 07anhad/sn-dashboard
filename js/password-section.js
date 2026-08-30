@@ -9,7 +9,7 @@ function renderChangePassword() {
   const container = document.getElementById('changePasswordContent');
   container.innerHTML = `
     <div class="password-card">
-      <h3 style="font-size:1.3rem;font-weight:700;margin-bottom:var(--sp-lg);color:var(--txt-primary)">🔑 Update Your Password</h3>
+      <h3 style="font-size:1.3rem;font-weight:700;margin-bottom:var(--sp-lg);color:var(--txt-primary)">Update Your Password</h3>
       <div id="pwAlert"></div>
 
       <div class="form-field" style="position:relative">
@@ -56,7 +56,7 @@ function renderChangePassword() {
         ${user && user.memberUid ? `
         <div style="margin-top:var(--sp-md)">
           <button class="btn btn-outline" onclick="editMember('${user.memberUid}', true)" style="font-size:0.9rem">
-            ✏️ Edit My Profile Details
+            Edit My Profile Details
           </button>
           <p style="font-size:0.78rem;color:var(--txt-muted);margin-top:6px">Update your personal, contact, family and other information.</p>
         </div>` : ''}
@@ -187,4 +187,3 @@ function resetPwForm() {
   if (label) label.style.display = 'none';
   if (match) match.style.display = 'none';
 }
- 
