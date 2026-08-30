@@ -183,7 +183,7 @@ function _renderMembersListTab() {
         </div>
         <div class="table-actions">
           ${canWrite() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddMemberModal()">+ Add Member</button>' : ''}
-          ${isSuperAdmin() ? '<button class="toolbar-btn" onclick="getFormA()">📋 Get Form A</button>' : ''}
+          ${isSuperAdmin() ? '<button class="toolbar-btn" onclick="getFormA()">Get Form A</button>' : ''}
           <button class="toolbar-btn" onclick="exportMembers()">↓ Export</button>
         </div>
       </div>
@@ -486,7 +486,7 @@ function renderSuperhumaneTable() {
           <button class="act-trigger" onclick="toggleActMenu(this)" title="Actions">⋮</button>
           <div class="act-dropdown">
             <button class="act-item act-view" onclick="viewSuperhumane('${c.uid}');closeActMenus()">\ud83d\udc41 View</button>
-            ${canWrite() ? `<button class="act-item act-edit" onclick="editSuperhumane('${c.uid}');closeActMenus()">\u270f Edit</button>` : ''}
+            ${canWrite() ? `<button class="act-item act-edit" onclick="editSuperhumane('${c.uid}');closeActMenus()">Edit</button>` : ''}
             ${exitItem}
           </div>
         </div>
@@ -664,7 +664,7 @@ function viewSuperhumane(uid) {
       ${rf('Name', c.grandmother_name)}  ${rf('UID', c.grandmother_uid)}  ${rf('Contact', c.grandmother_contact)}
     </div>
     <div style="margin-top:var(--sp-lg);display:flex;gap:var(--sp-sm);justify-content:flex-end;flex-wrap:wrap;">
-      ${canWrite() ? `<button class="btn btn-outline" onclick="closeForcedModal();editSuperhumane('${uid}')">✏️ Edit</button>` : ''}
+      ${canWrite() ? `<button class="btn btn-outline" onclick="closeForcedModal();editSuperhumane('${uid}')">Edit</button>` : ''}
       <button class="btn btn-outline" onclick="closeForcedModal()">Close</button>
     </div>
   `, true);
@@ -683,7 +683,7 @@ function editSuperhumane(uid) {
 
   openModal(`
     <div class="modal-header">
-      <h3>✏️ Edit Superhumane — ${String(c.name||'').replace(/</g,'&lt;')}</h3>
+      <h3>Edit Superhumane — ${String(c.name||'').replace(/</g,'&lt;')}</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);">
@@ -786,7 +786,7 @@ function toggleSuperhumaneStatus(uid) {
   const isExit = !c.date_exit_scheme; // true = about to exit, false = about to reactivate
   openModal(`
     <div class="modal-header">
-      <h3>${isExit ? '⬜ Deactivate' : '✅ Reactivate'}</h3>
+      <h3>${isExit ? 'Deactivate' : 'Reactivate'}</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <p>${isExit ? 'Mark <strong>' + String(c.name||'').replace(/</g,'&lt;') + '</strong> as exited from the Sant-Su scheme?' : 'Reactivate <strong>' + String(c.name||'').replace(/</g,'&lt;') + '</strong> in the Sant-Su scheme?'}</p>
@@ -817,7 +817,7 @@ async function confirmToggleSuperhumane(uid, doExit) {
 function openAddSuperhumaneModal() {
   openModal(`
     <div class="modal-header">
-      <h3>➕ Add Superhumane Record</h3>
+      <h3>Add Superhumane Record</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);">
@@ -967,7 +967,7 @@ function memberRow(m) {
           <button class="act-trigger" onclick="toggleActMenu(this)" title="Actions">⋮</button>
           <div class="act-dropdown">
             <button class="act-item act-view" onclick="viewMember('${m.uid}');closeActMenus()">\ud83d\udc41 View</button>
-            ${canWrite() ? `<button class="act-item act-edit" onclick="editMember('${m.uid}');closeActMenus()">\u270f Edit</button>` : ''}
+            ${canWrite() ? `<button class="act-item act-edit" onclick="editMember('${m.uid}');closeActMenus()">Edit</button>` : ''}
             ${canWrite() ? deactivateItem : ''}
           </div>
         </div>
@@ -1177,7 +1177,7 @@ function buildSelfProfileHTML(m) {
             ${[m.category, m.gender, m.status].filter(Boolean).map(v=>`&nbsp;·&nbsp; ${v}`).join('')}
           </div>
         </div>
-        <button class="btn btn-saffron" onclick="editSelfProfileInline('${m.uid}')">✏️ Edit Profile</button>
+        <button class="btn btn-saffron" onclick="editSelfProfileInline('${m.uid}')">Edit Profile</button>
       </div>
 
       <!-- Identity -->
@@ -1295,7 +1295,7 @@ function viewMember(uid) {
   const yBadge = v => v === 'Y' ? '<span class="badge badge-success">Yes</span>' : '';
   openModal(`
     <div class="modal-header">
-      <h3>👤 Member Details — ${m.name}</h3>
+      <h3>Member Details — ${m.name}</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div style="overflow-y:auto;max-height:70vh;">
@@ -1441,7 +1441,7 @@ function editMember(uid, isSelfEdit = false) {
 
   openModal(`
     <div class="modal-header">
-      <h3>✏️ Edit Member — ${ea(m.name)}</h3>
+      <h3>Edit Member — ${ea(m.name)}</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
 
@@ -1484,7 +1484,7 @@ function editMember(uid, isSelfEdit = false) {
         ${fldNA('em_state',     'State',                     m.state)}
         ${fldNA('em_country',   'Country',                   m.country)}
         ${fldNA('em_mobile',    'Mobile 1',                  m.mobile)}
-        ${selNA('em_fTitle',    'Father Title',              m.fatherTitle, ['','Sh.','Dr.','Er.','Prof.'])}
+        ${selNA('em_fTitle',    'Father Title',              m.fatherTitle, ['','Sh.','Dr.','Er.','Prof.','PB.'])}
         ${fldNA('em_fFirst',    'Father Name',               m.fatherFirstName)}
         ${fldNA('em_neeFirst',  'Nee (Name)',                m.neeFirst)}
       </div>
@@ -1779,7 +1779,7 @@ async function toggleMemberActive(uid) {
   const action    = newStatus === 'Deactivated' ? 'Deactivate' : 'Reactivate';
   openModal(`
     <div class="modal-header">
-      <h3>${newStatus === 'Inactive' ? '⬜' : '✅'} ${action} Member</h3>
+      <h3>${action} Member</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <p>${action} <strong>${m.name}</strong> (${m.uid})?<br/>
@@ -1813,7 +1813,7 @@ async function confirmToggleMember(uid, newStatus) {
 function openAddMemberModal() {
   openModal(`
     <div class="modal-header">
-      <h3>➕ Add New Member</h3>
+      <h3>Add New Member</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);">
@@ -2097,8 +2097,8 @@ function handleMembersUpload(event) {
       
       const sheetsInfo = data.sheets_processed ? ` (from: ${data.sheets_processed.join(', ')})` : '';
       const msg = data.inserted > 0 
-        ? `✅ ${data.inserted} new, ${data.updated} updated${sheetsInfo}`
-        : `✅ ${data.updated} members updated${sheetsInfo}`;
+        ? `${data.inserted} new, ${data.updated} updated${sheetsInfo}`
+        : `${data.updated} members updated${sheetsInfo}`;
       showToast(`Processed ${data.count.toLocaleString()} records!`, 'success');
       if (status) status.innerHTML = `<span style="color:var(--clr-green)">${msg}</span>`;
 
@@ -2173,8 +2173,8 @@ function handleSuperhumaneUpload(event) {
       if (bar) bar.style.background = 'var(--clr-green)';
       
       const msg = data.inserted > 0 
-        ? `✅ ${data.inserted} new, ${data.updated} updated`
-        : `✅ ${data.updated} children updated`;
+        ? `${data.inserted} new, ${data.updated} updated`
+        : `${data.updated} children updated`;
       showToast(`Processed ${data.count.toLocaleString()} Superhumane records!`, 'success');
       if (status) status.innerHTML = `<span style="color:var(--clr-green)">${msg}</span>`;
 
