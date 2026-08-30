@@ -145,7 +145,7 @@ function renderAttUI() {
   const uniqueEvents   = attEvents;
 
   const dateRangeMsg = (attStats.minDate && attStats.maxDate)
-    ? `📅 Records available from <strong>${attStats.minDate}</strong> to <strong>${attStats.maxDate}</strong>`
+    ? `Records available from <strong>${attStats.minDate}</strong> to <strong>${attStats.maxDate}</strong>`
     : '';
 
   container.innerHTML = `
@@ -461,7 +461,7 @@ function handleAttUpload(event) {
       if (lbl) lbl.textContent = 'Done!';
       if (bar) bar.style.background = 'var(--clr-green)';
       showToast('Imported ' + data.count.toLocaleString() + ' records!', 'success');
-      if (status) status.innerHTML = '<span style="color:var(--clr-green)">✅ ' + data.count.toLocaleString() + ' new records imported' + (data.skipped ? ', ' + data.skipped + ' skipped (duplicates)' : '') + '.</span>';
+      if (status) status.innerHTML = '<span style="color:var(--clr-green)">' + data.count.toLocaleString() + ' new records imported' + (data.skipped ? ', ' + data.skipped + ' skipped (duplicates)' : '') + '.</span>';
 
       await _fetchAttPage(1);
       renderAttUI();
