@@ -275,6 +275,141 @@
 
     <form id="regForm" onsubmit="submitRegistration(event)" novalidate>
 
+      <style>
+        .na-toggle{display:inline-flex;align-items:center;gap:5px;font-size:0.72rem;color:#64748b;margin-top:5px;text-transform:none;letter-spacing:0;cursor:pointer;font-weight:400}
+        .na-toggle input{-webkit-appearance:auto;appearance:auto;width:14px;height:14px;min-width:14px;padding:0;border:initial;border-radius:0;accent-color:#e07b29;margin:0;flex-shrink:0}
+        .reg-container input:disabled,.reg-container select:disabled{background:#f1f5f9;color:#94a3b8;cursor:not-allowed}
+      </style>
+
+      <!-- 0. Mandatory (Form A) -->
+      <div class="sec-card">
+        <div class="sec-head open" onclick="toggleSec(this)">
+          <div class="sec-head-left">
+            <div><div class="sec-name">Mandatory Details (Form A)</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="sec-badge badge-required">Required</span>
+            <span class="sec-chevron">▼</span>
+          </div>
+        </div>
+        <div class="sec-body open">
+          <p style="font-size:0.82rem;color:#64748b;margin:0 0 14px">
+            These fields are mandatory. If you don't have a value, tick <strong>N/A</strong> beside that field.
+          </p>
+          <div class="grid-2">
+            <div class="field full">
+              <label>Full Name <span class="req-star">*</span></label>
+              <input id="rf_name" placeholder="As per initiation records" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_name" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Member UID <span class="req-star">*</span></label>
+              <input id="rf_uid" placeholder="e.g. SND2024XXXXXX" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_uid" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Category (Member Type) <span class="req-star">*</span></label>
+              <select id="rf_memberType">
+                <option value="">Select Member Type</option>
+                <option value="Initiated">Initiated (Naam-daan received)</option>
+                <option value="Jigyasu">Jigyasu (Seeker / Pre-initiate)</option>
+                <option value="Superhumane">Superhumane (Sant-Su scheme child)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Gender <span class="req-star">*</span></label>
+              <select id="rf_gender">
+                <option value="">Select</option>
+                <option>Male</option><option>Female</option><option>Other</option>
+              </select>
+              <label class="na-toggle"><input type="checkbox" data-na="rf_gender" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Date of Initiation <span class="req-star">*</span></label>
+              <input id="rf_doi" type="date" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_doi" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Date of Birth <span class="req-star">*</span></label>
+              <input id="rf_dob" type="date" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_dob" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Date of First Initiation <span class="req-star">*</span></label>
+              <input id="rf_doi_first" type="date" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_doi_first" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Caste / Community <span class="req-star">*</span></label>
+              <input id="rf_caste" placeholder="e.g. Hindu, Sikh" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_caste" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Nationality <span class="req-star">*</span></label>
+              <input id="rf_nationality" value="Indian" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_nationality" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Qualification <span class="req-star">*</span></label>
+              <input id="rf_qual" placeholder="e.g. B.Tech, M.A., MBA" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_qual" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Occupation <span class="req-star">*</span></label>
+              <input id="rf_occ" placeholder="e.g. Engineer, Doctor, Teacher" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_occ" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field full">
+              <label>Address <span class="req-star">*</span></label>
+              <input id="rf_addr1" placeholder="House / Flat No., Street, Building" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_addr1" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>City <span class="req-star">*</span></label>
+              <input id="rf_city" placeholder="City" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_city" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Pincode <span class="req-star">*</span></label>
+              <input id="rf_pincode" placeholder="6-digit pincode" maxlength="6" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_pincode" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>State <span class="req-star">*</span></label>
+              <input id="rf_state" placeholder="State" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_state" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Country <span class="req-star">*</span></label>
+              <input id="rf_country" value="India" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_country" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Mobile 1 <span class="req-star">*</span></label>
+              <input id="rf_mobile1" type="tel" placeholder="Primary mobile number" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_mobile1" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Father Title <span class="req-star">*</span></label>
+              <select id="rf_fatherTitle">
+                <option value="">—</option><option>Sh.</option><option>Dr.</option><option>Er.</option><option>Prof.</option>
+              </select>
+              <label class="na-toggle"><input type="checkbox" data-na="rf_fatherTitle" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Father Name <span class="req-star">*</span></label>
+              <input id="rf_fatherFirstName" placeholder="Father's name" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_fatherFirstName" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+            <div class="field">
+              <label>Nee (Name) <span class="req-star">*</span></label>
+              <input id="rf_neeFirst" placeholder="Maiden / Nee name" />
+              <label class="na-toggle"><input type="checkbox" data-na="rf_neeFirst" onchange="toggleNA(this)" /> N/A</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 1. Personal -->
       <div class="sec-card">
         <div class="sec-head open" onclick="toggleSec(this)">
@@ -290,42 +425,13 @@
         </div>
         <div class="sec-body open">
           <div class="grid-2">
-            <div class="field full">
-              <label>Full Name <span class="req-star">*</span></label>
-              <input id="rf_name" placeholder="As per initiation records" required />
-            </div>
-            <div class="field">
-              <label>Member UID <span style="font-weight:400;text-transform:none;letter-spacing:0">(if already assigned)</span></label>
-              <input id="rf_uid" placeholder="e.g. SND2024XXXXXX" />
-            </div>
-            <div class="field">
-              <label>Member Type <span class="req-star">*</span></label>
-              <select id="rf_memberType" required>
-                <option value="">Select Member Type</option>
-                <option value="Initiated">Initiated (Naam-daan received)</option>
-                <option value="Jigyasu">Jigyasu (Seeker / Pre-initiate)</option>
-                <option value="Superhumane">Superhumane (Sant-Su scheme child)</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Date of Initiation</label>
-              <input id="rf_doi" type="date" />
-            </div>
             <div class="field">
               <label>Date of Registration (Jigyasu)</label>
               <input id="rf_dor_jigyasu" type="date" />
             </div>
             <div class="field">
-              <label>Date of First Initiation</label>
-              <input id="rf_doi_first" type="date" />
-            </div>
-            <div class="field">
               <label>Date of Second Initiation</label>
               <input id="rf_doi_second" type="date" />
-            </div>
-            <div class="field">
-              <label>Date of Birth</label>
-              <input id="rf_dob" type="date" />
             </div>
             <div class="field">
               <label>Blood Group</label>
@@ -336,12 +442,11 @@
               </select>
             </div>
             <div class="field">
-              <label>Caste / Community</label>
-              <input id="rf_caste" placeholder="e.g. Hindu, Sikh" />
-            </div>
-            <div class="field">
-              <label>Nationality</label>
-              <input id="rf_nationality" value="Indian" />
+              <label>Marital Status</label>
+              <select id="rf_maritalStatus">
+                <option value="">Select</option>
+                <option>Single</option><option>Married</option><option>Widowed</option><option>Divorced</option>
+              </select>
             </div>
             <div class="field">
               <label>Profession</label>
@@ -350,6 +455,10 @@
             <div class="field">
               <label>Ashram</label>
               <input id="rf_ashram" placeholder="e.g. Grihastha, Brahmacharya" />
+            </div>
+            <div class="field">
+              <label>Previous Branch</label>
+              <input id="rf_previousBranch" placeholder="If transferred from another branch" />
             </div>
           </div>
         </div>
@@ -368,10 +477,6 @@
         </div>
         <div class="sec-body open">
           <div class="grid-2">
-            <div class="field">
-              <label>Mobile 1 <span class="req-star">*</span></label>
-              <input id="rf_mobile1" type="tel" placeholder="Primary mobile number" required />
-            </div>
             <div class="field">
               <label>Mobile 2</label>
               <input id="rf_mobile2" type="tel" placeholder="Alternative number" />
@@ -403,19 +508,15 @@
       <div class="sec-card">
         <div class="sec-head open" onclick="toggleSec(this)">
           <div class="sec-head-left">
-            <div><div class="sec-name">Address</div></div>
+            <div><div class="sec-name">Additional Address Lines</div></div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-required">Required</span>
+            <span class="sec-badge badge-optional">Optional</span>
             <span class="sec-chevron">▼</span>
           </div>
         </div>
         <div class="sec-body open">
           <div class="grid-2">
-            <div class="field full">
-              <label>Address Line 1</label>
-              <input id="rf_addr1" placeholder="House / Flat No., Street, Building" />
-            </div>
             <div class="field full">
               <label>Address Line 2</label>
               <input id="rf_addr2" placeholder="Locality / Area / Sector" />
@@ -423,22 +524,6 @@
             <div class="field full">
               <label>Address Line 3</label>
               <input id="rf_addr3" placeholder="Landmark / Colony (optional)" />
-            </div>
-            <div class="field">
-              <label>City</label>
-              <input id="rf_city" placeholder="City" />
-            </div>
-            <div class="field">
-              <label>Pincode</label>
-              <input id="rf_pincode" placeholder="6-digit pincode" maxlength="6" />
-            </div>
-            <div class="field">
-              <label>State</label>
-              <input id="rf_state" placeholder="State" />
-            </div>
-            <div class="field">
-              <label>Country</label>
-              <input id="rf_country" value="India" />
             </div>
           </div>
         </div>
@@ -457,14 +542,6 @@
         </div>
         <div class="sec-body">
           <div class="grid-2">
-            <div class="field">
-              <label>Qualification</label>
-              <input id="rf_qual" placeholder="e.g. B.Tech, M.A., MBA" />
-            </div>
-            <div class="field">
-              <label>Occupation</label>
-              <input id="rf_occ" placeholder="e.g. Engineer, Doctor, Teacher" />
-            </div>
             <div class="field">
               <label>Designation</label>
               <input id="rf_desig" placeholder="e.g. Manager, Director" />
@@ -489,17 +566,8 @@
           </div>
         </div>
         <div class="sec-body">
+          <p style="font-size:0.75rem;color:#64748b;margin:0 0 10px">Father's Title & Name are in the Mandatory section above.</p>
           <div class="grid-4">
-            <div class="field">
-              <label>Title</label>
-              <select id="rf_fatherTitle">
-                <option value="">—</option><option>Sh.</option><option>Dr.</option><option>Er.</option><option>Prof.</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>First Name</label>
-              <input id="rf_fatherFirstName" placeholder="First" />
-            </div>
             <div class="field">
               <label>Middle Name</label>
               <input id="rf_fatherMiddleName" placeholder="Middle" />
@@ -590,7 +658,6 @@
           </div>
           <div class="sub-label" style="margin-top:18px">Nee / Maiden Name (if applicable)</div>
           <div class="grid-3">
-            <div class="field"><label>Nee First Name</label><input id="rf_neeFirst" placeholder="First" /></div>
             <div class="field"><label>Nee Middle Name</label><input id="rf_neeMiddle" placeholder="Middle" /></div>
             <div class="field"><label>Nee Last Name</label><input id="rf_neeLast" placeholder="Last / Surname" /></div>
           </div>
@@ -752,6 +819,9 @@
   </div>
 
   <script>
+    // Use the same origin that served this page (works on any host/port)
+    const API_BASE = window.location.origin;
+
     const code = new URLSearchParams(window.location.search).get('code')
                || (window.location.pathname.split('/').filter(Boolean).pop() || '');
 
@@ -776,7 +846,7 @@
         return;
       }
       try {
-        const res  = await fetch('/api/register/' + encodeURIComponent(code));
+        const res  = await fetch(API_BASE + '/api/register/' + encodeURIComponent(code));
         const data = await res.json();
         if (!data.ok) {
           showLinkError('Link Invalid', data.error);
@@ -801,6 +871,27 @@
     const g  = id => (document.getElementById(id)?.value || '').trim() || null;
     const cb = id => document.getElementById(id)?.checked ? 'Y' : null;
 
+    // ── N/A toggle for mandatory fields ──
+    function toggleNA(chk) {
+      const el = document.getElementById(chk.dataset.na);
+      if (!el) return;
+      if (chk.checked) {
+        el.dataset.prev = el.value;
+        if (el.tagName === 'SELECT') {
+          if (![...el.options].some(o => o.value === 'N/A')) el.add(new Option('N/A', 'N/A'));
+          el.value = 'N/A';
+        } else if (el.type === 'date') {
+          el.value = '';   // dates can't hold "N/A" — leave blank (stored as N/A on export)
+        } else {
+          el.value = 'N/A';
+        }
+        el.disabled = true;
+      } else {
+        el.disabled = false;
+        el.value = el.dataset.prev || '';
+      }
+    }
+
     // ── Submit ──
     async function submitRegistration(e) {
       e.preventDefault();
@@ -818,6 +909,7 @@
 
       const payload = {
         name, memberType, dateOfBirth: g('rf_dob'), bloodGroup: g('rf_blood'),
+        gender: g('rf_gender'), maritalStatus: g('rf_maritalStatus'), previousBranch: g('rf_previousBranch'),
         uid: g('rf_uid'), dateOfInitiation: g('rf_doi'),
         dateOfRegistrationJigyasu: g('rf_dor_jigyasu'),
         dateOfFirstInitiation: g('rf_doi_first'),
@@ -859,7 +951,7 @@
       };
 
       try {
-        const res  = await fetch('/api/register/' + encodeURIComponent(code), {
+        const res  = await fetch(API_BASE + '/api/register/' + encodeURIComponent(code), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
