@@ -30,6 +30,13 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-insecure-key')
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 
+# Mandatory "Form A" text columns — enforced NOT NULL in schema; blanks are stored as 'N/A'
+MANDATORY_NA_COLUMNS = [
+    'name', 'category', 'gender', 'caste', 'nationality', 'qualification', 'occupation',
+    'address_line1', 'city', 'pincode', 'state', 'country', 'mobile1',
+    'father_title', 'father_first_name', 'nee_first_name',
+]
+
 # ═══════════════════════════════════════════
 # Auto-initialise DB schema on startup
 # ═══════════════════════════════════════════
@@ -560,13 +567,14 @@ def add_member():
     uid = (d.get('uid') or '').strip()
     if not uid:
         return jsonify({'ok': False, 'error': 'UID is required.'}), 400
+    na = lambda v: (str(v).strip() or 'N/A') if v is not None else 'N/A'
     try:
         execute(
             """INSERT INTO member_details
                (uid, bsl, name, mobile1, email1, city, state, record_status)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-            (uid, d.get('bslno',''), d.get('name',''), d.get('mobile',''),
-             d.get('email',''), d.get('city',''), d.get('state',''),
+            (uid, d.get('bslno',''), na(d.get('name')), na(d.get('mobile')),
+             d.get('email',''), na(d.get('city')), na(d.get('state')),
              d.get('status','Activated'))
         )
         audit('ADD_MEMBER', f"uid={uid} name={d.get('name','')}")
@@ -624,6 +632,8 @@ def update_member(uid):
 
         # Member self-edit: all fields including bsl and status
         or_none = lambda k: d.get(k) or None
+        # Mandatory Form A text columns: blank/None → 'N/A' (enforced NOT NULL in schema)
+        na = lambda k: (str(d.get(k)).strip() or 'N/A') if d.get(k) is not None else 'N/A'
         execute("""
             UPDATE member_details SET
               name=%s, bsl=%s, record_status=%s,
@@ -659,27 +669,28 @@ def update_member(uid):
               dor_youth=%s, date_of_initiation_new=%s,
               date_transfer_in=%s, transfer_from_branch=%s,
               date_transfer_out=%s, transfer_to_branch=%s,
-              date_of_expire=%s
+              date_of_expire=%s,
+              category=%s, gender=%s, marital_status=%s, previous_branch=%s
             WHERE uid=%s
         """, (
-            d.get('name'),            d.get('bslno'),         d.get('status', 'Activated'),
+            na('name'),               d.get('bslno'),         d.get('status', 'Activated'),
             or_none('dateOfInitiation'),      or_none('dateOfBirth'),
             or_none('dateOfRegistration'),
             or_none('dateOfFirstInitiation'), or_none('dateOfSecondInitiation'),
-            d.get('bloodGroup'),  d.get('caste'),        d.get('nationality'),
+            d.get('bloodGroup'),  na('caste'),           na('nationality'),
             d.get('ashram'),      d.get('snExt'),         d.get('branchIdCard'),
-            d.get('mobile'),      d.get('mobile2'),       d.get('landline'),    d.get('officePhone'),
+            na('mobile'),         d.get('mobile2'),       d.get('landline'),    d.get('officePhone'),
             d.get('email'),       d.get('email2'),
-            d.get('addressLine1'),d.get('addressLine2'),  d.get('addressLine3'),
-            d.get('city'),        d.get('pincode'),       d.get('state'),       d.get('country'),
-            d.get('qualification'),d.get('occupation'),  d.get('designation'),
+            na('addressLine1'),   d.get('addressLine2'),  d.get('addressLine3'),
+            na('city'),           na('pincode'),          na('state'),          na('country'),
+            na('qualification'),  na('occupation'),       d.get('designation'),
             d.get('organization'),d.get('profession'),
             d.get('professionCode'),d.get('commGridCode'),
             d.get('mahila'),      d.get('youth'),         d.get('assocYouth'),
             d.get('jrPreInit'),   d.get('srPreInit'),
             d.get('crc'),         d.get('cca'),           d.get('santSu'),
-            d.get('neeFirst'),    d.get('neeMiddle'),     d.get('neeLast'),
-            d.get('fatherTitle'), d.get('fatherFirstName'),d.get('fatherMiddleName'),d.get('fatherLastName'),
+            na('neeFirst'),       d.get('neeMiddle'),     d.get('neeLast'),
+            na('fatherTitle'),    na('fatherFirstName'),  d.get('fatherMiddleName'),d.get('fatherLastName'),
             d.get('fatherBranch'),d.get('fatherBslno'),  d.get('fatherUid'),   or_none('fatherDoi'),
             d.get('fatherPhone'), d.get('fatherCity'),   d.get('fatherState'),
             d.get('motherTitle'), d.get('motherFirstName'),d.get('motherMiddleName'),d.get('motherLastName'),
@@ -696,6 +707,7 @@ def update_member(uid):
             or_none('dateTransferIn'),    d.get('transferFromBranch'),
             or_none('dateTransferOut'),   d.get('transferToBranch'),
             or_none('dateOfExpire'),
+            na('category'),  na('gender'),  d.get('maritalStatus'),  d.get('previousBranch'),
             uid
         ))
         audit('SELF_EDIT_MEMBER', f"uid={uid}")
@@ -881,7 +893,8 @@ def submit_registration(code):
     n = lambda k: d.get(k) or None
     execute("""
         INSERT INTO pending_members (
-            reg_link_code, name, member_type, uid, date_of_initiation, date_of_registration_jigyasu,
+            reg_link_code, name, member_type, gender, marital_status, previous_branch,
+            uid, date_of_initiation, date_of_registration_jigyasu,
             date_of_first_initiation, date_of_second_initiation,
             date_of_birth, blood_group, caste, nationality, profession, ashram,
             mobile1, mobile2, landline, office_phone, email1, email2,
@@ -901,7 +914,7 @@ def submit_registration(code):
             ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
             notes, seva_interests
         ) VALUES (
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,
@@ -915,7 +928,8 @@ def submit_registration(code):
             %s,%s
         )
     """, (
-        code, name, n('memberType'), n('uid'), n('dateOfInitiation'), n('dateOfRegistrationJigyasu'),
+        code, name, n('memberType'), n('gender'), n('maritalStatus'), n('previousBranch'),
+        n('uid'), n('dateOfInitiation'), n('dateOfRegistrationJigyasu'),
         n('dateOfFirstInitiation'), n('dateOfSecondInitiation'),
         n('dateOfBirth'), n('bloodGroup'), n('caste'), n('nationality'), n('profession'), n('ashram'),
         n('mobile1'), n('mobile2'), n('landline'), n('officePhone'), n('email1'), n('email2'),
@@ -986,7 +1000,7 @@ def approve_pending_member(id):
                 %s, %s, %s
             )
         """, (
-            uid, bsl, row['name'], row['date_of_birth'], None,
+            uid, bsl, row['name'], row['date_of_birth'], row.get('gender'),
             father_name, row.get('father_phone'), row.get('father_uid'), row.get('father_doi'),
             mother_name, row.get('mother_phone'), row.get('mother_uid'), row.get('mother_doi'),
             full_address, 'Superhumane', 'Soaminagar Branch Delhi'
@@ -996,6 +1010,11 @@ def approve_pending_member(id):
         if not uid.startswith('PENDING-') and query("SELECT 1 FROM member_details WHERE uid=%s", (uid,)):
             return jsonify({'ok': False, 'error': f"UID '{uid}' is already in use"}), 409
         
+        # Mandatory Form A text columns must never be NULL (enforced NOT NULL in schema)
+        for _c in MANDATORY_NA_COLUMNS:
+            if not row.get(_c):
+                row[_c] = 'N/A'
+        category = category or 'N/A'
         execute("""
             INSERT INTO member_details (
                 uid, name, date_of_initiation, date_of_registration_jigyasu,
@@ -1016,7 +1035,7 @@ def approve_pending_member(id):
                 crc_member, cca_member, sant_su_member,
                 ref1_name, ref1_address, ref1_email, ref1_phone, ref1_branch, ref1_relation,
                 ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
-                record_status, bsl, category
+                record_status, bsl, category, gender, marital_status, previous_branch
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,
@@ -1029,7 +1048,7 @@ def approve_pending_member(id):
                 %s,%s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,
-                'Activated', %s, %s
+                'Activated', %s, %s, %s, %s, %s
             )
         """, (
             uid, row['name'], row.get('date_of_initiation'), row.get('date_of_registration_jigyasu'),
@@ -1050,7 +1069,7 @@ def approve_pending_member(id):
             row['crc_member'], row['cca_member'], row['sant_su_member'],
             row['ref1_name'], row['ref1_address'], row['ref1_email'], row['ref1_phone'], row['ref1_branch'], row['ref1_relation'],
             row['ref2_name'], row['ref2_address'], row['ref2_email'], row['ref2_phone'], row['ref2_branch'], row['ref2_relation'],
-            bsl, category
+            bsl, category, row.get('gender') or 'N/A', row.get('marital_status'), row.get('previous_branch')
         ))
     
     execute(
@@ -2344,6 +2363,10 @@ def upload_members():
                 # Set default record_status if not provided
                 if 'record_status' not in row_data or not row_data['record_status']:
                     row_data['record_status'] = 'Activated'
+                # Mandatory Form A text columns: blank/None → 'N/A' (enforced NOT NULL in schema)
+                for c in MANDATORY_NA_COLUMNS:
+                    if c in row_data and not row_data[c]:
+                        row_data[c] = 'N/A'
                 parsed_rows.append(row_data)
 
         if not parsed_rows:
@@ -2405,11 +2428,8 @@ if __name__ == '__main__':
     cur = conn.cursor()
     with open(os.path.join(os.path.dirname(__file__), 'schema.sql')) as f:
         sql = f.read()
-    # psycopg2 execute() does not support multiple statements; run each individually
-    for statement in sql.split(';'):
-        stmt = statement.strip()
-        if stmt:
-            cur.execute(stmt)
+    # Run the whole script at once so dollar-quoted blocks (DO $$ ... $$) stay intact
+    cur.execute(sql)
     conn.commit()
     cur.close()
     conn.close()
