@@ -183,6 +183,7 @@ function _renderMembersListTab() {
         </div>
         <div class="table-actions">
           ${canWrite() ? '<button class="toolbar-btn toolbar-btn-saffron" onclick="openAddMemberModal()">+ Add Member</button>' : ''}
+          ${isSuperAdmin() ? '<button class="toolbar-btn" onclick="getFormA()">📋 Get Form A</button>' : ''}
           <button class="toolbar-btn" onclick="exportMembers()">↓ Export</button>
         </div>
       </div>
@@ -1414,6 +1415,28 @@ function editMember(uid, isSelfEdit = false) {
 
   const ynsEl = (id, label, val) => sel(id, label, val, ['','Y','N']);
 
+  // Mandatory field with an N/A checkbox (text/date). Ticking N/A fills "N/A" (or clears a date) and disables.
+  const fldNA = (id, label, val, type='text') => {
+    const isNA = String(val ?? '').trim() === 'N/A';
+    return `<div class="form-field">
+      <label>${label} <span style="color:var(--clr-red)">*</span></label>
+      <input id="${id}" type="${type}" value="${ea(type==='date' ? dt(val) : val)}" ${isNA ? 'disabled' : ''}/>
+      <label class="na-chk"><input type="checkbox" data-na="${id}" onchange="toggleNAField(this)" ${isNA ? 'checked' : ''}/> N/A</label>
+    </div>`;
+  };
+  // Mandatory dropdown with an N/A checkbox.
+  const selNA = (id, label, val, opts) => {
+    const isNA = String(val ?? '').trim() === 'N/A';
+    const allOpts = [...opts];
+    if (val && !allOpts.map(String).includes(String(val))) allOpts.push(val);
+    if (isNA && !allOpts.includes('N/A')) allOpts.push('N/A');
+    return `<div class="form-field">
+      <label>${label} <span style="color:var(--clr-red)">*</span></label>
+      <select id="${id}" ${isNA ? 'disabled' : ''}>${allOpts.map(o=>`<option value="${ea(o)}" ${String(val)===String(o)?'selected':''}>${o||'—'}</option>`).join('')}</select>
+      <label class="na-chk"><input type="checkbox" data-na="${id}" onchange="toggleNAField(this)" ${isNA ? 'checked' : ''}/> N/A</label>
+    </div>`;
+  };
+
   const secHdr = txt => `<div style="grid-column:1/-1;font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:8px 0 2px">${txt}</div>`;
 
   openModal(`
@@ -1423,7 +1446,8 @@ function editMember(uid, isSelfEdit = false) {
     </div>
 
     <div class="edit-tabs">
-      <button class="edit-tab active"        onclick="switchEditTab('personal',this)">Personal</button>
+      <button class="edit-tab active"        onclick="switchEditTab('mandatory',this)">Mandatory (Form A)</button>
+      <button class="edit-tab"               onclick="switchEditTab('personal',this)">Personal</button>
       <button class="edit-tab"               onclick="switchEditTab('contact',this)">Contact & Address</button>
       <button class="edit-tab"               onclick="switchEditTab('professional',this)">Professional</button>
       <button class="edit-tab"               onclick="switchEditTab('flags',this)">Flags & Nee</button>
@@ -1432,21 +1456,48 @@ function editMember(uid, isSelfEdit = false) {
       <button class="edit-tab"               onclick="switchEditTab('admin',this)">Admin / Transfer</button>
     </div>
 
+    <style>
+      .na-chk{display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;color:var(--txt-muted);margin-top:3px;cursor:pointer;font-weight:400;text-transform:none;letter-spacing:0}
+      .na-chk input{width:13px;height:13px;accent-color:var(--clr-saffron);margin:0}
+      .etab-pane input:disabled,.etab-pane select:disabled{background:#f1f5f9;color:#94a3b8;cursor:not-allowed}
+    </style>
+
     <div style="overflow-y:auto;max-height:58vh;padding-right:4px;">
+
+      <!-- ── MANDATORY (FORM A) ──────────────── -->
+      <div id="etab-mandatory" class="etab-pane" data-display="grid"
+           style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
+        ${fld('em_uid',         'UID',                       m.uid, 'text', true)}
+        ${fldNA('em_name',      'Full Name',                 m.name)}
+        ${selNA('em_category',  'Category',                  m.category, ['','Initiated','Jigyasu','Superhumane'])}
+        ${selNA('em_gender',    'Gender',                    m.gender, ['','Male','Female','Other'])}
+        ${fldNA('em_doi',       'Date of Initiation',        m.dateOfInitiation,       'date')}
+        ${fldNA('em_dob',       'Date of Birth',             m.dateOfBirth,            'date')}
+        ${fldNA('em_doi1',      'Date of First Initiation',  m.dateOfFirstInitiation,  'date')}
+        ${fldNA('em_caste',     'Caste',                     m.caste)}
+        ${fldNA('em_nationality','Nationality',              m.nationality)}
+        ${fldNA('em_qual',      'Qualification',             m.qualification)}
+        ${fldNA('em_occ',       'Occupation',                m.occupation)}
+        ${fldNA('em_addr1',     'Address',                   m.addressLine1)}
+        ${fldNA('em_city',      'City',                      m.city)}
+        ${fldNA('em_pincode',   'Pincode',                   m.pincode)}
+        ${fldNA('em_state',     'State',                     m.state)}
+        ${fldNA('em_country',   'Country',                   m.country)}
+        ${fldNA('em_mobile',    'Mobile 1',                  m.mobile)}
+        ${selNA('em_fTitle',    'Father Title',              m.fatherTitle, ['','Sh.','Dr.','Er.','Prof.'])}
+        ${fldNA('em_fFirst',    'Father Name',               m.fatherFirstName)}
+        ${fldNA('em_neeFirst',  'Nee (Name)',                m.neeFirst)}
+      </div>
 
       <!-- ── PERSONAL ────────────────────────── -->
       <div id="etab-personal" class="etab-pane" data-display="grid"
-           style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${fld('em_name',        'Full Name *',            m.name)}
+           style="display:none;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
         ${fld('em_bslno',       'BSL No.',                m.bslno)}
         ${fld('em_blood',       'Blood Group',            m.bloodGroup)}
-        ${fld('em_doi',         'Date of Initiation',     m.dateOfInitiation,        'date')}
-        ${fld('em_dob',         'Date of Birth',          m.dateOfBirth,             'date')}
         ${fld('em_dor',         'Date of Reg. (Jigyasu)', m.dateOfRegistration,      'date')}
-        ${fld('em_doi1',        'Date of 1st Init.',      m.dateOfFirstInitiation,   'date')}
         ${fld('em_doi2',        'Date of 2nd Init.',      m.dateOfSecondInitiation,  'date')}
-        ${fld('em_caste',       'Caste',                  m.caste)}
-        ${fld('em_nationality', 'Nationality',            m.nationality)}
+        ${sel('em_marital',     'Marital Status',         m.maritalStatus, ['','Single','Married','Widowed','Divorced'])}
+        ${fld('em_prevBranch',  'Previous Branch',        m.previousBranch)}
         ${fld('em_ashram',      'Ashram',                 m.ashram)}
         ${fld('em_snext',       'SN/EXT',                 m.snExt)}
         ${fld('em_branch',      'Branch ID Card',         m.branchIdCard)}
@@ -1456,26 +1507,18 @@ function editMember(uid, isSelfEdit = false) {
       <!-- ── CONTACT & ADDRESS ──────────────── -->
       <div id="etab-contact" class="etab-pane" data-display="grid"
            style="display:none;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${fld('em_mobile',      'Mobile 1',      m.mobile)}
         ${fld('em_mobile2',     'Mobile 2',      m.mobile2)}
         ${fld('em_landline',    'Landline',      m.landline)}
         ${fld('em_officePhone', 'Office Phone',  m.officePhone)}
         ${fld('em_email',       'Email 1',       m.email,  'email')}
         ${fld('em_email2',      'Email 2',       m.email2, 'email')}
-        ${fld('em_addr1',       'Address Line 1',m.addressLine1)}
         ${fld('em_addr2',       'Address Line 2',m.addressLine2)}
         ${fld('em_addr3',       'Address Line 3',m.addressLine3)}
-        ${fld('em_city',        'City',          m.city)}
-        ${fld('em_pincode',     'Pincode',       m.pincode)}
-        ${fld('em_state',       'State',         m.state)}
-        ${fld('em_country',     'Country',       m.country)}
       </div>
 
       <!-- ── PROFESSIONAL ──────────────────── -->
       <div id="etab-professional" class="etab-pane" data-display="grid"
            style="display:none;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${fld('em_qual',      'Qualification',    m.qualification)}
-        ${fld('em_occ',       'Occupation',       m.occupation)}
         ${fld('em_desig',     'Designation',      m.designation)}
         ${fld('em_org',       'Organization',     m.organization)}
         ${fld('em_prof',      'Profession',       m.profession)}
@@ -1497,7 +1540,6 @@ function editMember(uid, isSelfEdit = false) {
         </div>
         <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:16px 0 8px">Nee (Maiden Name)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-          ${fld('em_neeFirst',  'Nee First Name',   m.neeFirst)}
           ${fld('em_neeMiddle', 'Nee Middle Name',  m.neeMiddle)}
           ${fld('em_neeLast',   'Nee Last Name',    m.neeLast)}
         </div>
@@ -1507,8 +1549,6 @@ function editMember(uid, isSelfEdit = false) {
       <div id="etab-family" class="etab-pane" data-display="block" style="display:none;">
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-sm);">
           ${secHdr('Father')}
-          ${fld('em_fTitle',  'Title',       m.fatherTitle)}
-          ${fld('em_fFirst',  'First Name',  m.fatherFirstName)}
           ${fld('em_fMid',    'Middle Name', m.fatherMiddleName)}
           ${fld('em_fLast',   'Last Name',   m.fatherLastName)}
           ${fld('em_fBranch', 'Branch',      m.fatherBranch)}
@@ -1589,6 +1629,27 @@ function editMember(uid, isSelfEdit = false) {
   `, true);
 }
 
+// Toggle an N/A checkbox for a mandatory edit field: fill "N/A" (or clear a date) and disable, or restore.
+function toggleNAField(chk) {
+  const el = document.getElementById(chk.dataset.na);
+  if (!el) return;
+  if (chk.checked) {
+    el.dataset.prev = el.value;
+    if (el.tagName === 'SELECT') {
+      if (![...el.options].some(o => o.value === 'N/A')) el.add(new Option('N/A', 'N/A'));
+      el.value = 'N/A';
+    } else if (el.type === 'date') {
+      el.value = '';
+    } else {
+      el.value = 'N/A';
+    }
+    el.disabled = true;
+  } else {
+    el.disabled = false;
+    el.value = el.dataset.prev || '';
+  }
+}
+
 async function saveMemberEdit(uid, isSelfEdit = false) {
   const name = document.getElementById('em_name')?.value.trim();
   if (!name) { showToast('Name is required!', 'error'); return; }
@@ -1599,6 +1660,10 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
   try {
     await apiPut('/api/members/' + uid + (isSelfEdit ? '/self' : ''), {
       name,
+      category:               g('em_category'),
+      gender:                 g('em_gender'),
+      maritalStatus:          g('em_marital'),
+      previousBranch:         g('em_prevBranch'),
       bslno:                  g('em_bslno'),
       dateOfInitiation:       g('em_doi')          || null,
       dateOfBirth:            g('em_dob')          || null,
@@ -1933,6 +1998,52 @@ function exportMembers() {
   a.href = url; a.download = 'members.csv'; a.click();
   URL.revokeObjectURL(url);
   showToast(`Exported ${membersData.length} members as CSV!`, 'success');
+}
+
+// ── Get Form A (superadmin only) — mandatory columns, blanks become "N/A" ──
+function getFormA() {
+  if (!isSuperAdmin()) { showToast('Superadmin only', 'error'); return; }
+
+  // Wrap a value in quotes, escaping internal quotes; blank/empty → "N/A"
+  const esc = v => {
+    const s = String(v ?? '').trim();
+    return `"${(s === '' ? 'N/A' : s).replace(/"/g, '""')}"`;
+  };
+  const join = (...parts) => parts.map(p => (p ?? '').toString().trim()).filter(Boolean).join(' ');
+
+  const COLS = [
+    ['UID',                       m => m.uid],
+    ['Name',                      m => m.name],
+    ['Date of Initiation',        m => m.dateOfInitiation],
+    ['Category',                  m => m.category],
+    ['Gender',                    m => m.gender],
+    ['Date of Birth',             m => m.dateOfBirth],
+    ['Date of First Initiation',  m => m.dateOfFirstInitiation],
+    ['Caste',                     m => m.caste],
+    ['Nationality',               m => m.nationality],
+    ['Qualification',             m => m.qualification],
+    ['Occupation',                m => m.occupation],
+    ['Address',                   m => join(m.addressLine1, m.addressLine2, m.addressLine3)],
+    ['City',                      m => m.city],
+    ['Pincode',                   m => m.pincode],
+    ['State',                     m => m.state],
+    ['Country',                   m => m.country],
+    ['Mobile-1',                  m => m.mobile],
+    ['Father Title',              m => m.fatherTitle],
+    ['Father Name',               m => join(m.fatherFirstName, m.fatherMiddleName, m.fatherLastName)],
+    ['Nee (Name)',                m => join(m.neeFirst, m.neeMiddle, m.neeLast)],
+  ];
+
+  const header = COLS.map(([h]) => esc(h)).join(',');
+  const rows   = membersData.map(m => COLS.map(([, fn]) => esc(fn(m))).join(','));
+  const csv    = [header, ...rows].join('\r\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'form_a.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast(`Form A exported for ${membersData.length} members!`, 'success');
 }
 
 // ── Upload Members Excel/CSV ────────────────
