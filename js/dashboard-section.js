@@ -38,7 +38,7 @@ function renderDashboard() {
           <div class="info-card" style="cursor:pointer" data-goto="events">
             <div class="info-label">${e.title}</div>
             <div class="info-value" style="font-size:.85rem;margin-top:4px;"><strong>${e.date}</strong> at ${e.time}</div>
-            <div class="info-link" style="margin-top:6px;font-size:.78rem;color:var(--txt-muted);">📍 ${e.venue} · ${e.type}</div>
+            <div class="info-link" style="margin-top:6px;font-size:.78rem;color:var(--txt-muted);">${e.venue} · ${e.type}</div>
           </div>
         `).join('')}
       </div>` : '<p class="text-muted" style="padding:var(--sp-md);">No upcoming events.</p>'}
@@ -270,7 +270,7 @@ function dashMemberSearch() {
             </div>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:0.82rem;color:var(--txt-muted)">
-            ${m.mobile || m.fatherContact ? `<span>📞 ${m.mobile || m.fatherContact}</span>` : ''}
+            ${m.mobile || m.fatherContact ? `<span>${m.mobile || m.fatherContact}</span>` : ''}
             ${m._source === 'superhumane' ? '' : statusBadge(m.status)}
           </div>
           <div style="display:flex;gap:var(--sp-sm)">
@@ -311,7 +311,7 @@ async function viewSuperhumaneQuick(uid) {
 
   openModal(`
     <div class="modal-header">
-      <h3>🧒 Sant-Su Child Record</h3>
+      <h3>Sant-Su Child Record</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
