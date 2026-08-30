@@ -28,9 +28,9 @@ function renderAnnouncements() {
 
 function announcementCard(a) {
   const priorityStyles = {
-    high:   { badge: 'badge-danger',  icon: '🔴', border: 'var(--clr-red)' },
-    medium: { badge: 'badge-warning', icon: '🟡', border: 'var(--clr-saffron)' },
-    low:    { badge: 'badge-info',    icon: '🔵', border: 'var(--clr-blue)' }
+    high:   { badge: 'badge-danger',  border: 'var(--clr-red)' },
+    medium: { badge: 'badge-warning', border: 'var(--clr-saffron)' },
+    low:    { badge: 'badge-info',    border: 'var(--clr-blue)' }
   };
   const ps = priorityStyles[a.priority] || priorityStyles.low;
 
@@ -39,7 +39,6 @@ function announcementCard(a) {
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-md);flex-wrap:wrap">
         <div style="flex:1">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span>${ps.icon}</span>
             <strong style="font-size:1rem">${a.title}</strong>
             <span class="badge ${ps.badge}">${a.priority.toUpperCase()}</span>
             ${!a.active ? '<span class="badge badge-gray">Archived</span>' : ''}
@@ -63,7 +62,7 @@ function announcementCard(a) {
 function openAddAnnouncementModal() {
   openModal(`
     <div class="modal-header">
-      <h3>📢 New Announcement</h3>
+      <h3>New Announcement</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div class="form-field"><label>Title *</label><input id="aa_title" placeholder="Announcement title" /></div>
@@ -109,7 +108,7 @@ function editAnnouncement(id) {
   if (!a) return;
   openModal(`
     <div class="modal-header">
-      <h3>✏️ Edit Announcement</h3>
+      <h3>Edit Announcement</h3>
       <button class="modal-close" onclick="closeForcedModal()">✕</button>
     </div>
     <div class="form-field"><label>Title</label><input id="ea_title" value="${a.title}" /></div>
