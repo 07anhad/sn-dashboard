@@ -1109,13 +1109,13 @@ def approve_pending_member(id):
   <table width="600" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
     <!-- Header -->
     <tr><td style="background:#1a2d5a;padding:32px;text-align:center">
-      <div style="font-size:2rem">🙏</div>
+      <div style="font-size:2rem"></div>
       <h1 style="color:#f4a124;font-size:1.4rem;margin:10px 0 4px;font-family:Georgia,serif">Soaminagar Branch Delhi</h1>
       <p style="color:rgba(255,255,255,0.7);margin:0;font-size:0.85rem">Ra Dha Sva Aa Mi</p>
     </td></tr>
     <!-- Body -->
     <tr><td style="padding:32px 36px">
-      <h2 style="color:#1a2d5a;margin:0 0 8px;font-size:1.2rem">Registration Approved ✅</h2>
+      <h2 style="color:#1a2d5a;margin:0 0 8px;font-size:1.2rem">Registration Approved</h2>
       <p style="color:#444;line-height:1.6;margin:0 0 24px">
         Dear <strong>{_r('name')}</strong>, your membership registration has been
         <strong style="color:#16a34a">approved</strong>. Your details are below for your records.
