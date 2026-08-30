@@ -182,6 +182,9 @@ ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_registration_jigyas
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_first_initiation    DATE;
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_second_initiation   DATE;
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS member_type                  VARCHAR(50);
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS gender                       VARCHAR(20);
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS marital_status               VARCHAR(50);
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS previous_branch              VARCHAR(200);
 
 -- Contributions
 CREATE TABLE IF NOT EXISTS contributions (
@@ -384,6 +387,22 @@ ALTER TABLE member_details ADD COLUMN IF NOT EXISTS category        VARCHAR(100)
 ALTER TABLE member_details ADD COLUMN IF NOT EXISTS gender          VARCHAR(20);
 ALTER TABLE member_details ADD COLUMN IF NOT EXISTS marital_status  VARCHAR(50);
 ALTER TABLE member_details ADD COLUMN IF NOT EXISTS previous_branch VARCHAR(200);
+
+-- Mandatory "Form A" text columns: backfill blanks to 'N/A', default 'N/A', enforce NOT NULL.
+-- (Date columns are left nullable — they surface as N/A only in the Form A export.)
+DO $$
+DECLARE col TEXT;
+BEGIN
+    FOREACH col IN ARRAY ARRAY[
+        'name','category','gender','caste','nationality','qualification','occupation',
+        'address_line1','city','pincode','state','country','mobile1',
+        'father_title','father_first_name','nee_first_name'
+    ] LOOP
+        EXECUTE format('UPDATE member_details SET %I = ''N/A'' WHERE %I IS NULL OR btrim(%I) = ''''', col, col, col);
+        EXECUTE format('ALTER TABLE member_details ALTER COLUMN %I SET DEFAULT ''N/A''', col);
+        EXECUTE format('ALTER TABLE member_details ALTER COLUMN %I SET NOT NULL', col);
+    END LOOP;
+END $$;
 
 -- Superhumane (children in Sant-Su scheme) — linked to parents via father_uid / mother_uid
 CREATE TABLE IF NOT EXISTS superhumane_details (
