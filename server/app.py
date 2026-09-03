@@ -601,22 +601,35 @@ def update_member(uid):
             return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
 
         caller_row = query(
-            "SELECT email FROM users WHERE username=%s AND role='member'",
+            "SELECT email, member_id FROM users WHERE username=%s AND role='member'",
             (caller_username,), one=True
         )
         if not caller_row:
             audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} reason=user_not_found")
             return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
 
-        # Resolve the member_details uid for this user (same logic as login)
+        # Resolve the caller's own member uid. Accept the direct member_id link
+        # (authoritative) OR the email match, using the SAME email1-then-email2
+        # order as login so the profile shown and the profile edited always agree.
+        target_uid = uid.strip()
+        allowed_uids = set()
+        if caller_row.get('member_id'):
+            allowed_uids.add(str(caller_row['member_id']).strip())
         caller_email = (caller_row['email'] or '').strip().lower()
-        md = query(
-            "SELECT uid FROM member_details WHERE LOWER(TRIM(email1))=%s OR LOWER(TRIM(email2))=%s",
-            (caller_email, caller_email), one=True
-        )
-        caller_uid = md['uid'].strip() if md else None
-        if caller_uid != uid.strip():
-            audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} caller_uid={caller_uid} reason=uid_mismatch")
+        if caller_email:
+            md = query(
+                "SELECT uid FROM member_details WHERE LOWER(TRIM(email1))=%s",
+                (caller_email,), one=True
+            )
+            if not md:
+                md = query(
+                    "SELECT uid FROM member_details WHERE LOWER(TRIM(email2))=%s",
+                    (caller_email,), one=True
+                )
+            if md:
+                allowed_uids.add(md['uid'].strip())
+        if target_uid not in allowed_uids:
+            audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} allowed={sorted(allowed_uids)} reason=uid_mismatch")
             return jsonify({'ok': False, 'error': 'Unauthorized: you can only edit your own profile'}), 403
 
         # Fetch current values BEFORE the update so we can diff them.
