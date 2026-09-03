@@ -1400,8 +1400,16 @@ function editMember(uid, isSelfEdit = false) {
 
   // Escape for HTML attribute values
   const ea = v => String(v ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-  // Date fields: strip time component if present
-  const dt = v => v ? String(v).split('T')[0] : '';
+  // Date fields → yyyy-MM-dd for <input type="date">. Handles ISO and RFC/GMT (e.g. "Sat, 23 Dec 1995 00:00:00 GMT").
+  const dt = v => {
+    if (!v) return '';
+    const s = String(v);
+    const iso = s.match(/^\d{4}-\d{2}-\d{2}/);
+    if (iso) return iso[0];
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  };
 
   const fld = (id, label, val, type='text', readonly=false) =>
     `<div class="form-field"><label>${label}</label><input id="${id}" type="${type}" value="${ea(type==='date' ? dt(val) : val)}" ${readonly ? 'readonly style="opacity:0.5;cursor:not-allowed"' : ''}/></div>`;
