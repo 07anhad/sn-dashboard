@@ -71,9 +71,10 @@
       <!-- OTP VERIFICATION STEP (hidden by default) -->
       <div class="login-form" id="otpForm" style="display:none;">
         <div style="text-align:center;margin-bottom:20px">
-          <div style="font-size:2rem;margin-bottom:8px">📧</div>
+          <div style="font-size:2rem;margin-bottom:8px"></div>
           <div style="color:rgba(255,255,255,0.9);font-size:0.95rem;font-weight:600;margin-bottom:6px">Check your email</div>
           <div style="color:rgba(255,255,255,0.55);font-size:0.82rem">A 6-digit code was sent to<br><span id="otpMaskedEmail" style="color:rgba(255,255,255,0.8);font-weight:600"></span></div>
+          <div style="color:rgba(255,255,255,0.45);font-size:0.75rem;line-height:1.5;margin-top:10px">The email comes from <span style="color:rgba(255,255,255,0.7);font-weight:600">soaminagarbranch@gmail.com</span>.<br>If you don't see it, please check your <span style="color:rgba(255,255,255,0.7);font-weight:600">Spam</span> folder.</div>
         </div>
         <div class="form-group">
           <label for="otpCode">Enter 6-digit code</label>
@@ -180,7 +181,7 @@
       <!-- FORGOT PASSWORD STEP 2: OTP + new password -->
       <div class="login-form" id="forgotOtpForm" style="display:none;">
         <div style="text-align:center;margin-bottom:20px">
-          <div style="font-size:2rem;margin-bottom:8px">📧</div>
+          <div style="font-size:2rem;margin-bottom:8px"></div>
           <div style="color:rgba(255,255,255,0.9);font-size:0.95rem;font-weight:600;margin-bottom:6px">Verify your identity</div>
           <div style="color:rgba(255,255,255,0.55);font-size:0.82rem">Code sent to <span id="forgotMaskedEmail" style="color:rgba(255,255,255,0.8);font-weight:600"></span></div>
         </div>
@@ -227,6 +228,7 @@
     </div>
   </div>
 
+  <script src="/config.js"></script>
   <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>
   <script>
