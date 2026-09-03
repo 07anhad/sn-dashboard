@@ -196,7 +196,6 @@ function _renderMembersListTab() {
               <th style="min-width:160px">UID</th>
               <th style="min-width:60px">BSL</th>
               <th style="min-width:180px">Name</th>
-              <th style="min-width:105px">Date of Initiation</th>
               <th style="min-width:105px">Date of Birth</th>
               <th style="min-width:125px">Date of Reg. (Jigyasu)</th>
               <th style="min-width:115px">Date of 1st Init.</th>
@@ -976,7 +975,6 @@ function memberRow(m) {
 <td><code style="font-size:0.78rem;color:var(--clr-navy-mid)" ${m.uid?.startsWith('PENDING-') ? 'data-pending title="UID not yet assigned"' : ''}>${v(m.uid)}</code></td>
       <td>${v(m.bslno)}</td>
       <td><strong>${v(m.name)}</strong></td>
-      ${d(m.dateOfInitiation)}
       ${d(m.dateOfBirth)}
       ${d(m.dateOfRegistration)}
       ${d(m.dateOfFirstInitiation)}
@@ -1192,7 +1190,6 @@ function buildSelfProfileHTML(m) {
       <!-- Initiation Dates -->
       ${sec('Initiation Dates')}
       ${grid(
-        pf('Date of Initiation', formatDate(m.dateOfInitiation)),
         pf('Date of Birth', formatDate(m.dateOfBirth)),
         pf('Reg. Date (Jigyasu)', formatDate(m.dateOfRegistration)),
         pf('1st Initiation', formatDate(m.dateOfFirstInitiation)),
@@ -1308,7 +1305,6 @@ function viewMember(uid) {
       </div>
       <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Initiation Dates</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${mf('Date of Initiation', formatDate(m.dateOfInitiation))}
         ${mf('Date of Birth', formatDate(m.dateOfBirth))}
         ${mf('Date of Reg. (Jigyasu)', formatDate(m.dateOfRegistration))}
         ${mf('Date of 1st Initiation', formatDate(m.dateOfFirstInitiation))}
@@ -1471,7 +1467,7 @@ function editMember(uid, isSelfEdit = false) {
         ${fldNA('em_name',      'Full Name',                 m.name)}
         ${selNA('em_category',  'Category',                  m.category, ['','Initiated','Jigyasu','Superhumane'])}
         ${selNA('em_gender',    'Gender',                    m.gender, ['','Male','Female','Other'])}
-        ${fldNA('em_doi',       'Date of Initiation',        m.dateOfInitiation,       'date')}
+        <input id="em_doi" type="hidden" value="${m.dateOfInitiation || ''}" />
         ${fldNA('em_dob',       'Date of Birth',             m.dateOfBirth,            'date')}
         ${fldNA('em_doi1',      'Date of First Initiation',  m.dateOfFirstInitiation,  'date')}
         ${fldNA('em_caste',     'Caste',                     m.caste)}
@@ -1891,7 +1887,6 @@ function exportMembers() {
     ['UID',                       m => m.uid],
     ['BSL',                       m => m.bslno],
     ['Name',                      m => m.name],
-    ['Date of Initiation',        m => m.dateOfInitiation],
     ['Date of Birth',             m => m.dateOfBirth],
     ['Date of Reg. (Jigyasu)',    m => m.dateOfRegistration],
     ['Date of 1st Init.',         m => m.dateOfFirstInitiation],
@@ -2014,7 +2009,6 @@ function getFormA() {
   const COLS = [
     ['UID',                       m => m.uid],
     ['Name',                      m => m.name],
-    ['Date of Initiation',        m => m.dateOfInitiation],
     ['Category',                  m => m.category],
     ['Gender',                    m => m.gender],
     ['Date of Birth',             m => m.dateOfBirth],
