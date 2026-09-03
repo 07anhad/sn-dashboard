@@ -1233,7 +1233,6 @@ def approve_pending_member(id):
         {_row('Nationality', _r('nationality'))}
         {_row('Profession', _r('profession'))}
         {_row('Ashram', _r('ashram'))}
-        {_row('Date of Initiation', _date('date_of_initiation'))}
         {_row('Date of Reg. (Jigyasu)', _date('date_of_registration_jigyasu'))}
         {_row('Date of 1st Initiation', _date('date_of_first_initiation'))}
         {_row('Date of 2nd Initiation', _date('date_of_second_initiation'))}
