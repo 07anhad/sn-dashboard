@@ -325,11 +325,6 @@
               <label class="na-toggle"><input type="checkbox" data-na="rf_gender" onchange="toggleNA(this)" /> N/A</label>
             </div>
             <div class="field">
-              <label>Date of Initiation <span class="req-star">*</span></label>
-              <input id="rf_doi" type="date" />
-              <label class="na-toggle"><input type="checkbox" data-na="rf_doi" onchange="toggleNA(this)" /> N/A</label>
-            </div>
-            <div class="field">
               <label>Date of Birth <span class="req-star">*</span></label>
               <input id="rf_dob" type="date" />
               <label class="na-toggle"><input type="checkbox" data-na="rf_dob" onchange="toggleNA(this)" /> N/A</label>
@@ -816,6 +811,9 @@
     <div class="result-icon" id="resultIcon"></div>
     <div class="result-title" id="resultTitle">Registration Submitted!</div>
     <div class="result-msg"   id="resultMsg"></div>
+    <div id="resultNote" style="display:none;margin-top:16px;font-size:0.9rem;color:#555;max-width:520px;line-height:1.6">
+      Any email from us will come from <strong>soaminagarbranch@gmail.com</strong>. If you don't see it in your inbox, please check your <strong>Spam</strong> folder.
+    </div>
   </div>
 
   <script>
@@ -910,7 +908,7 @@
       const payload = {
         name, memberType, dateOfBirth: g('rf_dob'), bloodGroup: g('rf_blood'),
         gender: g('rf_gender'), maritalStatus: g('rf_maritalStatus'), previousBranch: g('rf_previousBranch'),
-        uid: g('rf_uid'), dateOfInitiation: g('rf_doi'),
+        uid: g('rf_uid'),
         dateOfRegistrationJigyasu: g('rf_dor_jigyasu'),
         dateOfFirstInitiation: g('rf_doi_first'),
         dateOfSecondInitiation: g('rf_doi_second'),
@@ -970,6 +968,7 @@
           document.getElementById('resultIcon').textContent  = '';
           document.getElementById('resultTitle').textContent = 'Registration Submitted!';
           document.getElementById('resultMsg').textContent   = data.message;
+          document.getElementById('resultNote').style.display = 'block';
           window.scrollTo(0, 0);
         } else {
           showInlineErr(data.error || 'Submission failed. Please try again.');
