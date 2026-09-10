@@ -173,11 +173,19 @@
 /* Chrome autofill on login page (dark navy bg) */
 .input-wrap input:-webkit-autofill,
 .input-wrap input:-webkit-autofill:hover,
-.input-wrap input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px rgba(255,255,255,0.07) inset !important;
+.input-wrap input:-webkit-autofill:focus,
+.input-wrap input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px rgba(41,52,86,1) inset !important;
+  box-shadow: 0 0 0 1000px rgba(41,52,86,1) inset !important;
   -webkit-text-fill-color: #ffffff !important;
   caret-color: #fff !important;
   transition: background-color 9999s ease 0s;
+}
+/* Standard selector — kept separate so an unknown token can't void the rule above */
+.input-wrap input:autofill {
+  box-shadow: 0 0 0 1000px rgba(41,52,86,1) inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #fff !important;
 }
 .pass-toggle {
   position: absolute; right: 12px;
