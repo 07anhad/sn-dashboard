@@ -28,6 +28,66 @@ function setButtonLoading(btn, loading, loadingLabel) {
   }
 }
 
+function renderClaimMemberPrompt(container) {
+  container.innerHTML = `
+    <div style="max-width:460px;margin:48px auto;padding:28px;background:var(--bg-card);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.06)">
+      <div style="font-weight:700;font-size:1.05rem;margin-bottom:8px">Link your member record</div>
+      <div style="color:var(--txt-muted);font-size:0.9rem;line-height:1.6;margin-bottom:18px">
+        Your account isn't linked to a member record yet. Enter your UID or Branch ID to connect it — you only need to do this once.
+      </div>
+      <div class="form-field">
+        <label>UID or Branch ID</label>
+        <input id="claimIdentifier" placeholder="e.g. 2655 or MTA1995122319707" />
+      </div>
+      <div class="form-field">
+        <label>Confirm your password</label>
+        <input id="claimPassword" type="password" placeholder="Your account password" />
+      </div>
+      <div id="claimError" style="display:none;color:var(--clr-red,#dc2626);font-size:0.85rem;margin:10px 0"></div>
+      <button class="btn btn-saffron" id="claimBtn" style="width:100%;margin-top:12px" onclick="submitClaimMember()">Link My Record</button>
+    </div>`;
+}
+
+async function submitClaimMember() {
+  const identifier = document.getElementById('claimIdentifier').value.trim();
+  const password   = document.getElementById('claimPassword').value;
+  const errEl      = document.getElementById('claimError');
+  const btn        = document.getElementById('claimBtn');
+  const u          = getCurrentUser();
+
+  errEl.style.display = 'none';
+  if (!identifier || !password) {
+    errEl.textContent = 'Please enter both your UID/Branch ID and your password.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  setButtonLoading(btn, true, 'Linking…');
+  try {
+    const res  = await fetch('/api/auth/claim-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u.username, password, memberIdentifier: identifier })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      const updated = { ...u, memberId: data.user.member_id, memberUid: data.user.member_uid };
+      sessionStorage.setItem('currentUser', JSON.stringify(updated));
+      localStorage.setItem('currentUser',   JSON.stringify(updated));
+      showToast('Record linked successfully', 'success');
+      window.location.reload();
+    } else {
+      setButtonLoading(btn, false);
+      errEl.textContent = data.error || 'Could not link your record.';
+      errEl.style.display = 'block';
+    }
+  } catch {
+    setButtonLoading(btn, false);
+    errEl.textContent = 'Server error. Please try again.';
+    errEl.style.display = 'block';
+  }
+}
+
 function renderMembers() {
   const container = document.getElementById('membersContent');
   if (!isAdmin()) {
@@ -36,7 +96,7 @@ function renderMembers() {
     if (m) {
       renderSelfProfileInline(m);
     } else {
-      container.innerHTML = '<div style="padding:60px;text-align:center;color:var(--txt-muted);font-size:1rem;">No member record is linked to your account.</div>';
+      renderClaimMemberPrompt(container);
     }
     return;
   }
@@ -1766,9 +1826,15 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
       dateOfExpire:           g('em_dateExpire')    || null,
     });
     await reloadMembers();
-    closeForcedModal();
-    filterMembers();
     renderCache.delete('members');
+    closeForcedModal();
+    // filterMembers() only repaints the admin table; a member's own profile
+    // card needs a full re-render or it keeps showing the pre-save values.
+    if (isSelfEdit || !isAdmin()) {
+      renderMembers();
+    } else {
+      filterMembers();
+    }
     showToast('Member updated successfully!', 'success');
   } catch(e) {
     setButtonLoading(btn, false);
