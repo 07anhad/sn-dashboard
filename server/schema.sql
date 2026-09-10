@@ -449,6 +449,27 @@ CREATE TABLE IF NOT EXISTS otp_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_tokens (email);
 
+-- Tie each OTP to a specific account. Families share inboxes, so email alone
+-- is ambiguous — without this, one relative's login invalidates another's code.
+ALTER TABLE otp_tokens ADD COLUMN IF NOT EXISTS user_id INTEGER;
+CREATE INDEX IF NOT EXISTS idx_otp_user ON otp_tokens (user_id);
+
+-- Signups awaiting email verification. Nothing is written to `users` until the
+-- code is confirmed, so a mistyped email leaves no orphan row and never
+-- occupies a username.
+CREATE TABLE IF NOT EXISTS pending_signups (
+    id          SERIAL PRIMARY KEY,
+    username    VARCHAR(100) NOT NULL,
+    password    VARCHAR(255) NOT NULL,
+    name        VARCHAR(200) NOT NULL,
+    email       VARCHAR(200) NOT NULL,
+    member_uid  VARCHAR(50),
+    code        VARCHAR(6)   NOT NULL,
+    expires_at  TIMESTAMP    NOT NULL,
+    created_at  TIMESTAMP    DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_pending_signup_username ON pending_signups (LOWER(username));
+
 CREATE TABLE IF NOT EXISTS member_edit_log (
     id             SERIAL PRIMARY KEY,
     member_uid     TEXT NOT NULL,
@@ -458,3 +479,47 @@ CREATE TABLE IF NOT EXISTS member_edit_log (
     fields_changed TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_mel_edited_at ON member_edit_log (edited_at DESC);
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Identity migration — member_details.uid is the permanent identifier.
+-- Idempotent: safe to re-run on every startup.
+-- ═══════════════════════════════════════════════════════════════════
+
+-- Families legitimately share one inbox, so email cannot be unique.
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_email_key;
+
+-- Discard fabricated member_id values (e.g. 'M-10007') that match no member.
+UPDATE users SET member_id = NULL
+ WHERE member_id IS NOT NULL
+   AND member_id NOT IN (SELECT uid FROM member_details);
+
+-- Backfill only where the email identifies exactly ONE member. Ambiguous
+-- accounts stay NULL and are claimed by UID/Branch ID at next login.
+UPDATE users u SET member_id = sub.uid
+  FROM (
+      SELECT LOWER(TRIM(usr.email)) AS email, MIN(md.uid) AS uid
+        FROM users usr
+        JOIN member_details md
+          ON LOWER(TRIM(md.email1)) = LOWER(TRIM(usr.email))
+          OR LOWER(TRIM(md.email2)) = LOWER(TRIM(usr.email))
+       WHERE usr.role = 'member' AND usr.member_id IS NULL
+       GROUP BY 1
+      HAVING COUNT(DISTINCT md.uid) = 1
+  ) sub
+ WHERE u.role = 'member'
+   AND u.member_id IS NULL
+   AND LOWER(TRIM(u.email)) = sub.email;
+
+-- One account per member, and uid changes cascade instead of orphaning.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_member_id_key') THEN
+        ALTER TABLE users ADD CONSTRAINT users_member_id_key UNIQUE (member_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_member_id_fkey') THEN
+        ALTER TABLE users ADD CONSTRAINT users_member_id_fkey
+            FOREIGN KEY (member_id) REFERENCES member_details (uid)
+            ON UPDATE CASCADE ON DELETE SET NULL;
+    END IF;
+END $$;
+
