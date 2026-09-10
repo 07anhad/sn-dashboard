@@ -227,8 +227,10 @@
   </div>
 
   <script>
+    // PWA cache removed — unregister any old service worker and clear its caches
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(console.error);
+      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(()=>{});
+      if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(()=>{});
     }
     // Show iOS install banner: iOS + Safari + not already installed + not dismissed
     (function () {
