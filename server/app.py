@@ -1,7 +1,7 @@
 """
 app.py — Flask server: serves static frontend + REST API
 """
-import os, sys, logging, shutil, smtplib
+import os, sys, logging, shutil, smtplib, re, random
 import datetime as _dt
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -42,6 +42,7 @@ MANDATORY_NA_COLUMNS = [
 # ═══════════════════════════════════════════
 def _init_db():
     schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+    conn = None
     try:
         with open(schema_path, 'r', encoding='utf-8') as f:
             sql = f.read()
@@ -53,7 +54,14 @@ def _init_db():
         conn.close()
         print('[startup] DB schema initialised OK')
     except Exception as e:
-        print(f'[startup] DB init error: {e}')
+        # Roll back so a failed migration can never leave the DB half-applied.
+        if conn is not None:
+            try:
+                conn.rollback()
+                conn.close()
+            except Exception:
+                pass
+        print(f'[startup] *** DB INIT FAILED — schema NOT applied: {e}', flush=True)
 
 _init_db()
 
@@ -64,13 +72,16 @@ _init_db()
 GMAIL_USER     = 'soaminagarbranch@gmail.com'
 GMAIL_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', '')
 
+if not GMAIL_PASSWORD:
+    print('[startup] *** GMAIL_APP_PASSWORD not set — OTP emails will NOT be delivered ***', flush=True)
+
 def send_email(to_addr, subject, html_body):
-    """Send an HTML email via Gmail SMTP. Logs on failure, never crashes server."""
+    """Send an HTML email via Gmail SMTP. Returns True only if it actually left the server."""
     if not to_addr:
-        return
+        return False
     if not GMAIL_PASSWORD:
         print(f"[EMAIL DEV] Would send to {to_addr}: {subject}", flush=True)
-        return
+        return False
     try:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
@@ -83,9 +94,11 @@ def send_email(to_addr, subject, html_body):
             s.sendmail(GMAIL_USER, [to_addr], msg.as_string())
         logging.getLogger('audit').info(f"EMAIL_SENT to={to_addr} subject={subject}")
         print(f"[EMAIL] Sent to {to_addr}", flush=True)
+        return True
     except Exception as e:
         logging.getLogger('audit').warning(f"EMAIL_FAILED to={to_addr} err={e}")
-        print(f"[EMAIL ERROR] {e}", flush=True)
+        print(f"[EMAIL ERROR] to={to_addr} {type(e).__name__}: {e}", flush=True)
+        return False
 
 @app.route('/api/test-email')
 def test_email():
@@ -224,14 +237,58 @@ def icon_files(filename):
 # ═══════════════════════════════════════════
 # AUTH API
 # ═══════════════════════════════════════════
-@app.route('/api/debug/email-lookup')
-def debug_email_lookup():
-    email = (request.args.get('email') or '').strip().lower()
-    if not email:
-        return jsonify({'error': 'Pass ?email=...'})
-    exact = query("SELECT uid, email1, email2 FROM member_details WHERE email1=%s OR email2=%s", (email, email))
-    ilike = query("SELECT uid, email1, email2 FROM member_details WHERE LOWER(TRIM(email1))=%s OR LOWER(TRIM(email2))=%s", (email, email))
-    return jsonify({'exact_match': exact, 'ilike_match': ilike})
+EMAIL_RE = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$')
+
+
+def _member_uid_for(user):
+    """A member's identity is the stored member_id (member_details.uid).
+
+    Never re-derive it from email: 51 families share an inbox, so an email
+    lookup can silently resolve to the wrong person.
+    """
+    if (user or {}).get('role') != 'member':
+        return None
+    return (user.get('member_id') or None)
+
+
+def _mask_email(email):
+    email = (email or '').strip()
+    if '@' not in email:
+        return email
+    local, _, domain = email.partition('@')
+    return (local[:2] if len(local) > 2 else local) + '***@' + domain
+
+
+def _resolve_member_uid(identifier):
+    """Map a UID or Branch ID (BSL) typed by a member to exactly one member uid.
+
+    Returns (uid, error). Ambiguous Branch IDs are rejected rather than guessed.
+    """
+    ident = (identifier or '').strip()
+    if not ident:
+        return None, 'Please enter your UID or Branch ID.'
+
+    row = query("SELECT uid FROM member_details WHERE UPPER(TRIM(uid))=%s", (ident.upper(),), one=True)
+    if row:
+        return row['uid'], None
+
+    rows = query("SELECT uid, name FROM member_details WHERE TRIM(bsl)=%s", (ident,))
+    if not rows:
+        return None, 'No member found with that UID or Branch ID. Please check your records.'
+    if len(rows) > 1:
+        return None, 'That Branch ID matches more than one member. Please enter your UID instead.'
+    return rows[0]['uid'], None
+
+
+def _claim_conflict(member_uid):
+    """True if another account has already claimed this member."""
+    return bool(query("SELECT 1 FROM users WHERE member_id=%s", (member_uid,), one=True))
+
+
+def _purge_expired_signups():
+    execute("DELETE FROM pending_signups WHERE expires_at < NOW()")
+
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.json or {}
@@ -254,21 +311,7 @@ def login():
         )
     if user:
         user_dict = dict(user)
-        if user_dict['role'] == 'member' and user_dict.get('email'):
-            email_lower = user_dict['email'].strip().lower()
-            # Prefer email1 match first, only use email2 as fallback
-            md = query(
-                "SELECT uid FROM member_details WHERE LOWER(TRIM(email1))=%s",
-                (email_lower,), one=True
-            )
-            if not md:
-                md = query(
-                    "SELECT uid FROM member_details WHERE LOWER(TRIM(email2))=%s",
-                    (email_lower,), one=True
-                )
-            user_dict['member_uid'] = md['uid'] if md else None
-        else:
-            user_dict['member_uid'] = None
+        user_dict['member_uid'] = _member_uid_for(user_dict)
         audit('LOGIN_SUCCESS', f"username={username} role={user_dict['role']} member_uid={user_dict.get('member_uid')}")
         return jsonify({'ok': True, 'user': user_dict})
     audit('LOGIN_FAILED', f"username={username} attempted_role={role}")
@@ -276,11 +319,12 @@ def login():
 
 # ── OTP email helper (uses shared send_email / Gmail) ────────────────────────
 def _send_otp_email(to_email, code):
+    """Returns True only if the message was actually accepted by the SMTP server."""
     if not GMAIL_PASSWORD:
         # Dev mode: no App Password set — print code to console for local testing
         print(f"[OTP DEV] Code for {to_email}: {code}", flush=True)
-        return
-    send_email(
+        return True
+    return send_email(
         to_addr   = to_email,
         subject   = f'{code} — Your Soaminagar Branch login code',
         html_body = f"""
@@ -296,7 +340,6 @@ def _send_otp_email(to_email, code):
 
 @app.route('/api/auth/send-otp', methods=['POST'])
 def send_otp():
-    import random
     data     = request.json or {}
     username = (data.get('username') or '').strip()
     password = data.get('password') or ''
@@ -321,22 +364,36 @@ def send_otp():
     if not email:
         return jsonify({'ok': False, 'error': 'No email address linked to this account. Contact an administrator.'}), 400
 
-    # Invalidate any existing unused codes for this email
-    execute("UPDATE otp_tokens SET used=TRUE WHERE email=%s AND used=FALSE", (email,))
+    # Throttle: at most one code per account per 30s, and 5 per hour.
+    recent = query(
+        "SELECT count(*) AS c FROM otp_tokens WHERE user_id=%s AND created_at > NOW() - INTERVAL '30 seconds'",
+        (user['id'],), one=True
+    )['c']
+    if recent:
+        return jsonify({'ok': False, 'error': 'A code was just sent. Please wait a few seconds before trying again.'}), 429
+    hourly = query(
+        "SELECT count(*) AS c FROM otp_tokens WHERE user_id=%s AND created_at > NOW() - INTERVAL '1 hour'",
+        (user['id'],), one=True
+    )['c']
+    if hourly >= 5:
+        return jsonify({'ok': False, 'error': 'Too many codes requested. Please try again in an hour.'}), 429
+
+    # Scope to this account, not the email — families share inboxes.
+    execute("UPDATE otp_tokens SET used=TRUE WHERE user_id=%s AND used=FALSE", (user['id'],))
 
     code = str(random.randint(100000, 999999))
     execute(
-        "INSERT INTO otp_tokens (email, code, expires_at) VALUES (%s, %s, NOW() + INTERVAL '10 minutes')",
-        (email, code)
+        "INSERT INTO otp_tokens (user_id, email, code, expires_at) VALUES (%s, %s, %s, NOW() + INTERVAL '10 minutes')",
+        (user['id'], email, code)
     )
 
-    _send_otp_email(email, code)
+    if not _send_otp_email(email, code):
+        audit('OTP_SEND_FAILED', f"username={username}")
+        return jsonify({'ok': False, 'error': 'We could not send the code to your email. Please check the address or try again shortly.'}), 502
 
-    # Return masked email so frontend can display it
-    parts  = email.split('@')
-    masked = parts[0][:2] + '***@' + parts[1]
+    masked = _mask_email(email)
     audit('OTP_SENT', f"username={username} email={masked}")
-    return jsonify({'ok': True, 'maskedEmail': masked})
+    return jsonify({'ok': True, 'maskedEmail': masked, 'email': email})
 
 @app.route('/api/auth/verify-otp', methods=['POST'])
 def verify_otp():
@@ -361,17 +418,10 @@ def verify_otp():
     if not user:
         return jsonify({'ok': False, 'error': 'Invalid credentials.'}), 401
 
-    email = (user.get('email') or '').strip()
-    # Debug: log what we're checking
-    logging.warning(f"[OTP DEBUG] email={email!r} code={code!r}")
-    latest = query(
-        "SELECT id, code, used, expires_at FROM otp_tokens WHERE email=%s ORDER BY created_at DESC LIMIT 1",
-        (email,), one=True
-    )
-    logging.warning(f"[OTP DEBUG] latest token={latest}")
     token = query(
-        "SELECT id FROM otp_tokens WHERE email=%s AND code=%s AND used=FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
-        (email, code), one=True
+        "SELECT id FROM otp_tokens WHERE user_id=%s AND code=%s AND used=FALSE AND expires_at > NOW() "
+        "ORDER BY created_at DESC LIMIT 1",
+        (user['id'], code), one=True
     )
     if not token:
         return jsonify({'ok': False, 'error': 'Invalid or expired code. Please try again.'}), 401
@@ -380,45 +430,161 @@ def verify_otp():
     execute("UPDATE otp_tokens SET used=TRUE WHERE id=%s", (token['id'],))
 
     user_dict = dict(user)
-    if user_dict['role'] == 'member' and email:
-        email_lower = email.lower()
-        md = query("SELECT uid FROM member_details WHERE LOWER(TRIM(email1))=%s", (email_lower,), one=True)
-        if not md:
-            md = query("SELECT uid FROM member_details WHERE LOWER(TRIM(email2))=%s", (email_lower,), one=True)
-        user_dict['member_uid'] = md['uid'] if md else None
-    else:
-        user_dict['member_uid'] = None
+    user_dict['member_uid'] = _member_uid_for(user_dict)
 
     audit('OTP_LOGIN_SUCCESS', f"username={username} role={user_dict['role']}")
     return jsonify({'ok': True, 'user': user_dict})
 
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
-    data = request.json or {}
-    name = (data.get('name') or '').strip()
-    username = (data.get('username') or '').strip().lower()
-    email = (data.get('email') or '').strip().lower()
-    password = data.get('password') or ''
+    """Stage a signup and email a code. No account exists until the code is verified,
+    so a mistyped email leaves no orphan row and never occupies a username."""
+    data       = request.json or {}
+    name       = (data.get('name') or '').strip()
+    username   = (data.get('username') or '').strip().lower()
+    email      = (data.get('email') or '').strip().lower()
+    password   = data.get('password') or ''
+    identifier = (data.get('memberIdentifier') or '').strip()
 
     if not name or not username or not email or len(password) < 6:
         return jsonify({'ok': False, 'error': 'All fields required. Password min 6 chars.'}), 400
+    if not EMAIL_RE.match(email):
+        return jsonify({'ok': False, 'error': 'That email address does not look valid. Please check it.'}), 400
 
-    # Check duplicates
-    existing = query("SELECT id FROM users WHERE username=%s OR email=%s", (username, email))
-    if existing:
-        return jsonify({'ok': False, 'error': 'Username or email already taken.'}), 409
+    _purge_expired_signups()
 
-    # Generate member ID
-    count = query("SELECT count(*) as c FROM users WHERE role='member'", one=True)
-    member_id = 'M-' + str(10000 + (count['c'] if count else 0) + 1).zfill(5)
+    if query("SELECT 1 FROM users WHERE LOWER(username)=%s", (username,), one=True):
+        return jsonify({'ok': False, 'error': 'That username is already taken. Please choose another.'}), 409
+
+    member_uid, err = _resolve_member_uid(identifier)
+    if err:
+        return jsonify({'ok': False, 'error': err}), 400
+    if _claim_conflict(member_uid):
+        return jsonify({'ok': False, 'error': 'An account already exists for this member. Please sign in or use "Forgot Password".'}), 409
+
+    code = str(random.randint(100000, 999999))
+    # One pending signup per username — a retry replaces the previous attempt.
+    execute("DELETE FROM pending_signups WHERE LOWER(username)=%s", (username,))
+    execute(
+        "INSERT INTO pending_signups (username,password,name,email,member_uid,code,expires_at) "
+        "VALUES (%s,%s,%s,%s,%s,%s, NOW() + INTERVAL '30 minutes')",
+        (username, password, name, email, member_uid, code)
+    )
+
+    if not _send_otp_email(email, code):
+        execute("DELETE FROM pending_signups WHERE LOWER(username)=%s", (username,))
+        audit('SIGNUP_EMAIL_FAILED', f"username={username} email={_mask_email(email)}")
+        return jsonify({'ok': False, 'error': 'We could not send the code to that email address. Please check it and try again.'}), 502
+
+    audit('SIGNUP_PENDING', f"username={username} email={_mask_email(email)} member_uid={member_uid}")
+    return jsonify({'ok': True, 'email': email}), 202
+
+
+@app.route('/api/auth/signup/verify', methods=['POST'])
+def signup_verify():
+    """Confirm the emailed code and only then create the real account."""
+    data     = request.json or {}
+    username = (data.get('username') or '').strip().lower()
+    code     = (data.get('code') or '').strip()
+
+    _purge_expired_signups()
+    pending = query(
+        "SELECT * FROM pending_signups WHERE LOWER(username)=%s AND expires_at > NOW() "
+        "ORDER BY created_at DESC LIMIT 1",
+        (username,), one=True
+    )
+    if not pending:
+        return jsonify({'ok': False, 'error': 'This signup has expired. Please start again.'}), 410
+    if code != pending['code']:
+        return jsonify({'ok': False, 'error': 'Invalid code. Please check your email and try again.'}), 401
+
+    # Re-check at commit time — someone may have taken these in the meantime.
+    if query("SELECT 1 FROM users WHERE LOWER(username)=%s", (username,), one=True):
+        return jsonify({'ok': False, 'error': 'That username was just taken. Please start again with a different one.'}), 409
+    if pending['member_uid'] and _claim_conflict(pending['member_uid']):
+        return jsonify({'ok': False, 'error': 'An account already exists for this member.'}), 409
 
     user = execute(
-        "INSERT INTO users (username,password,role,name,email,member_id) VALUES (%s,%s,'member',%s,%s,%s) RETURNING id,username,name,role,email,member_id",
-        (username, password, name, email, member_id),
+        "INSERT INTO users (username,password,role,name,email,member_id) VALUES (%s,%s,'member',%s,%s,%s) "
+        "RETURNING id,username,name,role,email,member_id",
+        (pending['username'], pending['password'], pending['name'], pending['email'], pending['member_uid']),
         returning=True
     )
-    audit('SIGNUP', f"new_user={username} email={email}")
-    return jsonify({'ok': True, 'user': user}), 201
+    execute("DELETE FROM pending_signups WHERE LOWER(username)=%s", (username,))
+
+    user_dict = dict(user)
+    user_dict['member_uid'] = _member_uid_for(user_dict)
+    audit('SIGNUP_VERIFIED', f"new_user={username} member_uid={pending['member_uid']}")
+    return jsonify({'ok': True, 'user': user_dict}), 201
+
+
+@app.route('/api/auth/signup/resend', methods=['POST'])
+def signup_resend():
+    """Resend the signup code, optionally to a corrected email address."""
+    data      = request.json or {}
+    username  = (data.get('username') or '').strip().lower()
+    new_email = (data.get('email') or '').strip().lower()
+
+    _purge_expired_signups()
+    pending = query(
+        "SELECT * FROM pending_signups WHERE LOWER(username)=%s AND expires_at > NOW() "
+        "ORDER BY created_at DESC LIMIT 1",
+        (username,), one=True
+    )
+    if not pending:
+        return jsonify({'ok': False, 'error': 'This signup has expired. Please start again.'}), 410
+
+    email = new_email or pending['email']
+    if not EMAIL_RE.match(email):
+        return jsonify({'ok': False, 'error': 'That email address does not look valid. Please check it.'}), 400
+
+    code = str(random.randint(100000, 999999))
+    execute(
+        "UPDATE pending_signups SET email=%s, code=%s, expires_at = NOW() + INTERVAL '30 minutes' WHERE id=%s",
+        (email, code, pending['id'])
+    )
+
+    if not _send_otp_email(email, code):
+        audit('SIGNUP_RESEND_FAILED', f"username={username} email={_mask_email(email)}")
+        return jsonify({'ok': False, 'error': 'We could not send the code to that email address. Please check it and try again.'}), 502
+
+    audit('SIGNUP_RESENT', f"username={username} email={_mask_email(email)}")
+    return jsonify({'ok': True, 'email': email})
+
+@app.route('/api/auth/claim-member', methods=['POST'])
+def claim_member():
+    """Let a signed-in member whose account predates the UID link claim their
+    record once, by UID or Branch ID. Never guesses."""
+    data       = request.json or {}
+    username   = (data.get('username') or '').strip().lower()
+    password   = data.get('password') or ''
+    identifier = (data.get('memberIdentifier') or '').strip()
+
+    user = query(
+        "SELECT id, username, name, role, email, member_id FROM users "
+        "WHERE LOWER(username)=%s AND password=%s AND role='member'",
+        (username, password), one=True
+    )
+    if not user:
+        return jsonify({'ok': False, 'error': 'Invalid credentials.'}), 401
+    if user['member_id']:
+        return jsonify({'ok': False, 'error': 'Your account is already linked to a member record.'}), 409
+
+    member_uid, err = _resolve_member_uid(identifier)
+    if err:
+        return jsonify({'ok': False, 'error': err}), 400
+    if _claim_conflict(member_uid):
+        audit('CLAIM_DENIED', f"username={username} uid={member_uid} reason=already_claimed")
+        return jsonify({'ok': False, 'error': 'That member record is already linked to another account. Please contact an administrator.'}), 409
+
+    execute("UPDATE users SET member_id=%s WHERE id=%s", (member_uid, user['id']))
+    audit('CLAIM_MEMBER', f"username={username} uid={member_uid}")
+
+    user_dict = dict(user)
+    user_dict['member_id']  = member_uid
+    user_dict['member_uid'] = member_uid
+    return jsonify({'ok': True, 'user': user_dict})
+
 
 @app.route('/api/auth/reset-password', methods=['POST'])
 def reset_password():
@@ -440,8 +606,8 @@ def reset_password():
         if not email:
             return jsonify({'ok': False, 'error': 'No email linked to this account.'}), 400
         token = query(
-            "SELECT id FROM otp_tokens WHERE email=%s AND code=%s AND used=FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
-            (email, code), one=True
+            "SELECT id FROM otp_tokens WHERE user_id=%s AND code=%s AND used=FALSE AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1",
+            (user['id'], code), one=True
         )
         if not token:
             return jsonify({'ok': False, 'error': 'Invalid or expired code.'}), 401
@@ -465,19 +631,20 @@ def forgot_send_otp():
     if not email:
         return jsonify({'ok': False, 'error': 'No email address linked to this account. Contact an administrator.'}), 400
 
-    execute("UPDATE otp_tokens SET used=TRUE WHERE email=%s AND used=FALSE", (email,))
+    execute("UPDATE otp_tokens SET used=TRUE WHERE user_id=%s AND used=FALSE", (user['id'],))
     code = str(random.randint(100000, 999999))
     execute(
-        "INSERT INTO otp_tokens (email, code, expires_at) VALUES (%s, %s, NOW() + INTERVAL '10 minutes')",
-        (email, code)
+        "INSERT INTO otp_tokens (user_id, email, code, expires_at) VALUES (%s, %s, %s, NOW() + INTERVAL '10 minutes')",
+        (user['id'], email, code)
     )
 
-    _send_otp_email(email, code)
+    if not _send_otp_email(email, code):
+        audit('FORGOT_OTP_FAILED', f"username={username}")
+        return jsonify({'ok': False, 'error': 'We could not send the code to your email. Please try again shortly.'}), 502
 
-    parts  = email.split('@')
-    masked = parts[0][:2] + '***@' + parts[1]
+    masked = _mask_email(email)
     audit('FORGOT_OTP_SENT', f"username={username} email={masked}")
-    return jsonify({'ok': True, 'maskedEmail': masked})
+    return jsonify({'ok': True, 'maskedEmail': masked, 'email': email})
 
 # ═══════════════════════════════════════════
 # ZONES API
@@ -601,35 +768,19 @@ def update_member(uid):
             return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
 
         caller_row = query(
-            "SELECT email, member_id FROM users WHERE username=%s AND role='member'",
+            "SELECT member_id FROM users WHERE username=%s AND role='member'",
             (caller_username,), one=True
         )
         if not caller_row:
             audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} reason=user_not_found")
             return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
 
-        # Resolve the caller's own member uid. Accept the direct member_id link
-        # (authoritative) OR the email match, using the SAME email1-then-email2
-        # order as login so the profile shown and the profile edited always agree.
-        target_uid = uid.strip()
-        allowed_uids = set()
-        if caller_row.get('member_id'):
-            allowed_uids.add(str(caller_row['member_id']).strip())
-        caller_email = (caller_row['email'] or '').strip().lower()
-        if caller_email:
-            md = query(
-                "SELECT uid FROM member_details WHERE LOWER(TRIM(email1))=%s",
-                (caller_email,), one=True
-            )
-            if not md:
-                md = query(
-                    "SELECT uid FROM member_details WHERE LOWER(TRIM(email2))=%s",
-                    (caller_email,), one=True
-                )
-            if md:
-                allowed_uids.add(md['uid'].strip())
-        if target_uid not in allowed_uids:
-            audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} allowed={sorted(allowed_uids)} reason=uid_mismatch")
+        caller_uid = (caller_row.get('member_id') or '').strip()
+        if not caller_uid:
+            audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} reason=account_not_linked")
+            return jsonify({'ok': False, 'error': 'Your account is not linked to a member record yet. Please contact an administrator.'}), 403
+        if caller_uid != uid.strip():
+            audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} caller_uid={caller_uid} reason=uid_mismatch")
             return jsonify({'ok': False, 'error': 'Unauthorized: you can only edit your own profile'}), 403
 
         # Fetch current values BEFORE the update so we can diff them.
@@ -2537,7 +2688,7 @@ if __name__ == '__main__':
     print("Setting up database...")
     conn = get_conn()
     cur = conn.cursor()
-    with open(os.path.join(os.path.dirname(__file__), 'schema.sql')) as f:
+    with open(os.path.join(os.path.dirname(__file__), 'schema.sql'), encoding='utf-8') as f:
         sql = f.read()
     # Run the whole script at once so dollar-quoted blocks (DO $$ ... $$) stay intact
     cur.execute(sql)
