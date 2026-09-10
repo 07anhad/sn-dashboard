@@ -109,7 +109,7 @@ function handleLogin(e) {
       // Show OTP step
       document.getElementById('loginForm').style.display = 'none';
       document.getElementById('otpForm').style.display   = 'block';
-      document.getElementById('otpMaskedEmail').textContent = data.maskedEmail;
+      document.getElementById('otpMaskedEmail').textContent = data.email || data.maskedEmail;
       document.getElementById('otpCode').value = '';
       document.getElementById('otpError').style.display = 'none';
       setTimeout(() => document.getElementById('otpCode').focus(), 100);
@@ -195,7 +195,7 @@ function handleResendOtp(e) {
   .then(r => r.json())
   .then(data => {
     if (data.ok) {
-      document.getElementById('otpMaskedEmail').textContent = data.maskedEmail;
+      document.getElementById('otpMaskedEmail').textContent = data.email || data.maskedEmail;
       err.style.cssText = 'display:block;background:rgba(34,197,94,0.15);color:#22c55e;border-color:rgba(34,197,94,0.3)';
       err.textContent = 'New code sent!';
       setTimeout(() => { err.style.display = 'none'; err.removeAttribute('style'); }, 3000);
@@ -293,6 +293,7 @@ function showSignup(e) {
   e.preventDefault();
   document.getElementById('loginForm').style.display  = 'none';
   document.getElementById('forgotForm').style.display = 'none';
+  document.getElementById('signupOtpForm').style.display = 'none';
   document.getElementById('signupForm').style.display = 'flex';
   document.getElementById('loginHint').style.display  = 'none';
   document.querySelector('.login-toggle').style.display = 'none';
@@ -303,6 +304,7 @@ function showForgotPassword(e) {
   _forgotUsername = null;
   document.getElementById('loginForm').style.display      = 'none';
   document.getElementById('signupForm').style.display     = 'none';
+  document.getElementById('signupOtpForm').style.display  = 'none';
   document.getElementById('forgotForm').style.display     = 'flex';
   document.getElementById('forgotOtpForm').style.display  = 'none';
   document.getElementById('otpForm').style.display        = 'none';
@@ -317,25 +319,32 @@ function showLoginForm(e) {
   e.preventDefault();
   _otpCredentials = null;
   _forgotUsername = null;
+  _pendingSignup  = null;
   document.getElementById('loginForm').style.display     = 'flex';
   document.getElementById('signupForm').style.display    = 'none';
+  document.getElementById('signupOtpForm').style.display = 'none';
   document.getElementById('forgotForm').style.display    = 'none';
   document.getElementById('forgotOtpForm').style.display = 'none';
   document.getElementById('otpForm').style.display       = 'none';
   const hint = document.getElementById('loginHint');
   if (hint) hint.style.display = 'none';
   document.querySelector('.login-toggle').style.display = 'flex';
-  ['signupError', 'signupSuccess', 'forgotError', 'forgotSuccess', 'forgotOtpError', 'loginError', 'otpError'].forEach(id => {
+  ['signupError', 'forgotError', 'forgotSuccess', 'forgotOtpError', 'loginError', 'otpError', 'signupOtpError'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
 }
 
 // ── Signup handler ────────────────────────
+// Nothing is stored until the emailed code is verified, so a mistyped address
+// leaves no orphan account and never occupies a username.
+let _pendingSignup = null;
+
 function handleSignup(e) {
   e.preventDefault();
   const name     = document.getElementById('signupName').value.trim();
   const username = document.getElementById('signupUsername').value.trim().toLowerCase();
+  const memberId = document.getElementById('signupMemberId').value.trim();
   const email    = document.getElementById('signupEmail').value.trim().toLowerCase();
   const pass     = document.getElementById('signupPass').value;
   const confirm  = document.getElementById('signupConfirm').value;
@@ -347,103 +356,148 @@ function handleSignup(e) {
   errEl.style.display  = 'none';
   succEl.style.display = 'none';
 
-  if (!name) {
-    errEl.textContent = 'Please enter your full name.';
+  const fail = (msg, focusId) => {
+    errEl.textContent = msg;
     errEl.style.display = 'block';
-    document.getElementById('signupName').focus();
-    return;
-  }
-  if (!username || !/^[a-z0-9._]+$/.test(username)) {
-    errEl.textContent = 'Username can only contain lowercase letters, numbers, dots and underscores.';
-    errEl.style.display = 'block';
-    document.getElementById('signupUsername').focus();
-    return;
-  }
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errEl.textContent = 'Please enter a valid email address.';
-    errEl.style.display = 'block';
-    document.getElementById('signupEmail').focus();
-    return;
-  }
-  if (pass.length < 6) {
-    errEl.textContent = 'Password must be at least 6 characters.';
-    errEl.style.display = 'block';
-    return;
-  }
-  if (pass !== confirm) {
-    errEl.textContent = 'Passwords do not match.';
-    errEl.style.display = 'block';
-    document.getElementById('signupConfirm').focus();
-    return;
-  }
-  if (!consent) {
-    errEl.textContent = 'You must give your data consent to create an account.';
-    errEl.style.display = 'block';
-    return;
-  }
+    if (focusId) document.getElementById(focusId)?.focus();
+  };
+
+  if (!name) return fail('Please enter your full name.', 'signupName');
+  if (!username || !/^[a-z0-9._]+$/.test(username))
+    return fail('Username can only contain lowercase letters, numbers, dots and underscores.', 'signupUsername');
+  if (!memberId) return fail('Please enter your UID or Branch ID.', 'signupMemberId');
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))
+    return fail('Please enter a valid email address.', 'signupEmail');
+  if (pass.length < 6) return fail('Password must be at least 6 characters.');
+  if (pass !== confirm) return fail('Passwords do not match.', 'signupConfirm');
+  if (!consent) return fail('You must give your data consent to create an account.');
 
   btn.disabled = true;
-  btn.querySelector('.btn-text').textContent = 'Creating account…';
+  btn.querySelector('.btn-text').textContent = 'Sending code…';
 
   fetch('/api/auth/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, username, email, password: pass })
+    body: JSON.stringify({ name, username, email, password: pass, memberIdentifier: memberId })
   })
   .then(r => r.json())
   .then(data => {
     btn.disabled = false;
     btn.querySelector('.btn-text').textContent = 'Create Account';
     if (data.ok) {
-      // Account created — now send OTP and go straight to verify step
-      btn.querySelector('.btn-text').textContent = 'Sending code…';
-      btn.disabled = true;
-      fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password: pass, role: 'member' })
-      })
-      .then(r => r.json())
-      .then(otpData => {
-        btn.disabled = false;
-        btn.querySelector('.btn-text').textContent = 'Create Account';
-        document.getElementById('signupForm').reset();
-        if (otpData.ok) {
-          _otpCredentials = { username, password: pass, role: 'member' };
-          document.getElementById('signupForm').style.display = 'none';
-          document.getElementById('otpForm').style.display    = 'block';
-          document.getElementById('otpMaskedEmail').textContent = otpData.maskedEmail;
-          document.getElementById('otpCode').value = '';
-          document.getElementById('otpError').style.display = 'none';
-          setTimeout(() => document.getElementById('otpCode').focus(), 100);
-        } else {
-          // Email failed — fall back to login form
-          succEl.innerHTML = '✓ Account created! Please sign in.';
-          succEl.style.display = 'block';
-          setTimeout(() => {
-            showLoginForm({ preventDefault: () => {} });
-            const loginIdEl = document.getElementById('loginId');
-            if (loginIdEl) { loginIdEl.value = username; document.getElementById('loginPass')?.focus(); }
-          }, 1800);
-        }
-      })
-      .catch(() => {
-        btn.disabled = false;
-        btn.querySelector('.btn-text').textContent = 'Create Account';
-        succEl.innerHTML = '✓ Account created! Please sign in.';
-        succEl.style.display = 'block';
-        setTimeout(() => showLoginForm({ preventDefault: () => {} }), 1800);
-      });
+      _pendingSignup = { username, email: data.email || email };
+      showSignupOtpStep(_pendingSignup.email);
     } else {
-      errEl.textContent = data.error || 'Signup failed. Please try again.';
-      errEl.style.display = 'block';
+      fail(data.error || 'Signup failed. Please try again.');
     }
   })
   .catch(() => {
     btn.disabled = false;
     btn.querySelector('.btn-text').textContent = 'Create Account';
-    errEl.textContent = 'Server error. Please try again later.';
-    errEl.style.display = 'block';
+    fail('Server error. Please try again later.');
+  });
+}
+
+function showSignupOtpStep(email) {
+  document.getElementById('signupForm').style.display    = 'none';
+  document.getElementById('signupOtpForm').style.display = 'block';
+  document.getElementById('signupOtpEmail').textContent  = email;
+  document.getElementById('signupOtpCode').value = '';
+  document.getElementById('signupOtpError').style.display = 'none';
+  setTimeout(() => document.getElementById('signupOtpCode').focus(), 100);
+}
+
+// Return to the signup form with every field still filled in, so only the
+// email needs correcting.
+function changeSignupEmail(e) {
+  e.preventDefault();
+  document.getElementById('signupOtpForm').style.display = 'none';
+  document.getElementById('signupForm').style.display    = 'flex';
+  const emailEl = document.getElementById('signupEmail');
+  emailEl.focus();
+  emailEl.select();
+}
+
+function handleVerifySignupOtp() {
+  const code = (document.getElementById('signupOtpCode').value || '').trim();
+  const btn  = document.getElementById('signupOtpBtn');
+  const err  = document.getElementById('signupOtpError');
+
+  if (code.length !== 6) {
+    err.textContent = 'Please enter the 6-digit code from your email.';
+    err.style.display = 'block';
+    return;
+  }
+  if (!_pendingSignup) { showLoginForm({ preventDefault: () => {} }); return; }
+
+  btn.disabled = true;
+  btn.querySelector('.btn-text').textContent = 'Verifying…';
+  err.style.display = 'none';
+
+  fetch('/api/auth/signup/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: _pendingSignup.username, code })
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Verify & Create Account';
+    if (data.ok) {
+      _pendingSignup = null;
+      document.getElementById('signupForm').reset();
+      // Verifying the code already proves the email — sign them straight in.
+      const userPayload = {
+        username:  data.user.username,
+        name:      data.user.name,
+        role:      data.user.role,
+        email:     data.user.email,
+        memberId:  data.user.member_id  || null,
+        memberUid: data.user.member_uid || null
+      };
+      sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
+      localStorage.setItem('currentUser',   JSON.stringify(userPayload));
+      window.location.replace('dashboard.html');
+    } else {
+      err.textContent = data.error || 'Invalid or expired code.';
+      err.style.display = 'block';
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.querySelector('.btn-text').textContent = 'Verify & Create Account';
+    err.textContent = 'Server error. Please try again.';
+    err.style.display = 'block';
+  });
+}
+
+function handleResendSignupOtp(e) {
+  e.preventDefault();
+  if (!_pendingSignup) { showLoginForm(e); return; }
+  const err = document.getElementById('signupOtpError');
+  err.style.display = 'none';
+  document.getElementById('signupOtpCode').value = '';
+
+  fetch('/api/auth/signup/resend', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: _pendingSignup.username, email: _pendingSignup.email })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      document.getElementById('signupOtpEmail').textContent = data.email || _pendingSignup.email;
+      err.style.cssText = 'display:block;background:rgba(34,197,94,0.15);color:#22c55e;border-color:rgba(34,197,94,0.3)';
+      err.textContent = 'New code sent!';
+      setTimeout(() => { err.style.display = 'none'; err.removeAttribute('style'); }, 3000);
+    } else {
+      err.textContent = data.error || 'Failed to resend. Please try changing your email.';
+      err.style.display = 'block';
+    }
+  })
+  .catch(() => {
+    err.textContent = 'Server error. Please try again.';
+    err.style.display = 'block';
   });
 }
 
@@ -476,7 +530,7 @@ function handleForgotStep1(e) {
       _forgotUsername = username;
       document.getElementById('forgotForm').style.display     = 'none';
       document.getElementById('forgotOtpForm').style.display  = 'block';
-      document.getElementById('forgotMaskedEmail').textContent = data.maskedEmail;
+      document.getElementById('forgotMaskedEmail').textContent = data.email || data.maskedEmail;
       document.getElementById('forgotOtpCode').value  = '';
       document.getElementById('forgotNewPass').value  = '';
       document.getElementById('forgotConfirm').value  = '';
@@ -559,7 +613,7 @@ function handleForgotResend(e) {
   .then(r => r.json())
   .then(data => {
     if (data.ok) {
-      document.getElementById('forgotMaskedEmail').textContent = data.maskedEmail;
+      document.getElementById('forgotMaskedEmail').textContent = data.email || data.maskedEmail;
       errEl.style.cssText = 'display:block;background:rgba(34,197,94,0.15);color:#22c55e;border-color:rgba(34,197,94,0.3)';
       errEl.textContent = 'New code sent!';
       setTimeout(() => { errEl.style.display = 'none'; errEl.removeAttribute('style'); }, 3000);
