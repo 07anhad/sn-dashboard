@@ -73,8 +73,8 @@
         <div style="text-align:center;margin-bottom:20px">
           <div style="font-size:2rem;margin-bottom:8px"></div>
           <div style="color:rgba(255,255,255,0.9);font-size:0.95rem;font-weight:600;margin-bottom:6px">Check your email</div>
-          <div style="color:rgba(255,255,255,0.55);font-size:0.82rem">A 6-digit code was sent to<br><span id="otpMaskedEmail" style="color:rgba(255,255,255,0.8);font-weight:600"></span></div>
-          <div style="color:rgba(255,255,255,0.45);font-size:0.75rem;line-height:1.5;margin-top:10px">The email comes from <span style="color:rgba(255,255,255,0.7);font-weight:600">soaminagarbranch@gmail.com</span>.<br>If you don't see it, please check your <span style="color:rgba(255,255,255,0.7);font-weight:600">Spam</span> folder.</div>
+          <div style="color:rgba(255,255,255,0.55);font-size:0.82rem">A 6-digit code was sent to<br><span id="otpMaskedEmail" style="color:rgba(255,255,255,0.8);font-weight:600;word-break:break-all"></span></div>
+          <div style="color:rgba(255,255,255,0.45);font-size:0.75rem;line-height:1.5;margin-top:10px">The email comes from <span style="color:rgba(255,255,255,0.7);font-weight:600">soaminagarbranch@gmail.com</span>.<br>If you don't see it, please check your <span style="color:rgba(255,255,255,0.7);font-weight:600">Spam</span> folder.<br>Not your email address? Please contact an administrator.</div>
         </div>
         <div class="form-group">
           <label for="otpCode">Enter 6-digit code</label>
@@ -114,6 +114,17 @@
             <input type="text" id="signupUsername" placeholder="e.g. anhad.parashar" required autocomplete="off" />
           </div>
         </div>
+        <div class="form-group">
+          <label for="signupMemberId">UID or Branch ID</label>
+          <div class="input-wrap">
+            <span class="input-icon">◎</span>
+            <input type="text" id="signupMemberId" placeholder="e.g. 1234 or ABC1234567890123" required autocomplete="off" />
+          </div>
+          <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-top:5px;line-height:1.5">
+            Links your account to your member record. Use your UID if your Branch ID is shared.
+          </div>
+        </div>
+
         <div class="form-group">
           <label for="signupEmail">Email</label>
           <div class="input-wrap">
@@ -156,7 +167,42 @@
         </div>
       </form>
 
-      <!-- FORGOT PASSWORD FORM (hidden by default) --> 
+      <!-- SIGNUP OTP STEP — shows the full typed email so typos are visible -->
+      <div class="login-form" id="signupOtpForm" style="display:none;">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="color:rgba(255,255,255,0.9);font-size:0.95rem;font-weight:600;margin-bottom:6px">Confirm your email</div>
+          <div style="color:rgba(255,255,255,0.55);font-size:0.82rem">We sent a 6-digit code to<br>
+            <span id="signupOtpEmail" style="color:rgba(255,255,255,0.85);font-weight:600;word-break:break-all"></span>
+          </div>
+          <div style="margin-top:8px">
+            <a href="#" onclick="changeSignupEmail(event)" style="color:var(--clr-saffron,#e8832a);font-size:0.8rem">Wrong email? Change it</a>
+          </div>
+          <div style="color:rgba(255,255,255,0.45);font-size:0.75rem;line-height:1.5;margin-top:10px">
+            Sent from <span style="color:rgba(255,255,255,0.7);font-weight:600">soaminagarbranch@gmail.com</span>.<br>
+            If you don't see it, check your <span style="color:rgba(255,255,255,0.7);font-weight:600">Spam</span> folder.
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="signupOtpCode">Enter 6-digit code</label>
+          <div class="input-wrap">
+            <span class="input-icon">◉</span>
+            <input type="text" id="signupOtpCode" placeholder="e.g. 483920" maxlength="6"
+                   inputmode="numeric" autocomplete="one-time-code"
+                   style="letter-spacing:8px;font-size:1.2rem;text-align:center"
+                   oninput="this.value=this.value.replace(/\D/g,'')" />
+          </div>
+        </div>
+        <div id="signupOtpError" class="login-error" style="display:none;"></div>
+        <button type="button" class="login-btn" id="signupOtpBtn" onclick="handleVerifySignupOtp()">
+          <span class="btn-text">Verify &amp; Create Account</span>
+          <span class="btn-arrow">→</span>
+        </button>
+        <div class="login-links" style="margin-top:16px">
+          <a href="#" onclick="handleResendSignupOtp(event)">Resend code</a>
+          <span class="link-sep">·</span>
+          <a href="#" onclick="showLoginForm(event)">Cancel</a>
+        </div>
+      </div>
       <form class="login-form" id="forgotForm" style="display:none;" onsubmit="handleForgotStep1(event)">
         <div class="form-group">
           <label for="forgotUsername">Username</label>
@@ -232,8 +278,10 @@
   <script src="/js/api.js"></script>
   <script src="/js/auth.js"></script>
   <script>
+    // PWA cache removed — unregister any old service worker and clear its caches
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(console.error);
+      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(()=>{});
+      if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(()=>{});
     }
   </script>
 </body>
