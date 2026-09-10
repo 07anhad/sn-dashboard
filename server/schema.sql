@@ -493,22 +493,39 @@ UPDATE users SET member_id = NULL
  WHERE member_id IS NOT NULL
    AND member_id NOT IN (SELECT uid FROM member_details);
 
--- Backfill only where the email identifies exactly ONE member. Ambiguous
--- accounts stay NULL and are claimed by UID/Branch ID at next login.
-UPDATE users u SET member_id = sub.uid
-  FROM (
-      SELECT LOWER(TRIM(usr.email)) AS email, MIN(md.uid) AS uid
-        FROM users usr
-        JOIN member_details md
-          ON LOWER(TRIM(md.email1)) = LOWER(TRIM(usr.email))
-          OR LOWER(TRIM(md.email2)) = LOWER(TRIM(usr.email))
-       WHERE usr.role = 'member' AND usr.member_id IS NULL
-       GROUP BY 1
-      HAVING COUNT(DISTINCT md.uid) = 1
-  ) sub
- WHERE u.role = 'member'
-   AND u.member_id IS NULL
-   AND LOWER(TRIM(u.email)) = sub.email;
+-- If several accounts already point at the same member, keep the oldest and
+-- unlink the rest, otherwise the UNIQUE constraint below cannot be created.
+UPDATE users SET member_id = NULL
+ WHERE id IN (
+     SELECT id FROM (
+         SELECT id, ROW_NUMBER() OVER (PARTITION BY member_id ORDER BY id) AS rn
+           FROM users WHERE member_id IS NOT NULL
+     ) dupes WHERE rn > 1
+ );
+
+-- Backfill only where the email identifies exactly ONE member AND exactly one
+-- account wants that member. Anything ambiguous stays NULL and is claimed by
+-- UID/Branch ID at next login.
+WITH candidate AS (
+    SELECT usr.id AS user_id, MIN(md.uid) AS uid
+      FROM users usr
+      JOIN member_details md
+        ON LOWER(TRIM(md.email1)) = LOWER(TRIM(usr.email))
+        OR LOWER(TRIM(md.email2)) = LOWER(TRIM(usr.email))
+     WHERE usr.role = 'member' AND usr.member_id IS NULL
+     GROUP BY usr.id
+    HAVING COUNT(DISTINCT md.uid) = 1
+),
+unclaimed AS (
+    SELECT uid, MIN(user_id) AS user_id
+      FROM candidate
+     WHERE uid NOT IN (SELECT member_id FROM users WHERE member_id IS NOT NULL)
+     GROUP BY uid
+    HAVING COUNT(*) = 1
+)
+UPDATE users u SET member_id = p.uid
+  FROM unclaimed p
+ WHERE u.id = p.user_id;
 
 -- One account per member, and uid changes cascade instead of orphaning.
 DO $$
