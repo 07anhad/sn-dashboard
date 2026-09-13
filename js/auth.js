@@ -55,48 +55,10 @@ function handleLogin(e) {
   const err  = document.getElementById('loginError');
 
   btn.disabled = true;
+  btn.querySelector('.btn-text').textContent = 'Signing in…';
 
-  // ── Admin: direct login, no OTP ──
-  if (currentRole === 'admin') {
-    btn.querySelector('.btn-text').textContent = 'Signing in…';
-    fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: id, password: pass, role: currentRole })
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.ok) {
-        const userPayload = {
-          username:  data.user.username,
-          name:      data.user.name,
-          role:      data.user.role,
-          email:     data.user.email,
-          memberId:  data.user.member_id  || null,
-          memberUid: data.user.member_uid || null
-        };
-        sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
-        localStorage.setItem('currentUser',   JSON.stringify(userPayload));
-        window.location.replace('dashboard.html');
-      } else {
-        err.textContent = 'Invalid admin credentials. Please try again.';
-        err.style.display = 'block';
-        btn.disabled = false;
-        btn.querySelector('.btn-text').textContent = 'Sign In';
-      }
-    })
-    .catch(() => {
-      err.textContent = 'Server error. Please try again later.';
-      err.style.display = 'block';
-      btn.disabled = false;
-      btn.querySelector('.btn-text').textContent = 'Sign In';
-    });
-    return;
-  }
-
-  // ── Member: OTP flow ──
-  btn.querySelector('.btn-text').textContent = 'Sending code…';
-  fetch('/api/auth/send-otp', {
+  // Direct login for both roles — email is verified once at signup, not per login.
+  fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: id, password: pass, role: currentRole })
@@ -104,25 +66,27 @@ function handleLogin(e) {
   .then(r => r.json())
   .then(data => {
     if (data.ok) {
-      // Store credentials temporarily for the verify step
-      _otpCredentials = { username: id, password: pass, role: currentRole };
-      // Show OTP step
-      document.getElementById('loginForm').style.display = 'none';
-      document.getElementById('otpForm').style.display   = 'block';
-      document.getElementById('otpMaskedEmail').textContent = data.email || data.maskedEmail;
-      document.getElementById('otpCode').value = '';
-      document.getElementById('otpError').style.display = 'none';
-      setTimeout(() => document.getElementById('otpCode').focus(), 100);
+      const userPayload = {
+        username:  data.user.username,
+        name:      data.user.name,
+        role:      data.user.role,
+        email:     data.user.email,
+        memberId:  data.user.member_id  || null,
+        memberUid: data.user.member_uid || null
+      };
+      sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
+      localStorage.setItem('currentUser',   JSON.stringify(userPayload));
+      window.location.replace('dashboard.html');
     } else {
       err.textContent = data.error || 'Invalid credentials. Please try again.';
       err.style.display = 'block';
+      btn.disabled = false;
+      btn.querySelector('.btn-text').textContent = 'Sign In';
     }
   })
   .catch(() => {
     err.textContent = 'Server error. Please try again later.';
     err.style.display = 'block';
-  })
-  .finally(() => {
     btn.disabled = false;
     btn.querySelector('.btn-text').textContent = 'Sign In';
   });
