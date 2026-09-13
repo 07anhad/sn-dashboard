@@ -149,6 +149,10 @@
       text-transform: uppercase; letter-spacing: .06em;
     }
     .req-star { color: #e8832a; }
+    .field-hint {
+      font-size: 0.68rem; color: #94a3b8; margin-top: 4px;
+      text-transform: none; letter-spacing: 0;
+    }
 
     .field input,
     .field select,
@@ -327,6 +331,7 @@
             <div class="field">
               <label>Date of Birth <span class="req-star">*</span></label>
               <input id="rf_dob" type="date" />
+              <div class="field-hint">Format: DD/MM/YYYY</div>
               <label class="na-toggle"><input type="checkbox" data-na="rf_dob" onchange="toggleNA(this)" /> N/A</label>
             </div>
             <div class="field">
@@ -381,8 +386,9 @@
             </div>
             <div class="field">
               <label>Mobile 1 <span class="req-star">*</span></label>
-              <input id="rf_mobile1" type="tel" placeholder="Primary mobile number" />
-              <label class="na-toggle"><input type="checkbox" data-na="rf_mobile1" onchange="toggleNA(this)" /> N/A</label>
+              <input id="rf_mobile1" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number"
+                     oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)" />
+              <div class="field-hint">Must be exactly 10 digits</div>
             </div>
             <div class="field">
               <label>Father Title <span class="req-star">*</span></label>
@@ -449,7 +455,19 @@
             </div>
             <div class="field">
               <label>Ashram</label>
-              <input id="rf_ashram" placeholder="e.g. Grihastha, Brahmacharya" />
+              <select id="rf_ashram">
+                <option value="">Select</option>
+                <option value="Y">Yes</option>
+                <option value="N">No</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>SN Extension</label>
+              <select id="rf_snExt">
+                <option value="">Select</option>
+                <option value="Y">Yes</option>
+                <option value="N">No</option>
+              </select>
             </div>
             <div class="field">
               <label>Previous Branch</label>
@@ -474,7 +492,8 @@
           <div class="grid-2">
             <div class="field">
               <label>Mobile 2</label>
-              <input id="rf_mobile2" type="tel" placeholder="Alternative number" />
+              <input id="rf_mobile2" type="tel" inputmode="numeric" maxlength="10" placeholder="Alternative number (10 digits)"
+                     oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)" />
             </div>
             <div class="field">
               <label>Landline</label>
@@ -899,6 +918,17 @@
       if (!name)       { showInlineErr('Full Name is required.'); scrollTo(0,0); return; }
       if (!memberType) { showInlineErr('Please select your Member Type.'); scrollTo(0,0); return; }
       if (!mobile1)    { showInlineErr('Mobile 1 is required.'); scrollTo(0,0); return; }
+      if (!/^\d{10}$/.test(mobile1)) {
+        showInlineErr('Mobile 1 must be exactly 10 digits.');
+        document.getElementById('rf_mobile1').focus();
+        scrollTo(0,0); return;
+      }
+      const mobile2val = g('rf_mobile2');
+      if (mobile2val && !/^\d{10}$/.test(mobile2val)) {
+        showInlineErr('Mobile 2 must be exactly 10 digits.');
+        document.getElementById('rf_mobile2').focus();
+        scrollTo(0,0); return;
+      }
 
       const btn = document.getElementById('regSubmitBtn');
       btn.disabled = true;
@@ -913,7 +943,7 @@
         dateOfFirstInitiation: g('rf_doi_first'),
         dateOfSecondInitiation: g('rf_doi_second'),
         caste: g('rf_caste'), nationality: g('rf_nationality'),
-        profession: g('rf_profession'), ashram: g('rf_ashram'),
+        profession: g('rf_profession'), ashram: g('rf_ashram'), snExt: g('rf_snExt'),
         mobile1, mobile2: g('rf_mobile2'), landline: g('rf_landline'),
         officePhone: g('rf_officePhone'), email1: g('rf_email1'), email2: g('rf_email2'),
         addressLine1: g('rf_addr1'), addressLine2: g('rf_addr2'), addressLine3: g('rf_addr3'),
