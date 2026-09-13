@@ -97,6 +97,7 @@ def send_email(to_addr, subject, html_body):
         return True
     except Exception as e:
         logging.getLogger('audit').warning(f"EMAIL_FAILED to={to_addr} err={e}")
+        logging.getLogger('errors').error(f"EMAIL_FAILED to={to_addr} subject={subject} {type(e).__name__}: {e}")
         print(f"[EMAIL ERROR] to={to_addr} {type(e).__name__}: {e}", flush=True)
         return False
 
@@ -131,6 +132,95 @@ def audit(action: str, detail: str = ''):
     if detail:
         msg += f" | detail={detail}"
     _audit_logger.info(msg)
+
+
+# ═══════════════════════════════════════════
+# Debug logging — logs/requests.log and logs/errors.log
+# Every API call and every unhandled exception, for diagnosing live issues.
+# ═══════════════════════════════════════════
+def _make_logger(name, filename, keep=30):
+    lg = logging.getLogger(name)
+    lg.setLevel(logging.INFO)
+    lg.propagate = False
+    h = _WinSafeRotatingHandler(
+        os.path.join(_LOG_DIR, filename), when='midnight', backupCount=keep, encoding='utf-8'
+    )
+    h.suffix = '%Y-%m-%d'
+    h.setFormatter(logging.Formatter('%(asctime)s | %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+    lg.addHandler(h)
+    return lg
+
+_req_logger = _make_logger('requests', 'requests.log', keep=14)
+_err_logger = _make_logger('errors',   'errors.log',   keep=90)
+
+# Request bodies are logged to help debugging; these keys must never appear.
+_SECRET_KEYS = {'password', 'newpassword', 'confirm', 'code', 'token', 'secret'}
+
+
+def _safe_body():
+    """Request JSON with secrets masked, truncated so logs stay readable."""
+    try:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return ''
+        clean = {k: ('***' if k.lower() in _SECRET_KEYS else v) for k, v in data.items()}
+        s = str(clean)
+        return s if len(s) <= 600 else s[:600] + '…'
+    except Exception:
+        return ''
+
+
+@app.before_request
+def _log_request_start():
+    request._t0 = _dt.datetime.now()
+
+
+@app.after_request
+def _log_request_end(response):
+    try:
+        if request.path.startswith('/api/'):
+            ms = int((_dt.datetime.now() - getattr(request, '_t0', _dt.datetime.now())).total_seconds() * 1000)
+            actor = request.headers.get('X-User', 'anonymous')
+            ip = request.headers.get('X-Forwarded-For', request.remote_addr or '-')
+            line = (f"{request.method} {request.full_path.rstrip('?')} -> {response.status_code} "
+                    f"| {ms}ms | actor={actor} | ip={ip}")
+            body = _safe_body() if request.method in ('POST', 'PUT', 'PATCH') else ''
+            if body:
+                line += f" | body={body}"
+            _req_logger.info(line)
+            # Surface failures in the error log too, so it alone tells the story.
+            if response.status_code >= 400:
+                _err_logger.info(line)
+    except Exception:
+        pass
+    return response
+
+
+@app.errorhandler(Exception)
+def _log_unhandled(e):
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        return e
+    import traceback
+    actor = request.headers.get('X-User', 'anonymous')
+    _err_logger.error(
+        f"UNHANDLED {request.method} {request.path} | actor={actor} | "
+        f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+    )
+    print(f"[ERROR] {request.method} {request.path} {type(e).__name__}: {e}", flush=True)
+    return jsonify({'ok': False, 'error': 'Server error. Please try again or contact the administrator.'}), 500
+
+
+def _log_startup():
+    """One-line record of how the server is configured — first thing to check when live behaviour is odd."""
+    from db import DB_CONFIG
+    _req_logger.info(
+        f"=== SERVER START === db={DB_CONFIG.get('user')}@{DB_CONFIG.get('host')}:"
+        f"{DB_CONFIG.get('port')}/{DB_CONFIG.get('dbname')} | "
+        f"gmail_configured={bool(GMAIL_PASSWORD)} | sender={GMAIL_USER} | python={sys.version.split()[0]}"
+    )
+
+_log_startup()
 
 # ═══════════════════════════════════════════
 # BSL (Branch Serial Number) Auto-Assignment
@@ -289,6 +379,24 @@ def _purge_expired_signups():
     execute("DELETE FROM pending_signups WHERE expires_at < NOW()")
 
 
+def _record_otp(email, code, purpose, user_id=None):
+    """Mirror a signup code into otp_tokens so every code issued is auditable.
+    Signup has no user row yet, so user_id is filled in on verification."""
+    execute(
+        "INSERT INTO otp_tokens (user_id, email, code, purpose, expires_at) "
+        "VALUES (%s, %s, %s, %s, NOW() + INTERVAL '30 minutes')",
+        (user_id, email, code, purpose)
+    )
+
+
+def _consume_otp(email, code, user_id):
+    execute(
+        "UPDATE otp_tokens SET used=TRUE, user_id=COALESCE(user_id, %s) "
+        "WHERE LOWER(email)=LOWER(%s) AND code=%s AND used=FALSE",
+        (user_id, email, code)
+    )
+
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.json or {}
@@ -383,7 +491,7 @@ def send_otp():
 
     code = str(random.randint(100000, 999999))
     execute(
-        "INSERT INTO otp_tokens (user_id, email, code, expires_at) VALUES (%s, %s, %s, NOW() + INTERVAL '10 minutes')",
+        "INSERT INTO otp_tokens (user_id, email, code, purpose, expires_at) VALUES (%s, %s, %s, 'login', NOW() + INTERVAL '10 minutes')",
         (user['id'], email, code)
     )
 
@@ -476,6 +584,7 @@ def signup():
         audit('SIGNUP_EMAIL_FAILED', f"username={username} email={_mask_email(email)}")
         return jsonify({'ok': False, 'error': 'We could not send the code to that email address. Please check it and try again.'}), 502
 
+    _record_otp(email, code, purpose='signup')
     audit('SIGNUP_PENDING', f"username={username} email={_mask_email(email)} member_uid={member_uid}")
     return jsonify({'ok': True, 'email': email}), 202
 
@@ -511,6 +620,7 @@ def signup_verify():
         returning=True
     )
     execute("DELETE FROM pending_signups WHERE LOWER(username)=%s", (username,))
+    _consume_otp(pending['email'], code, user['id'])
 
     user_dict = dict(user)
     user_dict['member_uid'] = _member_uid_for(user_dict)
@@ -548,6 +658,7 @@ def signup_resend():
         audit('SIGNUP_RESEND_FAILED', f"username={username} email={_mask_email(email)}")
         return jsonify({'ok': False, 'error': 'We could not send the code to that email address. Please check it and try again.'}), 502
 
+    _record_otp(email, code, purpose='signup-resend')
     audit('SIGNUP_RESENT', f"username={username} email={_mask_email(email)}")
     return jsonify({'ok': True, 'email': email})
 
@@ -634,7 +745,7 @@ def forgot_send_otp():
     execute("UPDATE otp_tokens SET used=TRUE WHERE user_id=%s AND used=FALSE", (user['id'],))
     code = str(random.randint(100000, 999999))
     execute(
-        "INSERT INTO otp_tokens (user_id, email, code, expires_at) VALUES (%s, %s, %s, NOW() + INTERVAL '10 minutes')",
+        "INSERT INTO otp_tokens (user_id, email, code, purpose, expires_at) VALUES (%s, %s, %s, 'forgot', NOW() + INTERVAL '10 minutes')",
         (user['id'], email, code)
     )
 
@@ -1159,7 +1270,7 @@ def submit_registration(code):
             reg_link_code, name, member_type, gender, marital_status, previous_branch,
             uid, date_of_initiation, date_of_registration_jigyasu,
             date_of_first_initiation, date_of_second_initiation,
-            date_of_birth, blood_group, caste, nationality, profession, ashram,
+            date_of_birth, blood_group, caste, nationality, profession, ashram, sn_ext,
             mobile1, mobile2, landline, office_phone, email1, email2,
             address_line1, address_line2, address_line3, city, pincode, state, country,
             qualification, occupation, designation, organization,
@@ -1177,7 +1288,7 @@ def submit_registration(code):
             ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
             notes, seva_interests
         ) VALUES (
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,
@@ -1194,7 +1305,7 @@ def submit_registration(code):
         code, name, n('memberType'), n('gender'), n('maritalStatus'), n('previousBranch'),
         n('uid'), n('dateOfInitiation'), n('dateOfRegistrationJigyasu'),
         n('dateOfFirstInitiation'), n('dateOfSecondInitiation'),
-        n('dateOfBirth'), n('bloodGroup'), n('caste'), n('nationality'), n('profession'), n('ashram'),
+        n('dateOfBirth'), n('bloodGroup'), n('caste'), n('nationality'), n('profession'), n('ashram'), n('snExt'),
         n('mobile1'), n('mobile2'), n('landline'), n('officePhone'), n('email1'), n('email2'),
         n('addressLine1'), n('addressLine2'), n('addressLine3'), n('city'), n('pincode'), n('state'), n('country'),
         n('qualification'), n('occupation'), n('designation'), n('organization'),
@@ -1282,7 +1393,7 @@ def approve_pending_member(id):
             INSERT INTO member_details (
                 uid, name, date_of_initiation, date_of_registration_jigyasu,
                 date_of_first_initiation, date_of_second_initiation,
-                date_of_birth, blood_group, caste, nationality, profession, ashram,
+                date_of_birth, blood_group, caste, nationality, profession, ashram, sn_ext,
                 mobile1, mobile2, landline, office_phone, email1, email2,
                 address_line1, address_line2, address_line3, city, pincode, state, country,
                 qualification, occupation, designation, organization,
@@ -1300,7 +1411,7 @@ def approve_pending_member(id):
                 ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
                 record_status, bsl, category, gender, marital_status, previous_branch
             ) VALUES (
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,
@@ -1316,7 +1427,7 @@ def approve_pending_member(id):
         """, (
             uid, row['name'], row.get('date_of_initiation'), row.get('date_of_registration_jigyasu'),
             row.get('date_of_first_initiation'), row.get('date_of_second_initiation'),
-            row['date_of_birth'], row['blood_group'], row['caste'], row['nationality'], row['profession'], row['ashram'],
+            row['date_of_birth'], row['blood_group'], row['caste'], row['nationality'], row['profession'], row['ashram'], row.get('sn_ext'),
             row['mobile1'], row['mobile2'], row['landline'], row['office_phone'], row['email1'], row['email2'],
             row['address_line1'], row['address_line2'], row['address_line3'], row['city'], row['pincode'], row['state'], row['country'],
             row['qualification'], row['occupation'], row['designation'], row['organization'],
