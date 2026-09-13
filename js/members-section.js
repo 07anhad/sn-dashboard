@@ -31,7 +31,7 @@ function setButtonLoading(btn, loading, loadingLabel) {
 function renderClaimMemberPrompt(container) {
   container.innerHTML = `
     <div style="max-width:460px;margin:48px auto;padding:28px;background:var(--bg-card);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.06)">
-      <div style="font-weight:700;font-size:1.05rem;margin-bottom:8px">Link your member record</div>
+      <div style="font-weight:700;font-size:1.05rem;margin-bottom:8px">Deactivateber record</div>
       <div style="color:var(--txt-muted);font-size:0.9rem;line-height:1.6;margin-bottom:18px">
         Your account isn't linked to a member record yet. Enter your UID or Branch ID to connect it — you only need to do this once.
       </div>
@@ -1474,6 +1474,15 @@ function editMember(uid, isSelfEdit = false) {
   const fld = (id, label, val, type='text', readonly=false) =>
     `<div class="form-field"><label>${label}</label><input id="${id}" type="${type}" value="${ea(type==='date' ? dt(val) : val)}" ${readonly ? 'readonly style="opacity:0.5;cursor:not-allowed"' : ''}/></div>`;
 
+  // Stored as Y/N, shown as Yes/No.
+  const ynSel = (id, label, val) => {
+    const v = String(val ?? '').trim().toUpperCase();
+    const opts = [['', '—'], ['Y', 'Yes'], ['N', 'No']];
+    return `<div class="form-field"><label>${label}</label><select id="${id}">${
+      opts.map(([o, t]) => `<option value="${o}" ${v === o ? 'selected' : ''}>${t}</option>`).join('')
+    }</select></div>`;
+  };
+
   const sel = (id, label, val, opts) =>
     `<div class="form-field"><label>${label}</label><select id="${id}">${opts.map(o=>`<option value="${ea(o)}" ${String(val)===String(o)?'selected':''}>${o||'—'}</option>`).join('')}</select></div>`;
 
@@ -1536,7 +1545,7 @@ function editMember(uid, isSelfEdit = false) {
         ${selNA('em_category',  'Category',                  m.category, ['','Initiated','Jigyasu','Superhumane'])}
         ${selNA('em_gender',    'Gender',                    m.gender, ['','Male','Female','Other'])}
         <input id="em_doi" type="hidden" value="${m.dateOfInitiation || ''}" />
-        ${fldNA('em_dob',       'Date of Birth',             m.dateOfBirth,            'date')}
+        ${fldNA('em_dob',       'Date of Birth (DD/MM/YYYY)', m.dateOfBirth,           'date')}
         ${fldNA('em_doi1',      'Date of First Initiation',  m.dateOfFirstInitiation,  'date')}
         ${fldNA('em_caste',     'Caste',                     m.caste)}
         ${fldNA('em_nationality','Nationality',              m.nationality)}
@@ -1547,7 +1556,7 @@ function editMember(uid, isSelfEdit = false) {
         ${fldNA('em_pincode',   'Pincode',                   m.pincode)}
         ${fldNA('em_state',     'State',                     m.state)}
         ${fldNA('em_country',   'Country',                   m.country)}
-        ${fldNA('em_mobile',    'Mobile 1',                  m.mobile)}
+        ${fldNA('em_mobile',    'Mobile 1 (10 digits)',      m.mobile)}
         ${selNA('em_fTitle',    'Father Title',              m.fatherTitle, ['','Sh.','Dr.','Er.','Prof.','PB.'])}
         ${fldNA('em_fFirst',    'Father Name',               m.fatherFirstName)}
         ${fldNA('em_neeFirst',  'Nee (Name)',                m.neeFirst)}
@@ -1562,8 +1571,8 @@ function editMember(uid, isSelfEdit = false) {
         ${fld('em_doi2',        'Date of 2nd Init.',      m.dateOfSecondInitiation,  'date')}
         ${sel('em_marital',     'Marital Status',         m.maritalStatus, ['','Single','Married','Widowed','Divorced'])}
         ${fld('em_prevBranch',  'Previous Branch',        m.previousBranch)}
-        ${fld('em_ashram',      'Ashram',                 m.ashram)}
-        ${fld('em_snext',       'SN/EXT',                 m.snExt)}
+        ${ynSel('em_ashram',    'Ashram (Yes/No)',        m.ashram)}
+        ${ynSel('em_snext',     'SN Extension (Yes/No)',  m.snExt)}
         ${fld('em_branch',      'Branch ID Card',         m.branchIdCard)}
         ${sel('em_status',      'Record Status',          m.status, ['Activated','Deactivated'])}
       </div>
@@ -1718,6 +1727,24 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
   const name = document.getElementById('em_name')?.value.trim();
   if (!name) { showToast('Name is required!', 'error'); return; }
   const g = id => document.getElementById(id)?.value ?? '';
+
+  const mobile1 = g('em_mobile').trim();
+  if (!mobile1 || mobile1.toUpperCase() === 'N/A') {
+    showToast('Mobile 1 is required.', 'error');
+    document.getElementById('em_mobile')?.focus();
+    return;
+  }
+  if (!/^\d{10}$/.test(mobile1)) {
+    showToast('Mobile 1 must be exactly 10 digits.', 'error');
+    document.getElementById('em_mobile')?.focus();
+    return;
+  }
+  const mobile2 = g('em_mobile2').trim();
+  if (mobile2 && !/^\d{10}$/.test(mobile2)) {
+    showToast('Mobile 2 must be exactly 10 digits.', 'error');
+    document.getElementById('em_mobile2')?.focus();
+    return;
+  }
 
   const btn = document.getElementById('editMemberSaveBtn');
   setButtonLoading(btn, true, 'Saving…');
