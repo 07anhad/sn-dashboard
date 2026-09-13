@@ -177,6 +177,7 @@ CREATE TABLE IF NOT EXISTS pending_members (
 
 -- Migrate: add new columns to pending_members if upgrading from an older schema
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS uid                          VARCHAR(50);
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS sn_ext                       VARCHAR(50);
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_initiation          DATE;
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_registration_jigyasu DATE;
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_first_initiation    DATE;
@@ -453,6 +454,9 @@ CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_tokens (email);
 -- is ambiguous — without this, one relative's login invalidates another's code.
 ALTER TABLE otp_tokens ADD COLUMN IF NOT EXISTS user_id INTEGER;
 CREATE INDEX IF NOT EXISTS idx_otp_user ON otp_tokens (user_id);
+
+-- Why the code was issued: 'login' | 'signup' | 'signup-resend' | 'forgot'
+ALTER TABLE otp_tokens ADD COLUMN IF NOT EXISTS purpose VARCHAR(20) DEFAULT 'login';
 
 -- Signups awaiting email verification. Nothing is written to `users` until the
 -- code is confirmed, so a mistyped email leaves no orphan row and never
