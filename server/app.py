@@ -1,7 +1,7 @@
 """
 app.py — Flask server: serves static frontend + REST API
 """
-import os, sys, logging, shutil, smtplib, re, random
+import os, sys, logging, shutil, smtplib, re, random, json
 import datetime as _dt
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -341,6 +341,41 @@ def _member_uid_for(user):
     return (user.get('member_id') or None)
 
 
+# ── Designated admins (server/admins.json) ──────────────────────────────────
+_ADMIN_LIST_PATH = os.path.join(os.path.dirname(__file__), 'admins.json')
+
+
+def _load_admin_list():
+    """Read the admin allowlist fresh each call so edits apply without a restart."""
+    try:
+        with open(_ADMIN_LIST_PATH, encoding='utf-8') as f:
+            return json.load(f).get('admins', []) or []
+    except FileNotFoundError:
+        return []
+    except Exception as e:
+        logging.getLogger('errors').error(f"admins.json load failed: {type(e).__name__}: {e}")
+        return []
+
+
+def _designated_admin(username, name=None):
+    """Return the admins.json entry for this member, or None. Matches by login
+    username (Branch ID) first, then by full name."""
+    uname = (username or '').strip().lower()
+    nm    = (name or '').strip().lower()
+    for a in _load_admin_list():
+        if uname and str(a.get('username', '')).strip().lower() == uname:
+            return a
+        if nm and str(a.get('name', '')).strip().lower() == nm:
+            return a
+    return None
+
+
+def _caller_username():
+    """Login username parsed from the X-User header ('username(role)')."""
+    h = request.headers.get('X-User', '')
+    return h.split('(')[0].strip() if '(' in h else h.strip()
+
+
 def _mask_email(email):
     email = (email or '').strip()
     if '@' not in email:
@@ -420,6 +455,13 @@ def login():
     if user:
         user_dict = dict(user)
         user_dict['member_uid'] = _member_uid_for(user_dict)
+        # A member listed in admins.json is elevated to admin for this session.
+        if user_dict['role'] == 'member':
+            da = _designated_admin(user_dict['username'], user_dict['name'])
+            if da:
+                user_dict['role'] = 'admin'
+                user_dict['is_designated_admin'] = True
+                audit('DESIGNATED_ADMIN_LOGIN', f"username={username} name={user_dict['name']}")
         audit('LOGIN_SUCCESS', f"username={username} role={user_dict['role']} member_uid={user_dict.get('member_uid')}")
         return jsonify({'ok': True, 'user': user_dict})
     audit('LOGIN_FAILED', f"username={username} attempted_role={role}")
@@ -838,6 +880,16 @@ def get_member_edit_log():
     )
     return jsonify([{**dict(r), 'edited_at': str(r['edited_at'])} for r in rows])
 
+@app.route('/api/members/admin-edit-log')
+def get_admin_edit_log():
+    limit = min(int(request.args.get('limit', 300)), 1000)
+    rows  = query(
+        "SELECT id, member_uid, member_name, admin_username, admin_name, fields_changed, edited_at "
+        "FROM admin_edit_log ORDER BY edited_at DESC LIMIT %s",
+        (limit,)
+    )
+    return jsonify([{**dict(r), 'edited_at': str(r['edited_at'])} for r in rows])
+
 @app.route('/api/members', methods=['POST'])
 def add_member():
     import psycopg2
@@ -861,6 +913,76 @@ def add_member():
         return jsonify({'ok': False, 'error': f"A member with UID '{uid}' already exists."}), 409
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+# (payload key, db column, kind). kind 'date' → blank becomes NULL.
+MEMBER_COLUMN_MAP = [
+    ('name','name','text'), ('bslno','bsl','text'), ('category','category','text'),
+    ('gender','gender','text'), ('maritalStatus','marital_status','text'),
+    ('previousBranch','previous_branch','text'), ('status','record_status','text'),
+    ('dateOfInitiation','date_of_initiation','date'), ('dateOfBirth','date_of_birth','date'),
+    ('dateOfRegistration','date_of_registration_jigyasu','date'),
+    ('dateOfFirstInitiation','date_of_first_initiation','date'),
+    ('dateOfSecondInitiation','date_of_second_initiation','date'),
+    ('bloodGroup','blood_group','text'), ('caste','caste','text'), ('nationality','nationality','text'),
+    ('ashram','ashram','text'), ('snExt','sn_ext','text'), ('branchIdCard','branch_id_card_received','text'),
+    ('mobile','mobile1','text'), ('mobile2','mobile2','text'), ('landline','landline','text'),
+    ('officePhone','office_phone','text'), ('email','email1','text'), ('email2','email2','text'),
+    ('addressLine1','address_line1','text'), ('addressLine2','address_line2','text'),
+    ('addressLine3','address_line3','text'), ('city','city','text'), ('pincode','pincode','text'),
+    ('state','state','text'), ('country','country','text'), ('qualification','qualification','text'),
+    ('occupation','occupation','text'), ('designation','designation','text'),
+    ('organization','organization','text'), ('profession','profession','text'),
+    ('professionCode','profession_code','text'), ('commGridCode','communication_grid_code','text'),
+    ('mahila','mahila_association_member','text'), ('youth','youth_member','text'),
+    ('assocYouth','associate_youth_member','text'), ('jrPreInit','junior_pre_initiate_member','text'),
+    ('srPreInit','senior_pre_initiate_member','text'), ('crc','crc_member','text'),
+    ('cca','cca_member','text'), ('santSu','sant_su_member','text'),
+    ('neeFirst','nee_first_name','text'), ('neeMiddle','nee_middle_name','text'), ('neeLast','nee_last_name','text'),
+    ('fatherTitle','father_title','text'), ('fatherFirstName','father_first_name','text'),
+    ('fatherMiddleName','father_middle_name','text'), ('fatherLastName','father_last_name','text'),
+    ('fatherBranch','father_branch','text'), ('fatherBslno','father_bslno','text'),
+    ('fatherUid','father_uid','text'), ('fatherDoi','father_doi','date'), ('fatherPhone','father_phone','text'),
+    ('fatherCity','father_city','text'), ('fatherState','father_state','text'), ('fatherCountry','father_country','text'),
+    ('motherTitle','mother_title','text'), ('motherFirstName','mother_first_name','text'),
+    ('motherMiddleName','mother_middle_name','text'), ('motherLastName','mother_last_name','text'),
+    ('motherBranch','mother_branch','text'), ('motherBslno','mother_bslno','text'),
+    ('motherUid','mother_uid','text'), ('motherDoi','mother_doi','date'), ('motherPhone','mother_phone','text'),
+    ('motherCity','mother_city','text'), ('motherState','mother_state','text'), ('motherCountry','mother_country','text'),
+    ('spouseTitle','spouse_title','text'), ('spouseFirstName','spouse_first_name','text'),
+    ('spouseMiddleName','spouse_middle_name','text'), ('spouseLastName','spouse_last_name','text'),
+    ('spouseBranch','spouse_branch','text'), ('spouseBslno','spouse_bslno','text'),
+    ('spouseUid','spouse_uid','text'), ('spouseDoi','spouse_doi','date'), ('spousePhone','spouse_phone','text'),
+    ('spouseCity','spouse_city','text'), ('spouseState','spouse_state','text'), ('spouseCountry','spouse_country','text'),
+    ('ref1Name','ref1_name','text'), ('ref1Address','ref1_address','text'), ('ref1Email','ref1_email','text'),
+    ('ref1Phone','ref1_phone','text'), ('ref1Branch','ref1_branch','text'), ('ref1Relation','ref1_relation','text'),
+    ('ref2Name','ref2_name','text'), ('ref2Address','ref2_address','text'), ('ref2Email','ref2_email','text'),
+    ('ref2Phone','ref2_phone','text'), ('ref2Branch','ref2_branch','text'), ('ref2Relation','ref2_relation','text'),
+    ('dorYouth','dor_youth','date'), ('dateOfInitiationNew','date_of_initiation_new','date'),
+    ('dateTransferIn','date_transfer_in','date'), ('transferFromBranch','transfer_from_branch','text'),
+    ('dateTransferOut','date_transfer_out','date'), ('transferToBranch','transfer_to_branch','text'),
+    ('dateOfExpire','date_of_expire','date'),
+]
+
+
+def _apply_member_update(uid, d):
+    """Partial update: only columns whose payload key is PRESENT are written.
+    Fields the frontend omits (hidden/removed) are left untouched in the DB."""
+    sets, vals = [], []
+    for pk, col, kind in MEMBER_COLUMN_MAP:
+        if pk not in d:
+            continue
+        v = d.get(pk)
+        if kind == 'date':
+            v = v or None
+        elif col in MANDATORY_NA_COLUMNS:
+            v = (str(v).strip() or 'N/A') if v is not None else 'N/A'
+        sets.append(f"{col}=%s")
+        vals.append(v)
+    if not sets:
+        return
+    vals.append(uid)
+    execute(f"UPDATE member_details SET {', '.join(sets)} WHERE uid=%s", tuple(vals))
+
 
 @app.route('/api/members/<uid>', methods=['PUT'])
 @app.route('/api/members/<uid>/self', methods=['PUT'])
@@ -1001,86 +1123,8 @@ def update_member(uid):
         ]
         current = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
 
-        # Member self-edit: all fields including bsl and status
-        or_none = lambda k: d.get(k) or None
-        # Mandatory Form A text columns: blank/None → 'N/A' (enforced NOT NULL in schema)
-        na = lambda k: (str(d.get(k)).strip() or 'N/A') if d.get(k) is not None else 'N/A'
-        execute("""
-            UPDATE member_details SET
-              name=%s, bsl=%s, record_status=%s,
-              date_of_initiation=%s, date_of_birth=%s,
-              date_of_registration_jigyasu=%s,
-              date_of_first_initiation=%s, date_of_second_initiation=%s,
-              blood_group=%s, caste=%s, nationality=%s,
-              ashram=%s, sn_ext=%s, branch_id_card_received=%s,
-              mobile1=%s, mobile2=%s, landline=%s, office_phone=%s,
-              email1=%s, email2=%s,
-              address_line1=%s, address_line2=%s, address_line3=%s,
-              city=%s, pincode=%s, state=%s, country=%s,
-              qualification=%s, occupation=%s, designation=%s,
-              organization=%s, profession=%s,
-              profession_code=%s, communication_grid_code=%s,
-              mahila_association_member=%s, youth_member=%s, associate_youth_member=%s,
-              junior_pre_initiate_member=%s, senior_pre_initiate_member=%s,
-              crc_member=%s, cca_member=%s, sant_su_member=%s,
-              nee_first_name=%s, nee_middle_name=%s, nee_last_name=%s,
-              father_title=%s, father_first_name=%s, father_middle_name=%s, father_last_name=%s,
-              father_branch=%s, father_bslno=%s, father_uid=%s, father_doi=%s,
-              father_phone=%s, father_city=%s, father_state=%s,
-              mother_title=%s, mother_first_name=%s, mother_middle_name=%s, mother_last_name=%s,
-              mother_branch=%s, mother_bslno=%s, mother_uid=%s, mother_doi=%s,
-              mother_phone=%s, mother_city=%s, mother_state=%s,
-              spouse_title=%s, spouse_first_name=%s, spouse_middle_name=%s, spouse_last_name=%s,
-              spouse_branch=%s, spouse_bslno=%s, spouse_uid=%s, spouse_doi=%s,
-              spouse_phone=%s, spouse_city=%s, spouse_state=%s,
-              ref1_name=%s, ref1_address=%s, ref1_email=%s, ref1_phone=%s,
-              ref1_branch=%s, ref1_relation=%s,
-              ref2_name=%s, ref2_address=%s, ref2_email=%s, ref2_phone=%s,
-              ref2_branch=%s, ref2_relation=%s,
-              dor_youth=%s, date_of_initiation_new=%s,
-              date_transfer_in=%s, transfer_from_branch=%s,
-              date_transfer_out=%s, transfer_to_branch=%s,
-              date_of_expire=%s,
-              category=%s, gender=%s, marital_status=%s, previous_branch=%s
-            WHERE uid=%s
-        """, (
-            na('name'),               d.get('bslno'),         d.get('status', 'Activated'),
-            or_none('dateOfInitiation'),      or_none('dateOfBirth'),
-            or_none('dateOfRegistration'),
-            or_none('dateOfFirstInitiation'), or_none('dateOfSecondInitiation'),
-            d.get('bloodGroup'),  na('caste'),           na('nationality'),
-            d.get('ashram'),      d.get('snExt'),         d.get('branchIdCard'),
-            na('mobile'),         d.get('mobile2'),       d.get('landline'),    d.get('officePhone'),
-            d.get('email'),       d.get('email2'),
-            na('addressLine1'),   d.get('addressLine2'),  d.get('addressLine3'),
-            na('city'),           na('pincode'),          na('state'),          na('country'),
-            na('qualification'),  na('occupation'),       d.get('designation'),
-            d.get('organization'),d.get('profession'),
-            d.get('professionCode'),d.get('commGridCode'),
-            d.get('mahila'),      d.get('youth'),         d.get('assocYouth'),
-            d.get('jrPreInit'),   d.get('srPreInit'),
-            d.get('crc'),         d.get('cca'),           d.get('santSu'),
-            na('neeFirst'),       d.get('neeMiddle'),     d.get('neeLast'),
-            na('fatherTitle'),    na('fatherFirstName'),  d.get('fatherMiddleName'),d.get('fatherLastName'),
-            d.get('fatherBranch'),d.get('fatherBslno'),  d.get('fatherUid'),   or_none('fatherDoi'),
-            d.get('fatherPhone'), d.get('fatherCity'),   d.get('fatherState'),
-            d.get('motherTitle'), d.get('motherFirstName'),d.get('motherMiddleName'),d.get('motherLastName'),
-            d.get('motherBranch'),d.get('motherBslno'),  d.get('motherUid'),   or_none('motherDoi'),
-            d.get('motherPhone'), d.get('motherCity'),   d.get('motherState'),
-            d.get('spouseTitle'), d.get('spouseFirstName'),d.get('spouseMiddleName'),d.get('spouseLastName'),
-            d.get('spouseBranch'),d.get('spouseBslno'),  d.get('spouseUid'),   or_none('spouseDoi'),
-            d.get('spousePhone'), d.get('spouseCity'),   d.get('spouseState'),
-            d.get('ref1Name'),    d.get('ref1Address'),  d.get('ref1Email'),   d.get('ref1Phone'),
-            d.get('ref1Branch'),  d.get('ref1Relation'),
-            d.get('ref2Name'),    d.get('ref2Address'),  d.get('ref2Email'),   d.get('ref2Phone'),
-            d.get('ref2Branch'),  d.get('ref2Relation'),
-            or_none('dorYouth'),          or_none('dateOfInitiationNew'),
-            or_none('dateTransferIn'),    d.get('transferFromBranch'),
-            or_none('dateTransferOut'),   d.get('transferToBranch'),
-            or_none('dateOfExpire'),
-            na('category'),  na('gender'),  d.get('maritalStatus'),  d.get('previousBranch'),
-            uid
-        ))
+        _apply_member_update(uid, d)
+        after = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
         audit('SELF_EDIT_MEMBER', f"uid={uid}")
 
         # Compare against pre-update snapshot
@@ -1089,11 +1133,11 @@ def update_member(uid):
             return s.split('T')[0] if 'T' in s else s
         changed = [
             label for pk, col, label in field_defs
-            if _norm(d.get(pk)) != _norm(current.get(col))
+            if _norm(current.get(col)) != _norm(after.get(col))
         ]
         execute(
             "INSERT INTO member_edit_log (member_uid, member_name, edited_by, fields_changed) VALUES (%s,%s,%s,%s)",
-            (uid, d.get('name') or current.get('name'), caller_username, ', '.join(changed) if changed else 'no changes')
+            (uid, after.get('name'), caller_username, ', '.join(changed) if changed else 'no changes')
         )
         return jsonify({'ok': True})
 
@@ -1107,85 +1151,27 @@ def update_member(uid):
         audit('UPDATE_MEMBER_STATUS', f"uid={uid} status={d.get('status','Activated')}")
         return jsonify({'ok': True})
 
-    # Full field update
-    or_none = lambda k: d.get(k) or None
-    execute("""
-        UPDATE member_details SET
-          name=%s, bsl=%s,
-          date_of_initiation=%s, date_of_birth=%s,
-          date_of_registration_jigyasu=%s,
-          date_of_first_initiation=%s, date_of_second_initiation=%s,
-          blood_group=%s, caste=%s, nationality=%s,
-          ashram=%s, sn_ext=%s, branch_id_card_received=%s,
-          record_status=%s,
-          mobile1=%s, mobile2=%s, landline=%s, office_phone=%s,
-          email1=%s, email2=%s,
-          address_line1=%s, address_line2=%s, address_line3=%s,
-          city=%s, pincode=%s, state=%s, country=%s,
-          qualification=%s, occupation=%s, designation=%s,
-          organization=%s, profession=%s,
-          profession_code=%s, communication_grid_code=%s,
-          mahila_association_member=%s, youth_member=%s, associate_youth_member=%s,
-          junior_pre_initiate_member=%s, senior_pre_initiate_member=%s,
-          crc_member=%s, cca_member=%s, sant_su_member=%s,
-          nee_first_name=%s, nee_middle_name=%s, nee_last_name=%s,
-          father_title=%s, father_first_name=%s, father_middle_name=%s, father_last_name=%s,
-          father_branch=%s, father_bslno=%s, father_uid=%s, father_doi=%s,
-          father_phone=%s, father_city=%s, father_state=%s,
-          mother_title=%s, mother_first_name=%s, mother_middle_name=%s, mother_last_name=%s,
-          mother_branch=%s, mother_bslno=%s, mother_uid=%s, mother_doi=%s,
-          mother_phone=%s, mother_city=%s, mother_state=%s,
-          spouse_title=%s, spouse_first_name=%s, spouse_middle_name=%s, spouse_last_name=%s,
-          spouse_branch=%s, spouse_bslno=%s, spouse_uid=%s, spouse_doi=%s,
-          spouse_phone=%s, spouse_city=%s, spouse_state=%s,
-          ref1_name=%s, ref1_address=%s, ref1_email=%s, ref1_phone=%s,
-          ref1_branch=%s, ref1_relation=%s,
-          ref2_name=%s, ref2_address=%s, ref2_email=%s, ref2_phone=%s,
-          ref2_branch=%s, ref2_relation=%s,
-          dor_youth=%s, date_of_initiation_new=%s,
-          date_transfer_in=%s, transfer_from_branch=%s,
-          date_transfer_out=%s, transfer_to_branch=%s,
-          date_of_expire=%s
-        WHERE uid=%s
-    """, (
-        d.get('name'),              d.get('bslno'),
-        or_none('dateOfInitiation'),or_none('dateOfBirth'),
-        or_none('dateOfRegistration'),
-        or_none('dateOfFirstInitiation'), or_none('dateOfSecondInitiation'),
-        d.get('bloodGroup'),        d.get('caste'),         d.get('nationality'),
-        d.get('ashram'),            d.get('snExt'),         d.get('branchIdCard'),
-        d.get('status', 'Activated'),
-        d.get('mobile'),            d.get('mobile2'),       d.get('landline'),      d.get('officePhone'),
-        d.get('email'),             d.get('email2'),
-        d.get('addressLine1'),      d.get('addressLine2'),  d.get('addressLine3'),
-        d.get('city'),              d.get('pincode'),       d.get('state'),         d.get('country'),
-        d.get('qualification'),     d.get('occupation'),    d.get('designation'),
-        d.get('organization'),      d.get('profession'),
-        d.get('professionCode'),    d.get('commGridCode'),
-        d.get('mahila'),            d.get('youth'),         d.get('assocYouth'),
-        d.get('jrPreInit'),         d.get('srPreInit'),
-        d.get('crc'),               d.get('cca'),           d.get('santSu'),
-        d.get('neeFirst'),          d.get('neeMiddle'),     d.get('neeLast'),
-        d.get('fatherTitle'),       d.get('fatherFirstName'), d.get('fatherMiddleName'), d.get('fatherLastName'),
-        d.get('fatherBranch'),      d.get('fatherBslno'),   d.get('fatherUid'),     or_none('fatherDoi'),
-        d.get('fatherPhone'),       d.get('fatherCity'),    d.get('fatherState'),
-        d.get('motherTitle'),       d.get('motherFirstName'), d.get('motherMiddleName'), d.get('motherLastName'),
-        d.get('motherBranch'),      d.get('motherBslno'),   d.get('motherUid'),     or_none('motherDoi'),
-        d.get('motherPhone'),       d.get('motherCity'),    d.get('motherState'),
-        d.get('spouseTitle'),       d.get('spouseFirstName'), d.get('spouseMiddleName'), d.get('spouseLastName'),
-        d.get('spouseBranch'),      d.get('spouseBslno'),   d.get('spouseUid'),     or_none('spouseDoi'),
-        d.get('spousePhone'),       d.get('spouseCity'),    d.get('spouseState'),
-        d.get('ref1Name'),          d.get('ref1Address'),   d.get('ref1Email'),     d.get('ref1Phone'),
-        d.get('ref1Branch'),        d.get('ref1Relation'),
-        d.get('ref2Name'),          d.get('ref2Address'),   d.get('ref2Email'),     d.get('ref2Phone'),
-        d.get('ref2Branch'),        d.get('ref2Relation'),
-        or_none('dorYouth'),        or_none('dateOfInitiationNew'),
-        or_none('dateTransferIn'),  d.get('transferFromBranch'),
-        or_none('dateTransferOut'), d.get('transferToBranch'),
-        or_none('dateOfExpire'),
-        uid
-    ))
+    # Full field update (partial: only fields the form sent are written)
+    before = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
+    _apply_member_update(uid, d)
     audit('EDIT_MEMBER', f"uid={uid} name={d.get('name','')}")
+
+    # Record which admin changed which member's fields (superadmin "Admin Edits" log).
+    after = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
+    def _norm(v):
+        s = str(v).strip() if v is not None else ''
+        return s.split('T')[0] if 'T' in s else s
+    changed = [c for c in after if c != 'uid' and _norm(before.get(c)) != _norm(after.get(c))]
+    if changed:
+        cu = _caller_username()
+        urow = query("SELECT name FROM users WHERE LOWER(username)=%s", (cu.lower(),), one=True)
+        da = _designated_admin(cu, urow['name'] if urow else None)
+        admin_name = (da['name'] if da else (urow['name'] if urow else cu)) or cu
+        execute(
+            "INSERT INTO admin_edit_log (member_uid, member_name, admin_username, admin_name, fields_changed) "
+            "VALUES (%s,%s,%s,%s,%s)",
+            (uid, d.get('name') or after.get('name'), cu, admin_name, ', '.join(changed))
+        )
     return jsonify({'ok': True})
 
 @app.route('/api/members/<uid>', methods=['DELETE'])
