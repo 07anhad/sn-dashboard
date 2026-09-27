@@ -484,6 +484,23 @@ CREATE TABLE IF NOT EXISTS member_edit_log (
 );
 CREATE INDEX IF NOT EXISTS idx_mel_edited_at ON member_edit_log (edited_at DESC);
 
+-- Admin edits to member records (who edited whose data, and what changed).
+CREATE TABLE IF NOT EXISTS admin_edit_log (
+    id             SERIAL PRIMARY KEY,
+    member_uid     VARCHAR(50) NOT NULL,
+    member_name    TEXT,
+    admin_username TEXT,
+    admin_name     TEXT,
+    fields_changed TEXT,
+    edited_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ael_edited_at ON admin_edit_log (edited_at DESC);
+
+-- Country fields for family members (added later; member_details is the live table).
+ALTER TABLE member_details ADD COLUMN IF NOT EXISTS father_country VARCHAR(100);
+ALTER TABLE member_details ADD COLUMN IF NOT EXISTS mother_country VARCHAR(100);
+ALTER TABLE member_details ADD COLUMN IF NOT EXISTS spouse_country VARCHAR(100);
+
 -- ═══════════════════════════════════════════════════════════════════
 -- Identity migration — member_details.uid is the permanent identifier.
 -- Idempotent: safe to re-run on every startup.
