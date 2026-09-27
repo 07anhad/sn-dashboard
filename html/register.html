@@ -326,7 +326,6 @@
                 <option value="">Select</option>
                 <option>Male</option><option>Female</option><option>Other</option>
               </select>
-              <label class="na-toggle"><input type="checkbox" data-na="rf_gender" onchange="toggleNA(this)" /> N/A</label>
             </div>
             <div class="field">
               <label>Date of Birth <span class="req-star">*</span></label>
@@ -347,17 +346,23 @@
             <div class="field">
               <label>Nationality <span class="req-star">*</span></label>
               <input id="rf_nationality" value="Indian" />
-              <label class="na-toggle"><input type="checkbox" data-na="rf_nationality" onchange="toggleNA(this)" /> N/A</label>
             </div>
             <div class="field">
               <label>Qualification <span class="req-star">*</span></label>
-              <input id="rf_qual" placeholder="e.g. B.Tech, M.A., MBA" />
-              <label class="na-toggle"><input type="checkbox" data-na="rf_qual" onchange="toggleNA(this)" /> N/A</label>
+              <select id="rf_qual">
+                <option value="">Select</option>
+                <option>Below High School</option><option>Secondary School</option><option>Diploma</option>
+                <option>Graduate</option><option>Post Graduate</option><option>Doctorate</option>
+              </select>
             </div>
             <div class="field">
               <label>Occupation <span class="req-star">*</span></label>
-              <input id="rf_occ" placeholder="e.g. Engineer, Doctor, Teacher" />
-              <label class="na-toggle"><input type="checkbox" data-na="rf_occ" onchange="toggleNA(this)" /> N/A</label>
+              <select id="rf_occ">
+                <option value="">Select</option>
+                <option>Employed - Private</option><option>Employed - Govt</option><option>Self Employed</option>
+                <option>Student</option><option>Retired</option><option>Homemaker</option>
+                <option>Unemployed</option><option>Unable to Work</option>
+              </select>
             </div>
             <div class="field full">
               <label>Address <span class="req-star">*</span></label>
@@ -376,13 +381,11 @@
             </div>
             <div class="field">
               <label>State <span class="req-star">*</span></label>
-              <input id="rf_state" placeholder="State" />
-              <label class="na-toggle"><input type="checkbox" data-na="rf_state" onchange="toggleNA(this)" /> N/A</label>
+              <select id="rf_state" class="rf-state"><option value="">Select</option></select>
             </div>
             <div class="field">
               <label>Country <span class="req-star">*</span></label>
               <input id="rf_country" value="India" />
-              <label class="na-toggle"><input type="checkbox" data-na="rf_country" onchange="toggleNA(this)" /> N/A</label>
             </div>
             <div class="field">
               <label>Mobile 1 <span class="req-star">*</span></label>
@@ -393,9 +396,8 @@
             <div class="field">
               <label>Father Title <span class="req-star">*</span></label>
               <select id="rf_fatherTitle">
-                <option value="">—</option><option>Sh.</option><option>Dr.</option><option>Er.</option><option>Prof.</option><option>PB.</option>
+                <option value="">—</option><option>Mr.</option><option>Pb.</option>
               </select>
-              <label class="na-toggle"><input type="checkbox" data-na="rf_fatherTitle" onchange="toggleNA(this)" /> N/A</label>
             </div>
             <div class="field">
               <label>Father Name <span class="req-star">*</span></label>
@@ -465,8 +467,8 @@
               <label>SN Extension</label>
               <select id="rf_snExt">
                 <option value="">Select</option>
-                <option value="Y">Yes</option>
-                <option value="N">No</option>
+                <option value="Within SN">Within SN</option>
+                <option value="Outside SN">Outside SN</option>
               </select>
             </div>
             <div class="field">
@@ -594,7 +596,7 @@
           <div class="grid-2" style="margin-top:12px">
             <div class="field"><label>Phone</label><input id="rf_fatherPhone" type="tel" placeholder="Mobile / Landline" /></div>
             <div class="field"><label>City</label><input id="rf_fatherCity" placeholder="City" /></div>
-            <div class="field"><label>State</label><input id="rf_fatherState" placeholder="State" /></div>
+            <div class="field"><label>State</label><select id="rf_fatherState" class="rf-state"><option value="">Select</option></select></div>
             <div class="field"><label>Branch (Satsang)</label><input id="rf_fatherBranch" placeholder="Branch name" /></div>
             <div class="field"><label>BSL No.</label><input id="rf_fatherBslno" placeholder="If member" /></div>
             <div class="field"><label>UID</label><input id="rf_fatherUid" placeholder="If known" /></div>
@@ -629,7 +631,7 @@
           <div class="grid-2" style="margin-top:12px">
             <div class="field"><label>Phone</label><input id="rf_motherPhone" type="tel" placeholder="Mobile / Landline" /></div>
             <div class="field"><label>City</label><input id="rf_motherCity" placeholder="City" /></div>
-            <div class="field"><label>State</label><input id="rf_motherState" placeholder="State" /></div>
+            <div class="field"><label>State</label><select id="rf_motherState" class="rf-state"><option value="">Select</option></select></div>
             <div class="field"><label>Branch (Satsang)</label><input id="rf_motherBranch" placeholder="Branch name" /></div>
             <div class="field"><label>BSL No.</label><input id="rf_motherBslno" placeholder="If member" /></div>
             <div class="field"><label>UID</label><input id="rf_motherUid" placeholder="If known" /></div>
@@ -664,7 +666,7 @@
           <div class="grid-2" style="margin-top:12px">
             <div class="field"><label>Phone</label><input id="rf_spousePhone" type="tel" placeholder="Mobile / Landline" /></div>
             <div class="field"><label>City</label><input id="rf_spouseCity" placeholder="City" /></div>
-            <div class="field"><label>State</label><input id="rf_spouseState" placeholder="State" /></div>
+            <div class="field"><label>State</label><select id="rf_spouseState" class="rf-state"><option value="">Select</option></select></div>
             <div class="field"><label>Branch (Satsang)</label><input id="rf_spouseBranch" placeholder="Branch name" /></div>
             <div class="field"><label>BSL No.</label><input id="rf_spouseBslno" placeholder="If member" /></div>
             <div class="field"><label>UID</label><input id="rf_spouseUid" placeholder="If known" /></div>
@@ -1018,6 +1020,23 @@
       el.className = 'error';
       el.textContent = msg;
     }
+
+    // Populate all state dropdowns + apply ALL-CAPS to free-text inputs.
+    (function () {
+      const STATES = ['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'];
+      document.querySelectorAll('select.rf-state').forEach(sel => {
+        STATES.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+      });
+      document.querySelectorAll('input').forEach(inp => {
+        if (['date','email','checkbox','tel','number'].includes(inp.type)) return;
+        inp.style.textTransform = 'uppercase';
+        inp.addEventListener('input', () => {
+          const p = inp.selectionStart;
+          inp.value = inp.value.toUpperCase();
+          try { inp.setSelectionRange(p, p); } catch (e) {}
+        });
+      });
+    })();
 
     validateLink();
   </script>
