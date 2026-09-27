@@ -72,7 +72,8 @@ function handleLogin(e) {
         role:      data.user.role,
         email:     data.user.email,
         memberId:  data.user.member_id  || null,
-        memberUid: data.user.member_uid || null
+        memberUid: data.user.member_uid || null,
+        isDesignatedAdmin: data.user.is_designated_admin || false
       };
       sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
       localStorage.setItem('currentUser',   JSON.stringify(userPayload));
