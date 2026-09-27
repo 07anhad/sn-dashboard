@@ -88,17 +88,17 @@ async function loadAllData() {
       fatherTitle: m.father_title,
       fatherFirstName: m.father_first_name, fatherMiddleName: m.father_middle_name, fatherLastName: m.father_last_name,
       fatherBranch: m.father_branch, fatherBslno: m.father_bslno, fatherUid: m.father_uid,
-      fatherDoi: m.father_doi, fatherPhone: m.father_phone, fatherCity: m.father_city, fatherState: m.father_state,
+      fatherDoi: m.father_doi, fatherPhone: m.father_phone, fatherCity: m.father_city, fatherState: m.father_state, fatherCountry: m.father_country,
       // mother
       motherTitle: m.mother_title,
       motherFirstName: m.mother_first_name, motherMiddleName: m.mother_middle_name, motherLastName: m.mother_last_name,
       motherBranch: m.mother_branch, motherBslno: m.mother_bslno, motherUid: m.mother_uid,
-      motherDoi: m.mother_doi, motherPhone: m.mother_phone, motherCity: m.mother_city, motherState: m.mother_state,
+      motherDoi: m.mother_doi, motherPhone: m.mother_phone, motherCity: m.mother_city, motherState: m.mother_state, motherCountry: m.mother_country,
       // spouse
       spouseTitle: m.spouse_title,
       spouseFirstName: m.spouse_first_name, spouseMiddleName: m.spouse_middle_name, spouseLastName: m.spouse_last_name,
       spouseBranch: m.spouse_branch, spouseBslno: m.spouse_bslno, spouseUid: m.spouse_uid,
-      spouseDoi: m.spouse_doi, spousePhone: m.spouse_phone, spouseCity: m.spouse_city, spouseState: m.spouse_state,
+      spouseDoi: m.spouse_doi, spousePhone: m.spouse_phone, spouseCity: m.spouse_city, spouseState: m.spouse_state, spouseCountry: m.spouse_country,
       // ref-1
       ref1Name: m.ref1_name, ref1Address: m.ref1_address, ref1Email: m.ref1_email,
       ref1Phone: m.ref1_phone, ref1Branch: m.ref1_branch, ref1Relation: m.ref1_relation,
@@ -207,13 +207,13 @@ async function reloadMembers() {
     neeFirst: m.nee_first_name, neeMiddle: m.nee_middle_name, neeLast: m.nee_last_name,
     fatherTitle: m.father_title, fatherFirstName: m.father_first_name, fatherMiddleName: m.father_middle_name, fatherLastName: m.father_last_name,
     fatherBranch: m.father_branch, fatherBslno: m.father_bslno, fatherUid: m.father_uid,
-    fatherDoi: m.father_doi, fatherPhone: m.father_phone, fatherCity: m.father_city, fatherState: m.father_state,
+    fatherDoi: m.father_doi, fatherPhone: m.father_phone, fatherCity: m.father_city, fatherState: m.father_state, fatherCountry: m.father_country,
     motherTitle: m.mother_title, motherFirstName: m.mother_first_name, motherMiddleName: m.mother_middle_name, motherLastName: m.mother_last_name,
     motherBranch: m.mother_branch, motherBslno: m.mother_bslno, motherUid: m.mother_uid,
-    motherDoi: m.mother_doi, motherPhone: m.mother_phone, motherCity: m.mother_city, motherState: m.mother_state,
+    motherDoi: m.mother_doi, motherPhone: m.mother_phone, motherCity: m.mother_city, motherState: m.mother_state, motherCountry: m.mother_country,
     spouseTitle: m.spouse_title, spouseFirstName: m.spouse_first_name, spouseMiddleName: m.spouse_middle_name, spouseLastName: m.spouse_last_name,
     spouseBranch: m.spouse_branch, spouseBslno: m.spouse_bslno, spouseUid: m.spouse_uid,
-    spouseDoi: m.spouse_doi, spousePhone: m.spouse_phone, spouseCity: m.spouse_city, spouseState: m.spouse_state,
+    spouseDoi: m.spouse_doi, spousePhone: m.spouse_phone, spouseCity: m.spouse_city, spouseState: m.spouse_state, spouseCountry: m.spouse_country,
     ref1Name: m.ref1_name, ref1Address: m.ref1_address, ref1Email: m.ref1_email,
     ref1Phone: m.ref1_phone, ref1Branch: m.ref1_branch, ref1Relation: m.ref1_relation,
     ref2Name: m.ref2_name, ref2Address: m.ref2_address, ref2Email: m.ref2_email,
@@ -272,8 +272,8 @@ function isAdmin() {
 }
 
 function canWrite() {
-  // Only superadmin can add / edit / delete / upload
-  return isSuperAdmin();
+  // Superadmin, plus members elevated via admins.json, can add / edit / delete.
+  return isSuperAdmin() || (getCurrentUser()?.isDesignatedAdmin === true);
 }
 
 function formatDate(dateStr) {
