@@ -31,7 +31,7 @@ function setButtonLoading(btn, loading, loadingLabel) {
 function renderClaimMemberPrompt(container) {
   container.innerHTML = `
     <div style="max-width:460px;margin:48px auto;padding:28px;background:var(--bg-card);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.06)">
-      <div style="font-weight:700;font-size:1.05rem;margin-bottom:8px">Deactivateber record</div>
+      <div style="font-weight:700;font-size:1.05rem;margin-bottom:8px">Link Your Member Record</div>
       <div style="color:var(--txt-muted);font-size:0.9rem;line-height:1.6;margin-bottom:18px">
         Your account isn't linked to a member record yet. Enter your UID or Branch ID to connect it — you only need to do this once.
       </div>
@@ -508,7 +508,7 @@ function renderSuperhumaneAdminTab() {
                   <th style="min-width:105px">Scheme Exit</th>
                   <th style="min-width:70px">Status</th>
                   <th style="min-width:200px">Address</th>
-                  <th style="min-width:160px">Father Name</th>
+                  <th style="min-width:160px">Father Full Name</th>
                   <th style="min-width:140px">Father UID</th>
                   <th style="min-width:110px">Father Contact</th>
                   <th style="min-width:105px">Father DOI</th>
@@ -697,7 +697,7 @@ function exportSuperhumane() {
     ['Scheme Exit',       c => fmt(c.date_exit_scheme)],
     ['Status',            c => c.date_exit_scheme ? 'Exited' : 'Active'],
     ['Address',           c => c.address],
-    ['Father Name',       c => c.father_name],
+    ['Father Full Name',  c => c.father_name],
     ['Father UID',        c => c.father_uid],
     ['Father Contact',    c => c.father_contact],
     ['Father DOI',        c => fmt(c.father_doi)],
@@ -818,7 +818,7 @@ function editSuperhumane(uid) {
     </div>
     <div style="font-weight:600;font-size:0.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-muted);margin:var(--sp-md) 0 var(--sp-sm);">Father</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-md);">
-      ${fi('she_father_name',    'Father Name',    dv('father_name'))}
+      ${fi('she_father_name',    'Father Full Name',    dv('father_name'))}
       ${fi('she_father_uid',     'Father UID',     dv('father_uid'))}
       ${fi('she_father_contact', 'Father Contact', dv('father_contact'))}
       ${fi('she_father_doi',     'Father DOI',     dateVal('father_doi'), 'date')}
@@ -945,7 +945,7 @@ function openAddSuperhumaneModal() {
       <div class="form-field"><label>Date of Birth</label><input id="sha_dob" type="date" /></div>
       <div class="form-field"><label>Scheme Entry Date</label><input id="sha_entry" type="date" /></div>
       <div class="form-field"><label>Father UID</label><input id="sha_father_uid" placeholder="Father's member UID" /></div>
-      <div class="form-field"><label>Father Name</label><input id="sha_father_name" /></div>
+      <div class="form-field"><label>Father Full Name</label><input id="sha_father_name" /></div>
       <div class="form-field"><label>Father Contact</label><input id="sha_father_contact" /></div>
       <div class="form-field"><label>Mother UID</label><input id="sha_mother_uid" placeholder="Mother's member UID" /></div>
       <div class="form-field"><label>Mother Name</label><input id="sha_mother_name" /></div>
@@ -1368,20 +1368,6 @@ function buildSelfProfileHTML(m) {
         pf('City', m.spouseCity), pf('State', m.spouseState)
       )}
 
-      <!-- Reference 1 -->
-      ${sec('Reference 1')}
-      ${grid(
-        pf('Name', m.ref1Name), pf('Relation', m.ref1Relation), pf('Branch', m.ref1Branch),
-        pf('Email', m.ref1Email), pf('Phone', m.ref1Phone), pf('Address', m.ref1Address)
-      )}
-
-      <!-- Reference 2 -->
-      ${sec('Reference 2')}
-      ${grid(
-        pf('Name', m.ref2Name), pf('Relation', m.ref2Relation), pf('Branch', m.ref2Branch),
-        pf('Email', m.ref2Email), pf('Phone', m.ref2Phone), pf('Address', m.ref2Address)
-      )}
-
       <!-- Transfer / History -->
       ${sec('Transfer / History')}
       ${grid(
@@ -1401,7 +1387,7 @@ function editSelfProfileInline(uid) {
 function viewMember(uid) {
   const m = MEMBERS.find(x => x.uid === uid);
   if (!m) return;
-  const mf = (label, val) => val ? modalField(label, val) : '';
+  const mf = (label, val) => modalField(label, val);
   const yBadge = v => v === 'Y' ? '<span class="badge badge-success">Yes</span>' : '';
   openModal(`
     <div class="modal-header">
@@ -1475,16 +1461,6 @@ function viewMember(uid) {
         ${mf('Name', m.spouseName)} ${mf('UID', m.spouseUid)} ${mf('BSL No.', m.spouseBslno)}
         ${mf('Branch', m.spouseBranch)} ${mf('DOI', formatDate(m.spouseDoi))} ${mf('Phone', m.spousePhone)}
         ${mf('City', m.spouseCity)} ${mf('State', m.spouseState)}
-      </div>
-      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Reference 1</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${mf('Name', m.ref1Name)} ${mf('Relation', m.ref1Relation)} ${mf('Branch', m.ref1Branch)}
-        ${mf('Email', m.ref1Email)} ${mf('Phone', m.ref1Phone)} ${mf('Address', m.ref1Address)}
-      </div>
-      <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Reference 2</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${mf('Name', m.ref2Name)} ${mf('Relation', m.ref2Relation)} ${mf('Branch', m.ref2Branch)}
-        ${mf('Email', m.ref2Email)} ${mf('Phone', m.ref2Phone)} ${mf('Address', m.ref2Address)}
       </div>
       <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:14px 0 6px">Transfer / History</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-sm);">
@@ -1588,6 +1564,24 @@ function editMember(uid, isSelfEdit = false) {
       <option value="N" ${v === 'N' ? 'selected' : ''}>No</option></select></div>`;
   };
 
+  // Mandatory field with no N/A option (plain, but still marked required).
+  const fldReq = (id, label, val, type='text') =>
+    `<div class="form-field"><label>${label} <span style="color:var(--clr-red)">*</span></label>
+      <input id="${id}" type="${type}" value="${ea(type==='date' ? dt(val) : val)}"/></div>`;
+
+  // Mandatory dropdown restricted to the standard list only (no free-text/appended values).
+  const selStd = (id, label, val, opts) =>
+    `<div class="form-field"><label>${label} <span style="color:var(--clr-red)">*</span></label>
+      <select id="${id}">${opts.map(o=>`<option value="${ea(o)}" ${String(val)===String(o)?'selected':''}>${o||'—'}</option>`).join('')}</select></div>`;
+
+  // Whether living in Soami Nagar — exactly 2 choices (Yes/No), defaults to No.
+  const snYN = (id, label, val) => {
+    const isWithin = String(val ?? '').trim() === 'Within SN';
+    return `<div class="form-field"><label>${label}</label><select id="${id}">
+      <option value="Within SN" ${isWithin ? 'selected' : ''}>Yes</option>
+      <option value="Outside SN" ${!isWithin ? 'selected' : ''}>No</option></select></div>`;
+  };
+
   // Strip an honorific prefix (PB / PBN) for display only.
   const stripPB = s => String(s ?? '').replace(/^\s*(PBN\.?|PB\.?)\s+/i, '').trim();
 
@@ -1595,8 +1589,33 @@ function editMember(uid, isSelfEdit = false) {
   const QUAL_OPTS  = ['', 'Below High School','Secondary School','Diploma','Graduate','Post Graduate','Doctorate'];
   const OCC_OPTS   = ['', 'Employed - Private','Employed - Govt','Self Employed','Student','Retired','Homemaker','Unemployed','Unable to Work'];
   const BLOOD_OPTS = ['', 'A+','A-','B+','B-','O+','O-','AB+','AB-'];
-  const SNEXT_OPTS = ['', 'Within SN','Outside SN'];
+  // Seva interest options — kept in sync with the registration form's SEVA_OPTIONS list.
+  const SEVA_OPTIONS = [
+    'Dayalbagh Field Security: 1 Week Seva Duty in Dayalbagh Fields',
+    'Horticulture: Seva in Satsang Hall Grounds',
+    'Night Pehna: Patrolling of Satsang Institutions',
+    'Medical Assistance: Blood Donation',
+    'Medical Assistance: Duties at Hospitals',
+    'Medical Assistance: Pick & Drop',
+    'Medical Assistance: Other (As Required)',
+    'Communication Grid: Pick & Drop',
+    'Communication Grid: Assistance to Senior Satsangis',
+    'Communication Grid: Other (As Required)',
+    'Youth Association: As per Defined Guidelines',
+    'Youth Association: As Advised by BS',
+    'Mahila Association: As per Requirement',
+    'Mahila Association: As per Requirement (Secretary role)',
+    'Data Management: Data Entry in System',
+    'MCREIC: Course Facilitator',
+    'MCREIC: Attendance Management',
+    'DEI Distance Education: Teaching & Coordinating',
+    'CRC: As per Defined Guidelines',
+  ];
+  const sevaSelected = String(m.sevaInterests || '').split(',').map(s => s.trim()).filter(Boolean);
   const isSA = (typeof isSuperAdmin === 'function') && isSuperAdmin();
+  // Admin/superadmin may edit frozen fields (incl. UID, BSL, dates) when managing another member;
+  // when editing their own profile (isSelfEdit) those fields stay frozen like any other member.
+  const canUnlock = (typeof isAdmin === 'function') && isAdmin() && !isSelfEdit;
 
   openModal(`
     <div class="modal-header">
@@ -1625,41 +1644,45 @@ function editMember(uid, isSelfEdit = false) {
       <!-- ── MANDATORY (FORM A) ──────────────── -->
       <div id="etab-mandatory" class="etab-pane" data-display="grid"
            style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${frozen('UID', m.uid)}
-        ${frozen('Full Name', stripPB(m.name), 'To change, contact the help desk')}
-        ${selP('em_category',   'Category',                  m.category, ['','Initiated','Jigyasu','Superhumane'], true)}
+        ${canUnlock ? fld('em_uid', 'UID', m.uid) : frozen('UID', m.uid)}
+        ${frozen('Full Name', stripPB(m.name))}
+        ${canUnlock ? selP('em_category', 'Category', m.category, ['','Initiated','Jigyasu','Superhumane'], true) : frozen('Category', m.category)}
         ${selP('em_gender',     'Gender',                    m.gender, ['','Male','Female','Other'], true)}
         <input id="em_doi" type="hidden" value="${m.dateOfInitiation || ''}" />
-        ${fldNA('em_dob',       'Date of Birth',             m.dateOfBirth,           'date')}
-        ${fldNA('em_doi1',      'Date of First Initiation',  m.dateOfFirstInitiation,  'date')}
-        ${isSA ? fldNA('em_email', 'Email', m.email, 'email') : frozen('Email', m.email, 'To change, contact the help desk', 'email')}
-        ${fldNA('em_caste',     'Caste',                     m.caste)}
-        ${fldNA('em_nationality','Nationality',              m.nationality)}
-        ${selP('em_qual',       'Qualification',             m.qualification, QUAL_OPTS, true)}
-        ${selP('em_occ',        'Occupation',                m.occupation, OCC_OPTS, true)}
-        ${fldNA('em_addr1',     'Address',                   m.addressLine1)}
-        ${fldNA('em_city',      'City',                      m.city)}
-        ${fldNA('em_pincode',   'Pincode',                   m.pincode)}
-        ${fldNA('em_state',     'State',                     m.state)}
-        ${fldNA('em_country',   'Country',                   m.country)}
-        ${fldNA('em_mobile',    'Mobile (10 digits)',        m.mobile)}
+        ${canUnlock ? fld('em_dob', 'Date of Birth', m.dateOfBirth, 'date') : frozen('Date of Birth', dt(m.dateOfBirth), '', 'date')}
+        ${canUnlock ? fld('em_doi1', 'Date of First Initiation', m.dateOfFirstInitiation, 'date') : frozen('Date of First Initiation', dt(m.dateOfFirstInitiation), '', 'date')}
+        ${canUnlock ? fldNA('em_doi2', 'Date of Second Initiation', m.dateOfSecondInitiation, 'date') : frozen('Date of Second Initiation', dt(m.dateOfSecondInitiation), '', 'date')}
+        ${canUnlock ? fldNA('em_email', 'Email', m.email, 'email') : frozen('Email', m.email, '', 'email')}
+        ${fldReq('em_caste',     'Caste',                     m.caste)}
+        ${fldReq('em_nationality','Nationality',              m.nationality)}
+        ${selStd('em_qual',     'Qualification',             m.qualification, QUAL_OPTS)}
+        ${selStd('em_occ',      'Occupation',                m.occupation, OCC_OPTS)}
+        ${fldReq('em_addr1',     'Address',                   m.addressLine1)}
+        ${fldReq('em_city',      'City',                      m.city)}
+        ${fldReq('em_pincode',   'Pincode',                   m.pincode)}
+        ${selNA('em_state',     'State',                     m.state, STATE_OPTS)}
+        ${fldReq('em_country',   'Country',                   m.country)}
+        ${canUnlock ? fld('em_mobile', 'Mobile (10 digits)', m.mobile) : frozen('Mobile', m.mobile)}
         ${selP('em_fTitle',     'Father Title',              m.fatherTitle, ['','Mr.','Pb.'], true)}
-        ${fldNA('em_fFirst',    'Father Name',               m.fatherFirstName)}
-        ${fldNA('em_neeFirst',  'Nee (Name)',                m.neeFirst)}
+        ${fldReq('em_fFirst',    'Father Full Name',          m.fatherFirstName)}
+        ${fldReq('em_neeFirst',  'Nee (Name)',                m.neeFirst)}
         ${isSA ? frozen('Record Status', m.status) : ''}
+        <div style="grid-column:1/-1;font-size:0.72rem;color:var(--txt-muted);margin-top:4px;padding-top:8px;border-top:1px solid var(--border)">
+          To change any of the frozen fields above, please contact the help desk.
+        </div>
       </div>
 
       <!-- ── PERSONAL ────────────────────────── -->
       <div id="etab-personal" class="etab-pane" data-display="grid"
            style="display:none;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${frozen('BSL No.', m.bslno, 'Frozen — contact the help desk')}
+        ${canUnlock ? fld('em_bslno', 'BSL No.', m.bslno) : frozen('BSL No.', m.bslno, 'Frozen — contact the help desk')}
         ${selP('em_blood',      'Blood Group',            m.bloodGroup, BLOOD_OPTS)}
         ${fld('em_dor',         'Date of Reg. (Jigyasu)', m.dateOfRegistration,      'date')}
-        ${fld('em_doi2',        'Date of 2nd Initiation', m.dateOfSecondInitiation,  'date')}
+        ${frozen('Date of 2nd Initiation', dt(m.dateOfSecondInitiation), 'Set on the Mandatory (Form A) tab', 'date')}
         ${sel('em_marital',     'Marital Status',         m.maritalStatus, ['','Single','Married','Widowed','Divorced'])}
         ${fld('em_prevBranch',  'Previous Branch',        m.previousBranch)}
         ${ynN('em_ashram',      'Whether living in Satsang Ashram House',              m.ashram)}
-        ${selP('em_snext',      'Whether living in Soami Nagar / Outside Soami Nagar', m.snExt, SNEXT_OPTS)}
+        ${snYN('em_snext',      'Whether living in Soami Nagar',                      m.snExt)}
       </div>
 
       <!-- ── PROFESSIONAL ──────────────────── -->
@@ -1669,7 +1692,13 @@ function editMember(uid, isSelfEdit = false) {
         ${fld('em_org',       'Organization',     m.organization)}
         ${fld('em_prof',      'Profession',       m.profession)}
         ${fld('em_profCode',  'Profession Code',  m.professionCode)}
-        ${isSA ? frozen('Comm. Grid Code', m.commGridCode, 'Frozen — contact the help desk') : ''}
+        ${isSA ? (canUnlock ? fld('em_commGrid', 'Comm. Grid Code', m.commGridCode) : frozen('Comm. Grid Code', m.commGridCode, 'Frozen — contact the help desk')) : ''}
+        <div style="grid-column:1/-1;font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:8px 0 2px">Seva Interests</div>
+        <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px">
+          ${SEVA_OPTIONS.map(val => `<label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.78rem;cursor:pointer">
+            <input type="checkbox" class="em-seva-chk" value="${ea(val)}" ${sevaSelected.includes(val) ? 'checked' : ''}/> ${ea(val)}
+          </label>`).join('')}
+        </div>
       </div>
 
       <!-- ── FLAGS ─────────────────────────── -->
@@ -1690,6 +1719,7 @@ function editMember(uid, isSelfEdit = false) {
       <div id="etab-family" class="etab-pane" data-display="block" style="display:none;">
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-sm);">
           ${secHdr('Father')}
+          ${frozen('Name', [m.fatherTitle, m.fatherFirstName, m.fatherMiddleName, m.fatherLastName].filter(Boolean).join(' '), 'From the Mandatory (Form A) tab')}
           ${fld('em_fBranch', 'Branch',      m.fatherBranch)}
           ${fld('em_fBsl',    'BSL',         m.fatherBslno)}
           ${fld('em_fUid',    'UID',         m.fatherUid)}
@@ -1792,6 +1822,8 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
 
   put('category','em_category');            put('gender','em_gender');
   putDate('dateOfBirth','em_dob');          putDate('dateOfFirstInitiation','em_doi1');
+  putDate('dateOfSecondInitiation','em_doi2');
+  put('uid','em_uid');
   put('email','em_email');
   put('caste','em_caste');                  put('nationality','em_nationality');
   put('qualification','em_qual');           put('occupation','em_occ');
@@ -1799,13 +1831,15 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
   put('state','em_state');                  put('country','em_country');     put('mobile','em_mobile');
   put('fatherTitle','em_fTitle');           put('fatherFirstName','em_fFirst'); put('neeFirst','em_neeFirst');
 
+  put('bslno','em_bslno');
   put('bloodGroup','em_blood');             putDate('dateOfRegistration','em_dor');
-  putDate('dateOfSecondInitiation','em_doi2');
   put('maritalStatus','em_marital');        put('previousBranch','em_prevBranch');
   put('ashram','em_ashram');                put('snExt','em_snext');
 
   put('designation','em_desig');            put('organization','em_org');
   put('profession','em_prof');              put('professionCode','em_profCode');
+  put('commGridCode','em_commGrid');
+  payload.sevaInterests = Array.from(document.querySelectorAll('.em-seva-chk:checked')).map(c => c.value).join(', ');
 
   put('mahila','em_mahila');   put('youth','em_youth');   put('assocYouth','em_assocYouth');
   put('jrPreInit','em_jrPreInit'); put('srPreInit','em_srPreInit');
@@ -2103,7 +2137,7 @@ function getFormA() {
     ['Country',                   m => m.country],
     ['Mobile-1',                  m => m.mobile],
     ['Father Title',              m => m.fatherTitle],
-    ['Father Name',               m => join(m.fatherFirstName, m.fatherMiddleName, m.fatherLastName)],
+    ['Father Full Name',          m => join(m.fatherFirstName, m.fatherMiddleName, m.fatherLastName)],
     ['Nee (Name)',                m => join(m.neeFirst, m.neeMiddle, m.neeLast)],
   ];
 
