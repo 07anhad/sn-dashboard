@@ -960,7 +960,7 @@ MEMBER_COLUMN_MAP = [
     ('dorYouth','dor_youth','date'), ('dateOfInitiationNew','date_of_initiation_new','date'),
     ('dateTransferIn','date_transfer_in','date'), ('transferFromBranch','transfer_from_branch','text'),
     ('dateTransferOut','date_transfer_out','date'), ('transferToBranch','transfer_to_branch','text'),
-    ('dateOfExpire','date_of_expire','date'),
+    ('dateOfExpire','date_of_expire','date'), ('sevaInterests','seva_interests','text'),
 ]
 
 
@@ -1120,6 +1120,7 @@ def update_member(uid):
             ('dateTransferOut', 'date_transfer_out', 'Date Transfer Out'),
             ('transferToBranch', 'transfer_to_branch', 'Transfer To Branch'),
             ('dateOfExpire', 'date_of_expire', 'Date of Expire'),
+            ('sevaInterests', 'seva_interests', 'Seva Interests'),
         ]
         current = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
 
@@ -1153,6 +1154,18 @@ def update_member(uid):
 
     # Full field update (partial: only fields the form sent are written)
     before = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
+
+    # Optional UID change (admin/superadmin only — self-edit never reaches this branch).
+    # uid is the primary key so it's handled separately from MEMBER_COLUMN_MAP.
+    new_uid = (d.pop('uid', None) or '').strip()
+    if new_uid and new_uid != uid:
+        if query("SELECT 1 FROM member_details WHERE uid=%s", (new_uid,)):
+            return jsonify({'ok': False, 'error': f"UID '{new_uid}' is already in use."}), 409
+        execute("UPDATE member_details SET uid=%s WHERE uid=%s", (new_uid, uid))
+        execute("UPDATE users SET member_id=%s WHERE member_id=%s", (new_uid, uid))
+        audit('CHANGE_MEMBER_UID', f"old={uid} new={new_uid}")
+        uid = new_uid
+
     _apply_member_update(uid, d)
     audit('EDIT_MEMBER', f"uid={uid} name={d.get('name','')}")
 
@@ -1259,13 +1272,13 @@ def submit_registration(code):
             date_of_birth, blood_group, caste, nationality, profession, ashram, sn_ext,
             mobile1, mobile2, landline, office_phone, email1, email2,
             address_line1, address_line2, address_line3, city, pincode, state, country,
-            qualification, occupation, designation, organization,
+            qualification, occupation, designation, organization, profession_code,
             father_title, father_first_name, father_middle_name, father_last_name,
-            father_branch, father_bslno, father_uid, father_doi, father_phone, father_city, father_state,
+            father_branch, father_bslno, father_uid, father_doi, father_phone, father_city, father_state, father_country,
             mother_title, mother_first_name, mother_middle_name, mother_last_name,
-            mother_branch, mother_bslno, mother_uid, mother_doi, mother_phone, mother_city, mother_state,
+            mother_branch, mother_bslno, mother_uid, mother_doi, mother_phone, mother_city, mother_state, mother_country,
             spouse_title, spouse_first_name, spouse_middle_name, spouse_last_name,
-            spouse_branch, spouse_bslno, spouse_uid, spouse_doi, spouse_phone, spouse_city, spouse_state,
+            spouse_branch, spouse_bslno, spouse_uid, spouse_doi, spouse_phone, spouse_city, spouse_state, spouse_country,
             nee_first_name, nee_middle_name, nee_last_name,
             mahila_association_member, youth_member, associate_youth_member,
             junior_pre_initiate_member, senior_pre_initiate_member,
@@ -1277,10 +1290,10 @@ def submit_registration(code):
             %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,
             %s,%s,%s,%s,%s,%s,%s,%s,
             %s,%s,%s,%s,%s,%s,
@@ -1294,13 +1307,13 @@ def submit_registration(code):
         n('dateOfBirth'), n('bloodGroup'), n('caste'), n('nationality'), n('profession'), n('ashram'), n('snExt'),
         n('mobile1'), n('mobile2'), n('landline'), n('officePhone'), n('email1'), n('email2'),
         n('addressLine1'), n('addressLine2'), n('addressLine3'), n('city'), n('pincode'), n('state'), n('country'),
-        n('qualification'), n('occupation'), n('designation'), n('organization'),
+        n('qualification'), n('occupation'), n('designation'), n('organization'), n('professionCode'),
         n('fatherTitle'), n('fatherFirstName'), n('fatherMiddleName'), n('fatherLastName'),
-        n('fatherBranch'), n('fatherBslno'), n('fatherUid'), n('fatherDoi'), n('fatherPhone'), n('fatherCity'), n('fatherState'),
+        n('fatherBranch'), n('fatherBslno'), n('fatherUid'), n('fatherDoi'), n('fatherPhone'), n('fatherCity'), n('fatherState'), n('fatherCountry'),
         n('motherTitle'), n('motherFirstName'), n('motherMiddleName'), n('motherLastName'),
-        n('motherBranch'), n('motherBslno'), n('motherUid'), n('motherDoi'), n('motherPhone'), n('motherCity'), n('motherState'),
+        n('motherBranch'), n('motherBslno'), n('motherUid'), n('motherDoi'), n('motherPhone'), n('motherCity'), n('motherState'), n('motherCountry'),
         n('spouseTitle'), n('spouseFirstName'), n('spouseMiddleName'), n('spouseLastName'),
-        n('spouseBranch'), n('spouseBslno'), n('spouseUid'), n('spouseDoi'), n('spousePhone'), n('spouseCity'), n('spouseState'),
+        n('spouseBranch'), n('spouseBslno'), n('spouseUid'), n('spouseDoi'), n('spousePhone'), n('spouseCity'), n('spouseState'), n('spouseCountry'),
         n('neeFirstName'), n('neeMiddleName'), n('neeLastName'),
         n('mahilaAssociationMember'), n('youthMember'), n('associateYouthMember'),
         n('juniorPreInitiateMember'), n('seniorPreInitiateMember'),
@@ -1382,32 +1395,34 @@ def approve_pending_member(id):
                 date_of_birth, blood_group, caste, nationality, profession, ashram, sn_ext,
                 mobile1, mobile2, landline, office_phone, email1, email2,
                 address_line1, address_line2, address_line3, city, pincode, state, country,
-                qualification, occupation, designation, organization,
+                qualification, occupation, designation, organization, profession_code,
                 father_title, father_first_name, father_middle_name, father_last_name,
-                father_branch, father_bslno, father_uid, father_doi, father_phone, father_city, father_state,
+                father_branch, father_bslno, father_uid, father_doi, father_phone, father_city, father_state, father_country,
                 mother_title, mother_first_name, mother_middle_name, mother_last_name,
-                mother_branch, mother_bslno, mother_uid, mother_doi, mother_phone, mother_city, mother_state,
+                mother_branch, mother_bslno, mother_uid, mother_doi, mother_phone, mother_city, mother_state, mother_country,
                 spouse_title, spouse_first_name, spouse_middle_name, spouse_last_name,
-                spouse_branch, spouse_bslno, spouse_uid, spouse_doi, spouse_phone, spouse_city, spouse_state,
+                spouse_branch, spouse_bslno, spouse_uid, spouse_doi, spouse_phone, spouse_city, spouse_state, spouse_country,
                 nee_first_name, nee_middle_name, nee_last_name,
                 mahila_association_member, youth_member, associate_youth_member,
                 junior_pre_initiate_member, senior_pre_initiate_member,
                 crc_member, cca_member, sant_su_member,
                 ref1_name, ref1_address, ref1_email, ref1_phone, ref1_branch, ref1_relation,
                 ref2_name, ref2_address, ref2_email, ref2_phone, ref2_branch, ref2_relation,
+                seva_interests,
                 record_status, bsl, category, gender, marital_status, previous_branch
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,
                 %s,%s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,
+                %s,
                 'Activated', %s, %s, %s, %s, %s
             )
         """, (
@@ -1416,19 +1431,20 @@ def approve_pending_member(id):
             row['date_of_birth'], row['blood_group'], row['caste'], row['nationality'], row['profession'], row['ashram'], row.get('sn_ext'),
             row['mobile1'], row['mobile2'], row['landline'], row['office_phone'], row['email1'], row['email2'],
             row['address_line1'], row['address_line2'], row['address_line3'], row['city'], row['pincode'], row['state'], row['country'],
-            row['qualification'], row['occupation'], row['designation'], row['organization'],
+            row['qualification'], row['occupation'], row['designation'], row['organization'], row.get('profession_code'),
             row['father_title'], row['father_first_name'], row['father_middle_name'], row['father_last_name'],
-            row['father_branch'], row['father_bslno'], row['father_uid'], row['father_doi'], row['father_phone'], row['father_city'], row['father_state'],
+            row['father_branch'], row['father_bslno'], row['father_uid'], row['father_doi'], row['father_phone'], row['father_city'], row['father_state'], row.get('father_country'),
             row['mother_title'], row['mother_first_name'], row['mother_middle_name'], row['mother_last_name'],
-            row['mother_branch'], row['mother_bslno'], row['mother_uid'], row['mother_doi'], row['mother_phone'], row['mother_city'], row['mother_state'],
+            row['mother_branch'], row['mother_bslno'], row['mother_uid'], row['mother_doi'], row['mother_phone'], row['mother_city'], row['mother_state'], row.get('mother_country'),
             row['spouse_title'], row['spouse_first_name'], row['spouse_middle_name'], row['spouse_last_name'],
-            row['spouse_branch'], row['spouse_bslno'], row['spouse_uid'], row['spouse_doi'], row['spouse_phone'], row['spouse_city'], row['spouse_state'],
+            row['spouse_branch'], row['spouse_bslno'], row['spouse_uid'], row['spouse_doi'], row['spouse_phone'], row['spouse_city'], row['spouse_state'], row.get('spouse_country'),
             row['nee_first_name'], row['nee_middle_name'], row['nee_last_name'],
             row['mahila_association_member'], row['youth_member'], row['associate_youth_member'],
             row['junior_pre_initiate_member'], row['senior_pre_initiate_member'],
             row['crc_member'], row['cca_member'], row['sant_su_member'],
             row['ref1_name'], row['ref1_address'], row['ref1_email'], row['ref1_phone'], row['ref1_branch'], row['ref1_relation'],
             row['ref2_name'], row['ref2_address'], row['ref2_email'], row['ref2_phone'], row['ref2_branch'], row['ref2_relation'],
+            row.get('seva_interests'),
             bsl, category, row.get('gender') or 'N/A', row.get('marital_status'), row.get('previous_branch')
         ))
     
