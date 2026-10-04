@@ -190,6 +190,36 @@
     }
     .sub-label:first-child { margin-top: 0; }
 
+    /* ── Tabs (same grouping as the member-edit form) ── */
+    .reg-tabs {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      margin-bottom: 16px;
+    }
+    .reg-tab {
+      padding: 9px 16px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #64748b;
+      font-size: 0.82rem; font-weight: 600;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .reg-tab.active { background: #1a2d5a; border-color: #1a2d5a; color: #ffffff; }
+    .reg-tab:hover:not(.active) { border-color: #e8832a; color: #1a2d5a; }
+    .rtab-pane {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 1px 8px rgba(26,45,90,0.07);
+      padding: 18px 20px 20px;
+      margin-bottom: 16px;
+    }
+    .rtab-note {
+      font-size: 0.82rem; color: #64748b; margin: 0 0 14px;
+    }
+
     /* ── Checkboxes ── */
     .check-grid {
       display: grid;
@@ -285,527 +315,266 @@
         .reg-container input:disabled,.reg-container select:disabled{background:#f1f5f9;color:#94a3b8;cursor:not-allowed}
       </style>
 
-      <!-- 0. Mandatory (Form A) -->
-      <div class="sec-card">
-        <div class="sec-head open" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Mandatory Details (Form A)</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-required">Required</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body open">
-          <p style="font-size:0.82rem;color:#64748b;margin:0 0 14px">
-            These fields are mandatory. Please fill them as accurately as you can.
-          </p>
-          <div class="grid-2">
-            <div class="field full">
-              <label>Full Name <span class="req-star">*</span></label>
-              <input id="rf_name" placeholder="As per initiation records" />
-            </div>
-            <div class="field">
-              <label>Member UID <span class="req-star">*</span></label>
-              <input id="rf_uid" placeholder="e.g. SND2024XXXXXX" />
-            </div>
-            <div class="field">
-              <label>Category (Member Type) <span class="req-star">*</span></label>
-              <select id="rf_memberType">
-                <option value="">Select Member Type</option>
-                <option value="Initiated">Initiated (Naam-daan received)</option>
-                <option value="Jigyasu">Jigyasu (Seeker / Pre-initiate)</option>
-                <option value="Superhumane">Superhumane (Sant-Su scheme child)</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Gender <span class="req-star">*</span></label>
-              <select id="rf_gender">
-                <option value="">Select</option>
-                <option>Male</option><option>Female</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Date of Birth <span class="req-star">*</span></label>
-              <input id="rf_dob" type="date" />
-              <div class="field-hint">Format: DD/MM/YYYY</div>
-            </div>
-            <div class="field">
-              <label>Date of First Initiation <span class="req-star">*</span></label>
-              <input id="rf_doi_first" type="date" />
-              <label class="na-toggle"><input type="checkbox" data-na="rf_doi_first" onchange="toggleNA(this)" /> N/A</label>
-            </div>
-            <div class="field">
-              <label>Caste / Community <span class="req-star">*</span></label>
-              <input id="rf_caste" placeholder="e.g. Hindu, Sikh" />
-            </div>
-            <div class="field">
-              <label>Nationality <span class="req-star">*</span></label>
-              <input id="rf_nationality" value="Indian" />
-            </div>
-            <div class="field">
-              <label>Qualification <span class="req-star">*</span></label>
-              <select id="rf_qual">
-                <option value="">Select</option>
-                <option>Below High School</option><option>Secondary School</option><option>Diploma</option>
-                <option>Graduate</option><option>Post Graduate</option><option>Doctorate</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Occupation <span class="req-star">*</span></label>
-              <select id="rf_occ">
-                <option value="">Select</option>
-                <option>Employed - Private</option><option>Employed - Govt</option><option>Self Employed</option>
-                <option>Student</option><option>Retired</option><option>Homemaker</option>
-                <option>Unemployed</option><option>Unable to Work</option>
-              </select>
-            </div>
-            <div class="field full">
-              <label>Address <span class="req-star">*</span></label>
-              <input id="rf_addr1" placeholder="House / Flat No., Street, Building" />
-            </div>
-            <div class="field">
-              <label>City <span class="req-star">*</span></label>
-              <input id="rf_city" placeholder="City" />
-            </div>
-            <div class="field">
-              <label>Pincode <span class="req-star">*</span></label>
-              <input id="rf_pincode" placeholder="6-digit pincode" maxlength="6" />
-            </div>
-            <div class="field">
-              <label>State <span class="req-star">*</span></label>
-              <select id="rf_state" class="rf-state"><option value="">Select</option></select>
-            </div>
-            <div class="field">
-              <label>Country <span class="req-star">*</span></label>
-              <input id="rf_country" value="India" />
-            </div>
-            <div class="field">
-              <label>Mobile 1 <span class="req-star">*</span></label>
-              <input id="rf_mobile1" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number"
-                     oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)" />
-              <div class="field-hint">Must be exactly 10 digits</div>
-            </div>
-            <div class="field">
-              <label>Father Title <span class="req-star">*</span></label>
-              <select id="rf_fatherTitle">
-                <option value="">—</option><option>Mr.</option><option>Pb.</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Father Name <span class="req-star">*</span></label>
-              <input id="rf_fatherFirstName" placeholder="Father's name" />
-            </div>
-            <div class="field">
-              <label>Nee (Name) <span class="req-star">*</span></label>
-              <input id="rf_neeFirst" placeholder="Maiden / Nee name" />
-            </div>
-          </div>
-        </div>
+      <!-- Tabs — same grouping as the member-edit form -->
+      <div class="reg-tabs">
+        <button type="button" class="reg-tab active" onclick="switchRegTab('mandatory',this)">Mandatory (Form A)</button>
+        <button type="button" class="reg-tab"         onclick="switchRegTab('personal',this)">Personal</button>
+        <button type="button" class="reg-tab"         onclick="switchRegTab('professional',this)">Professional</button>
+        <button type="button" class="reg-tab"         onclick="switchRegTab('flags',this)">Flags</button>
+        <button type="button" class="reg-tab"         onclick="switchRegTab('family',this)">Family</button>
       </div>
 
-      <!-- 1. Personal -->
-      <div class="sec-card">
-        <div class="sec-head open" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div>
-              <div class="sec-name">Personal Details</div>
-            </div>
+      <!-- ── MANDATORY (FORM A) ──────────────── -->
+      <div id="rtab-mandatory" class="rtab-pane" style="display:block">
+        <p class="rtab-note">These fields are mandatory. Please fill them as accurately as you can.</p>
+        <div class="grid-2">
+          <div class="field full">
+            <label>Full Name <span class="req-star">*</span></label>
+            <input id="rf_name" placeholder="As per initiation records" />
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-required">Required</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body open">
-          <div class="grid-2">
-            <div class="field">
-              <label>Date of Registration (Jigyasu)</label>
-              <input id="rf_dor_jigyasu" type="date" />
-            </div>
-            <div class="field">
-              <label>Date of Second Initiation</label>
-              <input id="rf_doi_second" type="date" />
-            </div>
-            <div class="field">
-              <label>Blood Group</label>
-              <select id="rf_blood">
-                <option value="">Select</option>
-                <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
-                <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Marital Status</label>
-              <select id="rf_maritalStatus">
-                <option value="">Select</option>
-                <option>Single</option><option>Married</option><option>Widowed</option><option>Divorced</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Profession</label>
-              <input id="rf_profession" placeholder="e.g. Engineer, Business, Service" />
-            </div>
-            <div class="field">
-              <label>Ashram</label>
-              <select id="rf_ashram">
-                <option value="">Select</option>
-                <option value="Y">Yes</option>
-                <option value="N">No</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>SN Extension</label>
-              <select id="rf_snExt">
-                <option value="">Select</option>
-                <option value="Within SN">Within SN</option>
-                <option value="Outside SN">Outside SN</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Previous Branch</label>
-              <input id="rf_previousBranch" placeholder="If transferred from another branch" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 2. Contact -->
-      <div class="sec-card">
-        <div class="sec-head open" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Contact Details</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-required">Required</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body open">
-          <div class="grid-2">
-            <div class="field">
-              <label>Mobile 2</label>
-              <input id="rf_mobile2" type="tel" inputmode="numeric" maxlength="10" placeholder="Alternative number (10 digits)"
-                     oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)" />
-            </div>
-            <div class="field">
-              <label>Landline</label>
-              <input id="rf_landline" type="tel" placeholder="With STD code" />
-            </div>
-            <div class="field">
-              <label>Office Phone</label>
-              <input id="rf_officePhone" type="tel" placeholder="Office number" />
-            </div>
-            <div class="field">
-              <label>Email 1</label>
-              <input id="rf_email1" type="email" placeholder="Primary email address" />
-            </div>
-            <div class="field">
-              <label>Email 2</label>
-              <input id="rf_email2" type="email" placeholder="Secondary email address" />
-            </div>
-          </div>
-          <p style="font-size:0.75rem;color:#64748b;margin-top:10px">
-            Approval notification will be sent to your email address once reviewed.
-          </p>
-        </div>
-      </div>
-
-      <!-- 3. Address -->
-      <div class="sec-card">
-        <div class="sec-head open" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Additional Address Lines</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-optional">Optional</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body open">
-          <div class="grid-2">
-            <div class="field full">
-              <label>Address Line 2</label>
-              <input id="rf_addr2" placeholder="Locality / Area / Sector" />
-            </div>
-            <div class="field full">
-              <label>Address Line 3</label>
-              <input id="rf_addr3" placeholder="Landmark / Colony (optional)" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4. Professional -->
-      <div class="sec-card">
-        <div class="sec-head" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Professional Details</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-optional">Optional</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body">
-          <div class="grid-2">
-            <div class="field">
-              <label>Designation</label>
-              <input id="rf_desig" placeholder="e.g. Manager, Director" />
-            </div>
-            <div class="field">
-              <label>Organization</label>
-              <input id="rf_org" placeholder="Company / Institution name" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 5. Father -->
-      <div class="sec-card">
-        <div class="sec-head" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Father's Details</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-optional">Optional</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body">
-          <p style="font-size:0.75rem;color:#64748b;margin:0 0 10px">Father's Title & Name are in the Mandatory section above.</p>
-          <div class="grid-4">
-            <div class="field">
-              <label>Middle Name</label>
-              <input id="rf_fatherMiddleName" placeholder="Middle" />
-            </div>
-            <div class="field">
-              <label>Last Name</label>
-              <input id="rf_fatherLastName" placeholder="Last" />
-            </div>
-          </div>
-          <div class="grid-2" style="margin-top:12px">
-            <div class="field"><label>Phone</label><input id="rf_fatherPhone" type="tel" placeholder="Mobile / Landline" /></div>
-            <div class="field"><label>City</label><input id="rf_fatherCity" placeholder="City" /></div>
-            <div class="field"><label>State</label><select id="rf_fatherState" class="rf-state"><option value="">Select</option></select></div>
-            <div class="field"><label>Branch (Satsang)</label><input id="rf_fatherBranch" placeholder="Branch name" /></div>
-            <div class="field"><label>BSL No.</label><input id="rf_fatherBslno" placeholder="If member" /></div>
-            <div class="field"><label>UID</label><input id="rf_fatherUid" placeholder="If known" /></div>
-            <div class="field"><label>Date of Initiation</label><input id="rf_fatherDoi" type="date" /></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 6. Mother -->
-      <div class="sec-card">
-        <div class="sec-head" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Mother's Details</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-optional">Optional</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body">
-          <div class="grid-4">
-            <div class="field">
-              <label>Title</label>
-              <select id="rf_motherTitle">
-                <option value="">—</option><option>Smt.</option><option>Dr.</option><option>Prof.</option><option>PBn.</option>
-              </select>
-            </div>
-            <div class="field"><label>First Name</label><input id="rf_motherFirstName" placeholder="First" /></div>
-            <div class="field"><label>Middle Name</label><input id="rf_motherMiddleName" placeholder="Middle" /></div>
-            <div class="field"><label>Last Name</label><input id="rf_motherLastName" placeholder="Last" /></div>
-          </div>
-          <div class="grid-2" style="margin-top:12px">
-            <div class="field"><label>Phone</label><input id="rf_motherPhone" type="tel" placeholder="Mobile / Landline" /></div>
-            <div class="field"><label>City</label><input id="rf_motherCity" placeholder="City" /></div>
-            <div class="field"><label>State</label><select id="rf_motherState" class="rf-state"><option value="">Select</option></select></div>
-            <div class="field"><label>Branch (Satsang)</label><input id="rf_motherBranch" placeholder="Branch name" /></div>
-            <div class="field"><label>BSL No.</label><input id="rf_motherBslno" placeholder="If member" /></div>
-            <div class="field"><label>UID</label><input id="rf_motherUid" placeholder="If known" /></div>
-            <div class="field"><label>Date of Initiation</label><input id="rf_motherDoi" type="date" /></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 7. Spouse -->
-      <div class="sec-card">
-        <div class="sec-head" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Spouse's Details</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-optional">Optional</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body">
-          <div class="grid-4">
-            <div class="field">
-              <label>Title</label>
-              <select id="rf_spouseTitle">
-                <option value="">—</option><option>Sh.</option><option>Smt.</option><option>Dr.</option><option>PB.</option><option>PBn.</option>
-              </select>
-            </div>
-            <div class="field"><label>First Name</label><input id="rf_spouseFirstName" placeholder="First" /></div>
-            <div class="field"><label>Middle Name</label><input id="rf_spouseMiddleName" placeholder="Middle" /></div>
-            <div class="field"><label>Last Name</label><input id="rf_spouseLastName" placeholder="Last" /></div>
-          </div>
-          <div class="grid-2" style="margin-top:12px">
-            <div class="field"><label>Phone</label><input id="rf_spousePhone" type="tel" placeholder="Mobile / Landline" /></div>
-            <div class="field"><label>City</label><input id="rf_spouseCity" placeholder="City" /></div>
-            <div class="field"><label>State</label><select id="rf_spouseState" class="rf-state"><option value="">Select</option></select></div>
-            <div class="field"><label>Branch (Satsang)</label><input id="rf_spouseBranch" placeholder="Branch name" /></div>
-            <div class="field"><label>BSL No.</label><input id="rf_spouseBslno" placeholder="If member" /></div>
-            <div class="field"><label>UID</label><input id="rf_spouseUid" placeholder="If known" /></div>
-            <div class="field"><label>Date of Initiation</label><input id="rf_spouseDoi" type="date" /></div>
-          </div>
-          <div class="sub-label" style="margin-top:18px">Nee / Maiden Name (if applicable)</div>
-          <div class="grid-3">
-            <div class="field"><label>Nee Middle Name</label><input id="rf_neeMiddle" placeholder="Middle" /></div>
-            <div class="field"><label>Nee Last Name</label><input id="rf_neeLast" placeholder="Last / Surname" /></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 8. Groups -->
-      <div class="sec-card">
-        <div class="sec-head" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Group Memberships</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-optional">Optional</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body">
-          <p style="font-size:0.82rem;color:#64748b;margin-bottom:12px">Select all groups you are a member of:</p>
-          <div class="check-grid">
-            <label class="check-item"><input type="checkbox" id="rf_mahila" /> Mahila Association</label>
-            <label class="check-item"><input type="checkbox" id="rf_youth" /> Youth Member</label>
-            <label class="check-item"><input type="checkbox" id="rf_assocYouth" /> Associate Youth Member</label>
-            <label class="check-item"><input type="checkbox" id="rf_jrPre" /> Junior Pre-Initiate</label>
-            <label class="check-item"><input type="checkbox" id="rf_srPre" /> Senior Pre-Initiate</label>
-            <label class="check-item"><input type="checkbox" id="rf_crc" /> CRC Member</label>
-            <label class="check-item"><input type="checkbox" id="rf_cca" /> CCA Member</label>
-            <label class="check-item"><input type="checkbox" id="rf_santSu" /> Sant Su Member</label>
-          </div>
-        </div>
-      </div>
-
-      <!-- 9. References -->
-      <div class="sec-card">
-        <div class="sec-head" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">References</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-optional">Optional</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body">
-          <div class="sub-label">Reference 1</div>
-          <div class="grid-2">
-            <div class="field"><label>Name</label><input id="rf_ref1Name" placeholder="Full name" /></div>
-            <div class="field"><label>Relation</label><input id="rf_ref1Relation" placeholder="e.g. Uncle, Friend, Colleague" /></div>
-            <div class="field"><label>Phone</label><input id="rf_ref1Phone" type="tel" placeholder="Mobile" /></div>
-            <div class="field"><label>Email</label><input id="rf_ref1Email" type="email" placeholder="Email address" /></div>
-            <div class="field"><label>Branch (Satsang)</label><input id="rf_ref1Branch" placeholder="Branch name" /></div>
-            <div class="field full"><label>Address</label><input id="rf_ref1Address" placeholder="City, State" /></div>
-          </div>
-          <div class="sub-label">Reference 2</div>
-          <div class="grid-2">
-            <div class="field"><label>Name</label><input id="rf_ref2Name" placeholder="Full name" /></div>
-            <div class="field"><label>Relation</label><input id="rf_ref2Relation" placeholder="e.g. Uncle, Friend, Colleague" /></div>
-            <div class="field"><label>Phone</label><input id="rf_ref2Phone" type="tel" placeholder="Mobile" /></div>
-            <div class="field"><label>Email</label><input id="rf_ref2Email" type="email" placeholder="Email address" /></div>
-            <div class="field"><label>Branch (Satsang)</label><input id="rf_ref2Branch" placeholder="Branch name" /></div>
-            <div class="field full"><label>Address</label><input id="rf_ref2Address" placeholder="City, State" /></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 10. Seva Interests -->
-      <div class="sec-card">
-        <div class="sec-head" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Seva Interests</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-optional">Optional</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body">
-          <div class="field" style="grid-column:1/-1">
-            <label>Select one or more seva you are interested in</label>
-            <div id="sevaList" style="display:flex;flex-direction:column;gap:10px;margin-top:4px"></div>
-            <script>
-              const SEVA_OPTIONS = [
-                { category: 'Dayalbagh Field Security', activity: '1 Week Seva Duty in Dayalbagh Fields',  frequency: 'As Desired',    timings: 'As per Schedule' },
-                { category: 'Horticulture',             activity: 'Seva in Satsang Hall Grounds',          frequency: 'Daily',         timings: '6:15 AM – 7:00 AM' },
-                { category: 'Night Pehna',              activity: 'Patrolling of Satsang Institutions',    frequency: 'Bi-Weekly',     timings: '11:00 PM – 5:00 AM' },
-                { category: 'Medical Assistance',       activity: 'Blood Donation',                        frequency: 'As Required',   timings: 'As Required' },
-                { category: 'Medical Assistance',       activity: 'Duties at Hospitals',                   frequency: 'As Required',   timings: 'As Required' },
-                { category: 'Medical Assistance',       activity: 'Pick & Drop',                           frequency: 'As Required',   timings: 'As Required' },
-                { category: 'Medical Assistance',       activity: 'Other (As Required)',                   frequency: 'As Required',   timings: 'As Required' },
-                { category: 'Communication Grid',       activity: 'Pick & Drop',                           frequency: 'As Required',   timings: 'As Required' },
-                { category: 'Communication Grid',       activity: 'Assistance to Senior Satsangis',        frequency: 'As Required',   timings: 'As Required' },
-                { category: 'Communication Grid',       activity: 'Other (As Required)',                   frequency: 'As Required',   timings: 'As Required' },
-                { category: 'Youth Association',        activity: 'As per Defined Guidelines',             frequency: 'Daily / Weekly',timings: 'As Required' },
-                { category: 'Youth Association',        activity: 'As Advised by BS',                      frequency: 'Daily / Weekly',timings: 'As Required' },
-                { category: 'Mahila Association',       activity: 'As per Requirement',                    frequency: 'Daily / Weekly',timings: 'As Required' },
-                { category: 'Mahila Association',       activity: 'As per Requirement (Secretary role)',   frequency: 'Daily / Weekly',timings: 'As Required' },
-                { category: 'Data Management',          activity: 'Data Entry in System',                  frequency: 'Weekly',        timings: '9:45 AM – 11:00 AM' },
-                { category: 'MCREIC',                   activity: 'Course Facilitator',                    frequency: 'Weekly',        timings: '5:50 AM – 7:30 AM' },
-                { category: 'MCREIC',                   activity: 'Attendance Management',                 frequency: 'Weekly',        timings: '5:50 AM – 7:30 AM' },
-                { category: 'DEI Distance Education',   activity: 'Teaching & Coordinating',               frequency: 'Daily / Weekly',timings: 'As Required' },
-                { category: 'CRC',                      activity: 'As per Defined Guidelines',             frequency: 'As Required',   timings: 'As Required' },
-              ];
-              const sevaList = document.getElementById('sevaList');
-              SEVA_OPTIONS.forEach((s, i) => {
-                const val = `${s.category}: ${s.activity}`;
-                sevaList.innerHTML += `
-                  <label class="seva-item" style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;cursor:pointer;background:#fafbff;transition:background 0.15s, border-color 0.15s">
-                    <input type="checkbox" name="seva" value="${val}"
-                           style="margin-top:3px;width:16px;height:16px;accent-color:#e07b29;flex-shrink:0"
-                           onchange="this.parentElement.style.background = this.checked ? '#fff8f2' : '#fafbff'; this.parentElement.style.borderColor = this.checked ? '#e8832a' : '#e2e8f0';" />
-                    <div>
-                      <div style="font-weight:600;font-size:0.88rem;color:#1e293b">${s.category}</div>
-                      <div style="font-size:0.83rem;color:#334155;margin-top:1px">${s.activity}</div>
-                      <div style="font-size:0.78rem;color:#64748b;margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">
-                        <span>${s.frequency}</span>
-                        <span>${s.timings}</span>
-                      </div>
-                    </div>
-                  </label>`;
-              });
-            </script>
-          </div>
-        </div>
-      </div>
-
-      <!-- 11. Notes -->
-      <div class="sec-card">
-        <div class="sec-head" onclick="toggleSec(this)">
-          <div class="sec-head-left">
-            <div><div class="sec-name">Additional Notes</div></div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="sec-badge badge-optional">Optional</span>
-            <span class="sec-chevron">▼</span>
-          </div>
-        </div>
-        <div class="sec-body">
           <div class="field">
-            <label>Any additional information</label>
-            <textarea id="rf_notes" rows="3" placeholder="Any other details you'd like to share with the admin…"></textarea>
+            <label>Member UID <span class="req-star">*</span></label>
+            <input id="rf_uid" placeholder="e.g. SND2024XXXXXX" />
           </div>
+          <div class="field">
+            <label>Category (Member Type) <span class="req-star">*</span></label>
+            <select id="rf_memberType">
+              <option value="">Select Member Type</option>
+                <option value="Initiated">Initiated</option>
+                <option value="Jigyasu">Jigyasu</option>
+                <option value="Superhumane">Superhumane</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Gender <span class="req-star">*</span></label>
+            <select id="rf_gender">
+              <option value="">Select</option>
+              <option>Male</option><option>Female</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Date of Birth <span class="req-star">*</span></label>
+            <input id="rf_dob" type="date" />
+            <div class="field-hint">Format: DD/MM/YYYY</div>
+          </div>
+          <div class="field">
+            <label>Date of First Initiation <span class="req-star">*</span></label>
+            <input id="rf_doi_first" type="date" />
+          </div>
+          <div class="field">
+            <label>Date of Second Initiation</label>
+            <input id="rf_doi_second" type="date" />
+            <label class="na-toggle"><input type="checkbox" data-na="rf_doi_second" onchange="toggleNA(this)" /> N/A</label>
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input id="rf_email1" type="email" placeholder="Primary email address" />
+          </div>
+          <div class="field">
+            <label>Caste / Community <span class="req-star">*</span></label>
+            <input id="rf_caste" placeholder="e.g. Hindu, Sikh" />
+          </div>
+          <div class="field">
+            <label>Nationality <span class="req-star">*</span></label>
+            <input id="rf_nationality" value="Indian" />
+          </div>
+          <div class="field">
+            <label>Qualification <span class="req-star">*</span></label>
+            <select id="rf_qual">
+              <option value="">Select</option>
+              <option>Below High School</option><option>Secondary School</option><option>Diploma</option>
+              <option>Graduate</option><option>Post Graduate</option><option>Doctorate</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Occupation <span class="req-star">*</span></label>
+            <select id="rf_occ">
+              <option value="">Select</option>
+              <option>Employed - Private</option><option>Employed - Govt</option><option>Self Employed</option>
+              <option>Student</option><option>Retired</option><option>Homemaker</option>
+              <option>Unemployed</option><option>Unable to Work</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label>Address <span class="req-star">*</span></label>
+            <input id="rf_addr1" placeholder="House / Flat No., Street, Building" />
+          </div>
+          <div class="field">
+            <label>City <span class="req-star">*</span></label>
+            <input id="rf_city" placeholder="City" />
+          </div>
+          <div class="field">
+            <label>Pincode <span class="req-star">*</span></label>
+            <input id="rf_pincode" placeholder="6-digit pincode" maxlength="6" />
+          </div>
+          <div class="field">
+            <label>State <span class="req-star">*</span></label>
+            <select id="rf_state" class="rf-state"><option value="">Select</option></select>
+            <label class="na-toggle"><input type="checkbox" data-na="rf_state" onchange="toggleNA(this)" /> N/A</label>
+          </div>
+          <div class="field">
+            <label>Country <span class="req-star">*</span></label>
+            <input id="rf_country" value="India" />
+          </div>
+          <div class="field">
+            <label>Mobile <span class="req-star">*</span></label>
+            <input id="rf_mobile1" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number"
+                   oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)" />
+            <div class="field-hint">Must be exactly 10 digits</div>
+          </div>
+          <div class="field">
+            <label>Father Title <span class="req-star">*</span></label>
+            <select id="rf_fatherTitle">
+              <option value="">—</option><option>Mr.</option><option>Pb.</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Father Full Name <span class="req-star">*</span></label>
+            <input id="rf_fatherFirstName" placeholder="Father's full name" />
+          </div>
+          <div class="field">
+            <label>Nee (Name) <span class="req-star">*</span></label>
+            <input id="rf_neeFirst" placeholder="Maiden / Nee name" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PERSONAL ────────────────────────── -->
+      <div id="rtab-personal" class="rtab-pane" style="display:none">
+        <div class="grid-2">
+          <div class="field">
+            <label>Blood Group</label>
+            <select id="rf_blood">
+              <option value="">Select</option>
+              <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+              <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Date of Reg. (Jigyasu)</label>
+            <input id="rf_dor_jigyasu" type="date" />
+          </div>
+          <div class="field">
+            <label>Marital Status</label>
+            <select id="rf_maritalStatus">
+              <option value="">Select</option>
+              <option>Single</option><option>Married</option><option>Widowed</option><option>Divorced</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Previous Branch</label>
+            <input id="rf_previousBranch" placeholder="If transferred from another branch" />
+          </div>
+          <div class="field">
+            <label>Whether living in Satsang Ashram House</label>
+            <select id="rf_ashram">
+              <option value="Y">Yes</option>
+              <option value="N" selected>No</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Whether living in Soami Nagar</label>
+            <select id="rf_snExt">
+              <option value="Within SN">Yes</option>
+              <option value="Outside SN" selected>No</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PROFESSIONAL ──────────────────── -->
+      <div id="rtab-professional" class="rtab-pane" style="display:none">
+        <div class="grid-2">
+          <div class="field">
+            <label>Designation</label>
+            <input id="rf_desig" placeholder="e.g. Manager, Director" />
+          </div>
+          <div class="field">
+            <label>Organization</label>
+            <input id="rf_org" placeholder="Company / Institution name" />
+          </div>
+          <div class="field">
+            <label>Profession</label>
+            <input id="rf_profession" placeholder="e.g. Engineer, Business, Service" />
+          </div>
+          <div class="field">
+            <label>Profession Code</label>
+            <input id="rf_profCode" placeholder="If known" />
+          </div>
+        </div>
+        <div class="sub-label" style="margin-top:18px">Seva Interests</div>
+        <div class="field" style="grid-column:1/-1">
+          <label>Select one or more seva you are interested in</label>
+          <div id="sevaList" style="display:flex;flex-direction:column;gap:10px;margin-top:4px"></div>
+        </div>
+      </div>
+
+      <!-- ── FLAGS ─────────────────────────── -->
+      <div id="rtab-flags" class="rtab-pane" style="display:none">
+        <p class="rtab-note" style="margin-bottom:12px">Select all groups you are a member of:</p>
+        <div class="check-grid">
+          <label class="check-item"><input type="checkbox" id="rf_mahila" /> Mahila Association</label>
+          <label class="check-item"><input type="checkbox" id="rf_youth" /> Youth Member</label>
+          <label class="check-item"><input type="checkbox" id="rf_assocYouth" /> Associate Youth Member</label>
+          <label class="check-item"><input type="checkbox" id="rf_jrPre" /> Junior Pre-Initiate</label>
+          <label class="check-item"><input type="checkbox" id="rf_srPre" /> Senior Pre-Initiate</label>
+          <label class="check-item"><input type="checkbox" id="rf_crc" /> CRC Member</label>
+          <label class="check-item"><input type="checkbox" id="rf_cca" /> CCA Member</label>
+          <label class="check-item"><input type="checkbox" id="rf_santSu" /> Sant Su Member</label>
+        </div>
+      </div>
+
+      <!-- ── FAMILY ────────────────────────── -->
+      <div id="rtab-family" class="rtab-pane" style="display:none">
+        <div class="sub-label">Father</div>
+        <p class="rtab-note">Father's Title & Name are captured in the Mandatory (Form A) tab above.</p>
+        <div class="grid-4">
+          <div class="field"><label>Branch (Satsang)</label><input id="rf_fatherBranch" placeholder="Branch name" /></div>
+          <div class="field"><label>BSL No.</label><input id="rf_fatherBslno" placeholder="If member" /></div>
+          <div class="field"><label>UID</label><input id="rf_fatherUid" placeholder="If known" /></div>
+          <div class="field"><label>Date of First Initiation</label><input id="rf_fatherDoi" type="date" /></div>
+          <div class="field"><label>Mobile</label><input id="rf_fatherPhone" type="tel" placeholder="Mobile / Landline" /></div>
+          <div class="field"><label>City</label><input id="rf_fatherCity" placeholder="City" /></div>
+          <div class="field"><label>State</label><select id="rf_fatherState" class="rf-state"><option value="">Select</option></select></div>
+          <div class="field"><label>Country</label><input id="rf_fatherCountry" placeholder="Country" /></div>
+        </div>
+
+        <div class="sub-label" style="margin-top:18px">Mother</div>
+        <div class="grid-4">
+          <div class="field">
+            <label>Title</label>
+            <select id="rf_motherTitle">
+              <option value="">—</option><option>Pbn.</option><option>Ms.</option>
+            </select>
+          </div>
+          <div class="field"><label>Name</label><input id="rf_motherFirstName" placeholder="Mother's name" /></div>
+          <div class="field"><label>Branch (Satsang)</label><input id="rf_motherBranch" placeholder="Branch name" /></div>
+          <div class="field"><label>BSL No.</label><input id="rf_motherBslno" placeholder="If member" /></div>
+          <div class="field"><label>UID</label><input id="rf_motherUid" placeholder="If known" /></div>
+          <div class="field"><label>Date of First Initiation</label><input id="rf_motherDoi" type="date" /></div>
+          <div class="field"><label>Mobile</label><input id="rf_motherPhone" type="tel" placeholder="Mobile / Landline" /></div>
+          <div class="field"><label>City</label><input id="rf_motherCity" placeholder="City" /></div>
+          <div class="field"><label>State</label><select id="rf_motherState" class="rf-state"><option value="">Select</option></select></div>
+          <div class="field"><label>Country</label><input id="rf_motherCountry" placeholder="Country" /></div>
+        </div>
+
+        <div class="sub-label" style="margin-top:18px">Spouse</div>
+        <div class="grid-4">
+          <div class="field">
+            <label>Title</label>
+            <select id="rf_spouseTitle">
+              <option value="">—</option><option>Pb.</option><option>Pbn.</option><option>Mr.</option><option>Ms.</option>
+            </select>
+          </div>
+          <div class="field"><label>Name</label><input id="rf_spouseFirstName" placeholder="Spouse's name" /></div>
+          <div class="field"><label>Branch (Satsang)</label><input id="rf_spouseBranch" placeholder="Branch name" /></div>
+          <div class="field"><label>BSL No.</label><input id="rf_spouseBslno" placeholder="If member" /></div>
+          <div class="field"><label>UID</label><input id="rf_spouseUid" placeholder="If known" /></div>
+          <div class="field"><label>Date of First Initiation</label><input id="rf_spouseDoi" type="date" /></div>
+          <div class="field"><label>Mobile</label><input id="rf_spousePhone" type="tel" placeholder="Mobile / Landline" /></div>
+          <div class="field"><label>City</label><input id="rf_spouseCity" placeholder="City" /></div>
+          <div class="field"><label>State</label><select id="rf_spouseState" class="rf-state"><option value="">Select</option></select></div>
+          <div class="field"><label>Country</label><input id="rf_spouseCountry" placeholder="Country" /></div>
         </div>
       </div>
 
@@ -835,12 +604,55 @@
     const code = new URLSearchParams(window.location.search).get('code')
                || (window.location.pathname.split('/').filter(Boolean).pop() || '');
 
-    // ── Accordion ──
-    function toggleSec(head) {
-      const isOpen = head.classList.contains('open');
-      head.classList.toggle('open', !isOpen);
-      head.nextElementSibling.classList.toggle('open', !isOpen);
+    // ── Tabs — same grouping as the member-edit form ──
+    function switchRegTab(name, btn) {
+      document.querySelectorAll('.rtab-pane').forEach(p => { p.style.display = 'none'; });
+      document.querySelectorAll('.reg-tab').forEach(b => b.classList.remove('active'));
+      const pane = document.getElementById('rtab-' + name);
+      if (pane) pane.style.display = 'block';
+      if (btn) btn.classList.add('active');
     }
+
+    // ── Seva Interests checklist ──
+    const SEVA_OPTIONS = [
+      { category: 'Dayalbagh Field Security', activity: '1 Week Seva Duty in Dayalbagh Fields',  frequency: 'As Desired',    timings: 'As per Schedule' },
+      { category: 'Horticulture',             activity: 'Seva in Satsang Hall Grounds',          frequency: 'Daily',         timings: '6:15 AM – 7:00 AM' },
+      { category: 'Night Pehna',              activity: 'Patrolling of Satsang Institutions',    frequency: 'Bi-Weekly',     timings: '11:00 PM – 5:00 AM' },
+      { category: 'Medical Assistance',       activity: 'Blood Donation',                        frequency: 'As Required',   timings: 'As Required' },
+      { category: 'Medical Assistance',       activity: 'Duties at Hospitals',                   frequency: 'As Required',   timings: 'As Required' },
+      { category: 'Medical Assistance',       activity: 'Pick & Drop',                           frequency: 'As Required',   timings: 'As Required' },
+      { category: 'Medical Assistance',       activity: 'Other (As Required)',                   frequency: 'As Required',   timings: 'As Required' },
+      { category: 'Communication Grid',       activity: 'Pick & Drop',                           frequency: 'As Required',   timings: 'As Required' },
+      { category: 'Communication Grid',       activity: 'Assistance to Senior Satsangis',        frequency: 'As Required',   timings: 'As Required' },
+      { category: 'Communication Grid',       activity: 'Other (As Required)',                   frequency: 'As Required',   timings: 'As Required' },
+      { category: 'Youth Association',        activity: 'As per Defined Guidelines',             frequency: 'Daily / Weekly',timings: 'As Required' },
+      { category: 'Youth Association',        activity: 'As Advised by BS',                      frequency: 'Daily / Weekly',timings: 'As Required' },
+      { category: 'Mahila Association',       activity: 'As per Requirement',                    frequency: 'Daily / Weekly',timings: 'As Required' },
+      { category: 'Mahila Association',       activity: 'As per Requirement (Secretary role)',   frequency: 'Daily / Weekly',timings: 'As Required' },
+      { category: 'Data Management',          activity: 'Data Entry in System',                  frequency: 'Weekly',        timings: '9:45 AM – 11:00 AM' },
+      { category: 'MCREIC',                   activity: 'Course Facilitator',                    frequency: 'Weekly',        timings: '5:50 AM – 7:30 AM' },
+      { category: 'MCREIC',                   activity: 'Attendance Management',                 frequency: 'Weekly',        timings: '5:50 AM – 7:30 AM' },
+      { category: 'DEI Distance Education',   activity: 'Teaching & Coordinating',               frequency: 'Daily / Weekly',timings: 'As Required' },
+      { category: 'CRC',                      activity: 'As per Defined Guidelines',             frequency: 'As Required',   timings: 'As Required' },
+    ];
+    const sevaList = document.getElementById('sevaList');
+    SEVA_OPTIONS.forEach((s, i) => {
+      const val = `${s.category}: ${s.activity}`;
+      sevaList.innerHTML += `
+        <label class="seva-item" style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;cursor:pointer;background:#fafbff;transition:background 0.15s, border-color 0.15s">
+          <input type="checkbox" name="seva" value="${val}"
+                 style="margin-top:3px;width:16px;height:16px;accent-color:#e07b29;flex-shrink:0"
+                 onchange="this.parentElement.style.background = this.checked ? '#fff8f2' : '#fafbff'; this.parentElement.style.borderColor = this.checked ? '#e8832a' : '#e2e8f0';" />
+          <div>
+            <div style="font-weight:600;font-size:0.88rem;color:#1e293b">${s.category}</div>
+            <div style="font-size:0.83rem;color:#334155;margin-top:1px">${s.activity}</div>
+            <div style="font-size:0.78rem;color:#64748b;margin-top:3px;display:flex;gap:12px;flex-wrap:wrap">
+              <span>${s.frequency}</span>
+              <span>${s.timings}</span>
+            </div>
+          </div>
+        </label>`;
+    });
 
     // ── Progress bar driven by scroll ──
     window.addEventListener('scroll', () => {
@@ -910,16 +722,10 @@
       const memberType = g('rf_memberType');
       if (!name)       { showInlineErr('Full Name is required.'); scrollTo(0,0); return; }
       if (!memberType) { showInlineErr('Please select your Member Type.'); scrollTo(0,0); return; }
-      if (!mobile1)    { showInlineErr('Mobile 1 is required.'); scrollTo(0,0); return; }
+      if (!mobile1)    { showInlineErr('Mobile is required.'); scrollTo(0,0); return; }
       if (!/^\d{10}$/.test(mobile1)) {
-        showInlineErr('Mobile 1 must be exactly 10 digits.');
+        showInlineErr('Mobile must be exactly 10 digits.');
         document.getElementById('rf_mobile1').focus();
-        scrollTo(0,0); return;
-      }
-      const mobile2val = g('rf_mobile2');
-      if (mobile2val && !/^\d{10}$/.test(mobile2val)) {
-        showInlineErr('Mobile 2 must be exactly 10 digits.');
-        document.getElementById('rf_mobile2').focus();
         scrollTo(0,0); return;
       }
 
@@ -937,37 +743,28 @@
         dateOfSecondInitiation: g('rf_doi_second'),
         caste: g('rf_caste'), nationality: g('rf_nationality'),
         profession: g('rf_profession'), ashram: g('rf_ashram'), snExt: g('rf_snExt'),
-        mobile1, mobile2: g('rf_mobile2'), landline: g('rf_landline'),
-        officePhone: g('rf_officePhone'), email1: g('rf_email1'), email2: g('rf_email2'),
-        addressLine1: g('rf_addr1'), addressLine2: g('rf_addr2'), addressLine3: g('rf_addr3'),
+        mobile1, email1: g('rf_email1'),
+        addressLine1: g('rf_addr1'),
         city: g('rf_city'), pincode: g('rf_pincode'), state: g('rf_state'), country: g('rf_country'),
         qualification: g('rf_qual'), occupation: g('rf_occ'),
-        designation: g('rf_desig'), organization: g('rf_org'),
+        designation: g('rf_desig'), organization: g('rf_org'), professionCode: g('rf_profCode'),
         fatherTitle: g('rf_fatherTitle'), fatherFirstName: g('rf_fatherFirstName'),
-        fatherMiddleName: g('rf_fatherMiddleName'), fatherLastName: g('rf_fatherLastName'),
         fatherPhone: g('rf_fatherPhone'), fatherCity: g('rf_fatherCity'),
-        fatherState: g('rf_fatherState'), fatherBranch: g('rf_fatherBranch'),
+        fatherState: g('rf_fatherState'), fatherBranch: g('rf_fatherBranch'), fatherCountry: g('rf_fatherCountry'),
         fatherBslno: g('rf_fatherBslno'), fatherUid: g('rf_fatherUid'), fatherDoi: g('rf_fatherDoi'),
         motherTitle: g('rf_motherTitle'), motherFirstName: g('rf_motherFirstName'),
-        motherMiddleName: g('rf_motherMiddleName'), motherLastName: g('rf_motherLastName'),
         motherPhone: g('rf_motherPhone'), motherCity: g('rf_motherCity'),
-        motherState: g('rf_motherState'), motherBranch: g('rf_motherBranch'),
+        motherState: g('rf_motherState'), motherBranch: g('rf_motherBranch'), motherCountry: g('rf_motherCountry'),
         motherBslno: g('rf_motherBslno'), motherUid: g('rf_motherUid'), motherDoi: g('rf_motherDoi'),
         spouseTitle: g('rf_spouseTitle'), spouseFirstName: g('rf_spouseFirstName'),
-        spouseMiddleName: g('rf_spouseMiddleName'), spouseLastName: g('rf_spouseLastName'),
         spousePhone: g('rf_spousePhone'), spouseCity: g('rf_spouseCity'),
-        spouseState: g('rf_spouseState'), spouseBranch: g('rf_spouseBranch'),
+        spouseState: g('rf_spouseState'), spouseBranch: g('rf_spouseBranch'), spouseCountry: g('rf_spouseCountry'),
         spouseBslno: g('rf_spouseBslno'), spouseUid: g('rf_spouseUid'), spouseDoi: g('rf_spouseDoi'),
-        neeFirstName: g('rf_neeFirst'), neeMiddleName: g('rf_neeMiddle'), neeLastName: g('rf_neeLast'),
+        neeFirstName: g('rf_neeFirst'),
         mahilaAssociationMember: cb('rf_mahila'), youthMember: cb('rf_youth'),
         associateYouthMember: cb('rf_assocYouth'), juniorPreInitiateMember: cb('rf_jrPre'),
         seniorPreInitiateMember: cb('rf_srPre'), crcMember: cb('rf_crc'),
         ccaMember: cb('rf_cca'), santSuMember: cb('rf_santSu'),
-        ref1Name: g('rf_ref1Name'), ref1Relation: g('rf_ref1Relation'), ref1Phone: g('rf_ref1Phone'),
-        ref1Email: g('rf_ref1Email'), ref1Branch: g('rf_ref1Branch'), ref1Address: g('rf_ref1Address'),
-        ref2Name: g('rf_ref2Name'), ref2Relation: g('rf_ref2Relation'), ref2Phone: g('rf_ref2Phone'),
-        ref2Email: g('rf_ref2Email'), ref2Branch: g('rf_ref2Branch'), ref2Address: g('rf_ref2Address'),
-        notes: g('rf_notes'),
         sevaInterests: Array.from(document.querySelectorAll('input[name="seva"]:checked')).map(c => c.value).join(', '),
       };
 
