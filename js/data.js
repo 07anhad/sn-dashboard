@@ -113,6 +113,7 @@ async function loadAllData() {
       // FormA extra fields
       category: m.category, gender: m.gender,
       maritalStatus: m.marital_status, previousBranch: m.previous_branch,
+      sevaInterests: m.seva_interests,
       // computed composite names (for display)
       fatherName: [m.father_title, m.father_first_name, m.father_middle_name, m.father_last_name].filter(Boolean).join(' ') || null,
       motherName: [m.mother_title, m.mother_first_name, m.mother_middle_name, m.mother_last_name].filter(Boolean).join(' ') || null,
@@ -224,6 +225,7 @@ async function reloadMembers() {
     dateOfExpire: m.date_of_expire,
     category: m.category, gender: m.gender,
     maritalStatus: m.marital_status, previousBranch: m.previous_branch,
+    sevaInterests: m.seva_interests,
     fatherName: [m.father_title, m.father_first_name, m.father_middle_name, m.father_last_name].filter(Boolean).join(' ') || null,
     motherName: [m.mother_title, m.mother_first_name, m.mother_middle_name, m.mother_last_name].filter(Boolean).join(' ') || null,
     spouseName: [m.spouse_title, m.spouse_first_name, m.spouse_middle_name, m.spouse_last_name].filter(Boolean).join(' ') || null,
