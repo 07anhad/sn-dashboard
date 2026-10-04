@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS pending_members (
     occupation                  VARCHAR(200),
     designation                 VARCHAR(200),
     organization                VARCHAR(200),
+    profession_code             VARCHAR(50),
     -- Father
     father_title                VARCHAR(20),
     father_first_name           VARCHAR(100),
@@ -183,9 +184,13 @@ ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_registration_jigyas
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_first_initiation    DATE;
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS date_of_second_initiation   DATE;
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS member_type                  VARCHAR(50);
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS profession_code              VARCHAR(50);
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS gender                       VARCHAR(20);
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS marital_status               VARCHAR(50);
 ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS previous_branch              VARCHAR(200);
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS father_country               VARCHAR(100);
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS mother_country               VARCHAR(100);
+ALTER TABLE pending_members ADD COLUMN IF NOT EXISTS spouse_country               VARCHAR(100);
 
 -- Contributions
 CREATE TABLE IF NOT EXISTS contributions (
@@ -388,6 +393,8 @@ ALTER TABLE member_details ADD COLUMN IF NOT EXISTS category        VARCHAR(100)
 ALTER TABLE member_details ADD COLUMN IF NOT EXISTS gender          VARCHAR(20);
 ALTER TABLE member_details ADD COLUMN IF NOT EXISTS marital_status  VARCHAR(50);
 ALTER TABLE member_details ADD COLUMN IF NOT EXISTS previous_branch VARCHAR(200);
+-- Seva interests: existing members default to blank until they pick from the dropdown.
+ALTER TABLE member_details ADD COLUMN IF NOT EXISTS seva_interests  TEXT;
 
 -- Mandatory "Form A" text columns: backfill blanks to 'N/A', default 'N/A', enforce NOT NULL.
 -- (Date columns are left nullable — they surface as N/A only in the Form A export.)
