@@ -16,6 +16,22 @@ let ANNOUNCEMENTS = [];
 
 let dataLoaded = false;
 
+// Compose a display name from split parts, dropping duplicate words. Handles legacy records
+// where the first-name field already holds the full name but stale middle/last columns linger
+// (which previously caused names like "SAHIB DAYAL PARASHAR DAYAL PARASHAR").
+function composeName(title, first, middle, last) {
+  const seen = new Set();
+  const words = [];
+  [first, middle, last].forEach(part => {
+    String(part ?? '').trim().split(/\s+/).filter(Boolean).forEach(w => {
+      const k = w.toUpperCase();
+      if (!seen.has(k)) { seen.add(k); words.push(w); }
+    });
+  });
+  return [title, words.join(' ')].filter(Boolean).join(' ').trim() || null;
+}
+
+
 // ── Members sessionStorage cache (TTL: 10 min) ───
 async function _fetchMembersWithCache() {
   try {
@@ -114,10 +130,11 @@ async function loadAllData() {
       category: m.category, gender: m.gender,
       maritalStatus: m.marital_status, previousBranch: m.previous_branch,
       sevaInterests: m.seva_interests,
-      // computed composite names (for display)
-      fatherName: [m.father_title, m.father_first_name, m.father_middle_name, m.father_last_name].filter(Boolean).join(' ') || null,
-      motherName: [m.mother_title, m.mother_first_name, m.mother_middle_name, m.mother_last_name].filter(Boolean).join(' ') || null,
-      spouseName: [m.spouse_title, m.spouse_first_name, m.spouse_middle_name, m.spouse_last_name].filter(Boolean).join(' ') || null,
+      // computed composite names (for display) — de-duplicated so legacy split name columns
+      // (first/middle/last) never double up with a full name typed into the first-name field.
+      fatherName: composeName(m.father_title, m.father_first_name, m.father_middle_name, m.father_last_name),
+      motherName: composeName(m.mother_title, m.mother_first_name, m.mother_middle_name, m.mother_last_name),
+      spouseName: composeName(m.spouse_title, m.spouse_first_name, m.spouse_middle_name, m.spouse_last_name),
       // status (kept for existing filter/badge compat)
       status: m.record_status || 'Active',
       approvalStatus: 'Approved',
@@ -226,9 +243,9 @@ async function reloadMembers() {
     category: m.category, gender: m.gender,
     maritalStatus: m.marital_status, previousBranch: m.previous_branch,
     sevaInterests: m.seva_interests,
-    fatherName: [m.father_title, m.father_first_name, m.father_middle_name, m.father_last_name].filter(Boolean).join(' ') || null,
-    motherName: [m.mother_title, m.mother_first_name, m.mother_middle_name, m.mother_last_name].filter(Boolean).join(' ') || null,
-    spouseName: [m.spouse_title, m.spouse_first_name, m.spouse_middle_name, m.spouse_last_name].filter(Boolean).join(' ') || null,
+    fatherName: composeName(m.father_title, m.father_first_name, m.father_middle_name, m.father_last_name),
+    motherName: composeName(m.mother_title, m.mother_first_name, m.mother_middle_name, m.mother_last_name),
+    spouseName: composeName(m.spouse_title, m.spouse_first_name, m.spouse_middle_name, m.spouse_last_name),
     status: m.record_status || 'Activated',
     approvalStatus: 'Approved', joinDate: m.date_of_initiation, zone: m.city,
     type: (m.sant_su_member === 'Y' ? 'Sant Su' :
