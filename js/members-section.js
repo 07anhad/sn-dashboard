@@ -1036,7 +1036,10 @@ function renderMembersTable() {
 
   const total = membersData.length;
   const activeCount = membersData.filter(m => (m.status || '').toLowerCase() !== 'deactivated').length;
-  if (countEl) countEl.textContent = activeCount + ' members';
+  // Badge must match the rows actually listed (which include deactivated), not just the active subset.
+  if (countEl) countEl.textContent = total === activeCount
+    ? `${total} members`
+    : `${total} members (${activeCount} active)`;
 
   const start = (membersPage - 1) * MEMBERS_PER_PAGE;
   const slice = membersData.slice(start, start + MEMBERS_PER_PAGE);
@@ -1629,7 +1632,7 @@ function editMember(uid, isSelfEdit = false) {
       <button class="edit-tab"               onclick="switchEditTab('professional',this)">Professional</button>
       <button class="edit-tab"               onclick="switchEditTab('flags',this)">Flags</button>
       <button class="edit-tab"               onclick="switchEditTab('family',this)">Family</button>
-      ${isSA ? `<button class="edit-tab"     onclick="switchEditTab('admin',this)">Admin / Transfer</button>` : ''}
+      ${canUnlock ? `<button class="edit-tab"     onclick="switchEditTab('admin',this)">Admin / Transfer</button>` : ''}
     </div>
 
     <style>
@@ -1666,7 +1669,7 @@ function editMember(uid, isSelfEdit = false) {
         ${selP('em_fTitle',     'Father Title',              m.fatherTitle, ['','Mr.','Pb.'], true)}
         ${fldReq('em_fFirst',    'Father Full Name',          m.fatherFirstName)}
         ${fldReq('em_neeFirst',  'Nee (Name)',                m.neeFirst)}
-        ${isSA ? frozen('Record Status', m.status) : ''}
+        ${canUnlock ? frozen('Record Status', m.status) : ''}
         <div style="grid-column:1/-1;font-size:0.72rem;color:var(--txt-muted);margin-top:4px;padding-top:8px;border-top:1px solid var(--border)">
           To change any of the frozen fields above, please contact the help desk.
         </div>
@@ -1678,7 +1681,6 @@ function editMember(uid, isSelfEdit = false) {
         ${canUnlock ? fld('em_bslno', 'BSL No.', m.bslno) : frozen('BSL No.', m.bslno, 'Frozen — contact the help desk')}
         ${selP('em_blood',      'Blood Group',            m.bloodGroup, BLOOD_OPTS)}
         ${fld('em_dor',         'Date of Reg. (Jigyasu)', m.dateOfRegistration,      'date')}
-        ${frozen('Date of 2nd Initiation', dt(m.dateOfSecondInitiation), 'Set on the Mandatory (Form A) tab', 'date')}
         ${sel('em_marital',     'Marital Status',         m.maritalStatus, ['','Single','Married','Widowed','Divorced'])}
         ${fld('em_prevBranch',  'Previous Branch',        m.previousBranch)}
         ${ynN('em_ashram',      'Whether living in Satsang Ashram House',              m.ashram)}
@@ -1692,7 +1694,7 @@ function editMember(uid, isSelfEdit = false) {
         ${fld('em_org',       'Organization',     m.organization)}
         ${fld('em_prof',      'Profession',       m.profession)}
         ${fld('em_profCode',  'Profession Code',  m.professionCode)}
-        ${isSA ? (canUnlock ? fld('em_commGrid', 'Comm. Grid Code', m.commGridCode) : frozen('Comm. Grid Code', m.commGridCode, 'Frozen — contact the help desk')) : ''}
+        ${canUnlock ? fld('em_commGrid', 'Comm. Grid Code', m.commGridCode) : ''}
         <div style="grid-column:1/-1;font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:8px 0 2px">Seva Interests</div>
         <div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px">
           ${SEVA_OPTIONS.map(val => `<label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.78rem;cursor:pointer">
@@ -1719,7 +1721,7 @@ function editMember(uid, isSelfEdit = false) {
       <div id="etab-family" class="etab-pane" data-display="block" style="display:none;">
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-sm);">
           ${secHdr('Father')}
-          ${frozen('Name', [m.fatherTitle, m.fatherFirstName, m.fatherMiddleName, m.fatherLastName].filter(Boolean).join(' '), 'From the Mandatory (Form A) tab')}
+          ${frozen('Name', composeName(m.fatherTitle, m.fatherFirstName, m.fatherMiddleName, m.fatherLastName), 'From the Mandatory (Form A) tab')}
           ${fld('em_fBranch', 'Branch',      m.fatherBranch)}
           ${fld('em_fBsl',    'BSL',         m.fatherBslno)}
           ${fld('em_fUid',    'UID',         m.fatherUid)}
@@ -1755,8 +1757,8 @@ function editMember(uid, isSelfEdit = false) {
         </div>
       </div>
 
-      ${isSA ? `
-      <!-- ── ADMIN / TRANSFER (superadmin only) ─ -->
+      ${canUnlock ? `
+      <!-- ── ADMIN / TRANSFER (admins & superadmins) ─ -->
       <div id="etab-admin" class="etab-pane" data-display="grid"
            style="display:none;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
         ${fld('em_dorYouth',     'DOR Youth',              m.dorYouth,            'date')}
@@ -1830,6 +1832,8 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
   put('addressLine1','em_addr1');           put('city','em_city');           put('pincode','em_pincode');
   put('state','em_state');                  put('country','em_country');     put('mobile','em_mobile');
   put('fatherTitle','em_fTitle');           put('fatherFirstName','em_fFirst'); put('neeFirst','em_neeFirst');
+  // Father Full Name is a single field now — clear the legacy split columns so old data can't re-append.
+  payload.fatherMiddleName = ''; payload.fatherLastName = '';
 
   put('bslno','em_bslno');
   put('bloodGroup','em_blood');             putDate('dateOfRegistration','em_dor');
@@ -1852,10 +1856,12 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
   put('motherTitle','em_mTitle'); put('motherFirstName','em_mFirst'); put('motherBranch','em_mBranch');
   put('motherBslno','em_mBsl'); put('motherUid','em_mUid'); putDate('motherDoi','em_mDoi');
   put('motherPhone','em_mPhone'); put('motherCity','em_mCity'); put('motherState','em_mState'); put('motherCountry','em_mCountry');
+  payload.motherMiddleName = ''; payload.motherLastName = '';
 
   put('spouseTitle','em_sTitle'); put('spouseFirstName','em_sFirst'); put('spouseBranch','em_sBranch');
   put('spouseBslno','em_sBsl'); put('spouseUid','em_sUid'); putDate('spouseDoi','em_sDoi');
   put('spousePhone','em_sPhone'); put('spouseCity','em_sCity'); put('spouseState','em_sState'); put('spouseCountry','em_sCountry');
+  payload.spouseMiddleName = ''; payload.spouseLastName = '';
 
   putDate('dorYouth','em_dorYouth'); putDate('dateOfInitiationNew','em_doiNew');
   putDate('dateTransferIn','em_transferIn'); put('transferFromBranch','em_transferFrom');
