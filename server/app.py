@@ -1166,6 +1166,13 @@ def update_member(uid):
         audit('CHANGE_MEMBER_UID', f"old={uid} new={new_uid}")
         uid = new_uid
 
+    # Category change → reassign BSL to the next number in the new category's series.
+    new_cat = (d.get('category') or '').strip()
+    old_cat = (before.get('category') or '').strip()
+    if new_cat and new_cat.lower() != old_cat.lower():
+        d['bslno'] = get_next_bsl(new_cat)
+        audit('REASSIGN_BSL', f"uid={uid} {old_cat or '—'}->{new_cat} bsl={d['bslno']}")
+
     _apply_member_update(uid, d)
     audit('EDIT_MEMBER', f"uid={uid} name={d.get('name','')}")
 
