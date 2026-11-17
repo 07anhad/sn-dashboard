@@ -1586,8 +1586,6 @@ function editMember(uid, isSelfEdit = false) {
   };
 
   // Strip an honorific prefix (PB / PBN) for display only.
-  const stripPB = s => String(s ?? '').replace(/^\s*(PBN\.?|PB\.?)\s+/i, '').trim();
-
   const STATE_OPTS = ['', 'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland','Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal','Andaman and Nicobar Islands','Chandigarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Jammu and Kashmir','Ladakh','Lakshadweep','Puducherry'];
   const QUAL_OPTS  = ['', 'Below High School','Secondary School','Diploma','Graduate','Post Graduate','Doctorate'];
   const OCC_OPTS   = ['', 'Employed - Private','Employed - Govt','Self Employed','Student','Retired','Homemaker','Unemployed','Unable to Work'];
@@ -1648,7 +1646,7 @@ function editMember(uid, isSelfEdit = false) {
       <div id="etab-mandatory" class="etab-pane" data-display="grid"
            style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
         ${canUnlock ? fld('em_uid', 'UID', m.uid) : frozen('UID', m.uid)}
-        ${frozen('Full Name', stripPB(m.name))}
+        ${frozen('Full Name', m.name)}
         ${canUnlock ? selP('em_category', 'Category', m.category, ['','Initiated','Jigyasu','Superhumane'], true) : frozen('Category', m.category)}
         ${selP('em_gender',     'Gender',                    m.gender, ['','Male','Female','Other'], true)}
         <input id="em_doi" type="hidden" value="${m.dateOfInitiation || ''}" />
