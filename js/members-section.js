@@ -1668,6 +1668,8 @@ function editMember(uid, isSelfEdit = false) {
         ${canUnlock ? fld('em_mobile', 'Mobile (10 digits)', m.mobile) : frozen('Mobile', m.mobile)}
         ${selP('em_fTitle',     'Father Title',              m.fatherTitle, ['','Mr.','Pb.'], true)}
         ${fldReq('em_fFirst',    'Father Full Name',          m.fatherFirstName)}
+        ${selP('em_sTitle',     'Spouse Title',              m.spouseTitle, ['','Pb.','Pbn.','Mr.','Ms.'])}
+        ${fld('em_sFirst',      'Spouse Full Name',          m.spouseFirstName)}
         ${fldReq('em_neeFirst',  'Nee (Name)',                m.neeFirst)}
         ${canUnlock ? frozen('Record Status', m.status) : ''}
         <div style="grid-column:1/-1;font-size:0.72rem;color:var(--txt-muted);margin-top:4px;padding-top:8px;border-top:1px solid var(--border)">
@@ -1744,8 +1746,7 @@ function editMember(uid, isSelfEdit = false) {
           ${fld('em_mCountry','Country',     m.motherCountry)}
 
           ${secHdr('Spouse')}
-          ${selP('em_sTitle', 'Title',       m.spouseTitle, ['','Pb.','Pbn.','Mr.','Ms.'])}
-          ${fld('em_sFirst',  'Name',        m.spouseFirstName)}
+          ${frozen('Name', composeName(m.spouseTitle, m.spouseFirstName, m.spouseMiddleName, m.spouseLastName), 'From the Mandatory (Form A) tab')}
           ${fld('em_sBranch', 'Branch',      m.spouseBranch)}
           ${fld('em_sBsl',    'BSL',         m.spouseBslno)}
           ${fld('em_sUid',    'UID',         m.spouseUid)}
@@ -2144,6 +2145,8 @@ function getFormA() {
     ['Mobile-1',                  m => m.mobile],
     ['Father Title',              m => m.fatherTitle],
     ['Father Full Name',          m => join(m.fatherFirstName, m.fatherMiddleName, m.fatherLastName)],
+    ['Spouse Title',              m => m.spouseTitle],
+    ['Spouse Full Name',          m => join(m.spouseFirstName, m.spouseMiddleName, m.spouseLastName)],
     ['Nee (Name)',                m => join(m.neeFirst, m.neeMiddle, m.neeLast)],
   ];
 
