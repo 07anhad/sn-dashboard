@@ -433,6 +433,16 @@
             <input id="rf_fatherFirstName" placeholder="Father's full name" />
           </div>
           <div class="field">
+            <label>Spouse Title</label>
+            <select id="rf_spouseTitle">
+              <option value="">—</option><option>Pb.</option><option>Pbn.</option><option>Mr.</option><option>Ms.</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Spouse Full Name</label>
+            <input id="rf_spouseFirstName" placeholder="Spouse's full name (if married)" />
+          </div>
+          <div class="field">
             <label>Nee (Name) <span class="req-star">*</span></label>
             <input id="rf_neeFirst" placeholder="Maiden / Nee name" />
           </div>
@@ -559,14 +569,8 @@
         </div>
 
         <div class="sub-label" style="margin-top:18px">Spouse</div>
+        <p class="rtab-note">Spouse's Title & Name are captured in the Mandatory (Form A) tab above.</p>
         <div class="grid-4">
-          <div class="field">
-            <label>Title</label>
-            <select id="rf_spouseTitle">
-              <option value="">—</option><option>Pb.</option><option>Pbn.</option><option>Mr.</option><option>Ms.</option>
-            </select>
-          </div>
-          <div class="field"><label>Name</label><input id="rf_spouseFirstName" placeholder="Spouse's name" /></div>
           <div class="field"><label>Branch (Satsang)</label><input id="rf_spouseBranch" placeholder="Branch name" /></div>
           <div class="field"><label>BSL No.</label><input id="rf_spouseBslno" placeholder="If member" /></div>
           <div class="field"><label>UID</label><input id="rf_spouseUid" placeholder="If known" /></div>
