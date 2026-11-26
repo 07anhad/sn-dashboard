@@ -1,8 +1,9 @@
 """
 app.py — Flask server: serves static frontend + REST API
 """
-import os, sys, logging, shutil, smtplib, re, random, json
+import os, sys, logging, shutil, smtplib, re, random, json, secrets, hmac, html, time, threading
 import datetime as _dt
+from collections import defaultdict, deque
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from logging.handlers import TimedRotatingFileHandler
@@ -19,14 +20,30 @@ class _WinSafeRotatingHandler(TimedRotatingFileHandler):
         except Exception:
             pass  # never crash the server over a log rotation failure
 
-from flask import Flask, send_from_directory, jsonify, request
+from flask import Flask, send_from_directory, jsonify, request, session, Response
 from flask_cors import CORS
+from werkzeug.routing import BaseConverter
+from werkzeug.security import generate_password_hash, check_password_hash
 from db import query, execute
+import member_links
 
 app = Flask(__name__, static_folder=None)
 CORS(app)
 app.config['MAX_CONTENT_LENGTH'] = 300 * 1024 * 1024  # 300 MB upload limit
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-only-insecure-key')
+app.config.update(
+    SESSION_COOKIE_NAME='sn_session',
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    # Set SESSION_COOKIE_SECURE=0 only for plain-http local testing.
+    SESSION_COOKIE_SECURE=os.environ.get('SESSION_COOKIE_SECURE', '1') != '0',
+    PERMANENT_SESSION_LIFETIME=_dt.timedelta(days=30),
+)
+
+
+class _MemberTokenConverter(BaseConverter):
+    regex = member_links.TOKEN_PATTERN
+
+app.url_map.converters['mtoken'] = _MemberTokenConverter
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 
@@ -64,6 +81,24 @@ def _init_db():
         print(f'[startup] *** DB INIT FAILED — schema NOT applied: {e}', flush=True)
 
 _init_db()
+
+
+def _load_secret_key():
+    """SECRET_KEY env var, else a random key stored in the DB so every worker and restart shares it."""
+    env_key = os.environ.get('SECRET_KEY', '').strip()
+    if env_key:
+        return env_key
+    try:
+        execute(
+            "INSERT INTO app_settings (key, value) VALUES ('flask_secret_key', %s) ON CONFLICT (key) DO NOTHING",
+            (secrets.token_hex(32),)
+        )
+        return query("SELECT value FROM app_settings WHERE key='flask_secret_key'", one=True)['value']
+    except Exception as e:
+        print(f'[startup] *** No SECRET_KEY and DB key unavailable ({e}) — sessions reset on restart', flush=True)
+        return secrets.token_hex(32)
+
+app.secret_key = _load_secret_key()
 
 # ═══════════════════════════════════════════
 # Email — Gmail SMTP
@@ -124,9 +159,21 @@ _handler.suffix = '%Y-%m-%d'
 _handler.setFormatter(logging.Formatter('%(asctime)s | %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
 _audit_logger.addHandler(_handler)
 
+def _actor(default='anonymous'):
+    """'username(role)' from the server session; the X-User header is only a fallback label."""
+    u = session.get('user')
+    if u:
+        return f"{u.get('username')}({u.get('role')})"
+    return request.headers.get('X-User', default) or default
+
+
+def _client_ip():
+    return (request.headers.get('X-Forwarded-For') or request.remote_addr or '').split(',')[0].strip()
+
+
 def audit(action: str, detail: str = ''):
-    """Log a user action. Reads actor info from the X-User header sent by the frontend."""
-    actor = request.headers.get('X-User', 'unknown')
+    """Log a user action."""
+    actor = _actor('unknown')
     ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown')
     msg = f"actor={actor} | ip={ip} | action={action}"
     if detail:
@@ -180,7 +227,7 @@ def _log_request_end(response):
     try:
         if request.path.startswith('/api/'):
             ms = int((_dt.datetime.now() - getattr(request, '_t0', _dt.datetime.now())).total_seconds() * 1000)
-            actor = request.headers.get('X-User', 'anonymous')
+            actor = _actor()
             ip = request.headers.get('X-Forwarded-For', request.remote_addr or '-')
             line = (f"{request.method} {request.full_path.rstrip('?')} -> {response.status_code} "
                     f"| {ms}ms | actor={actor} | ip={ip}")
@@ -202,12 +249,15 @@ def _log_unhandled(e):
     if isinstance(e, HTTPException):
         return e
     import traceback
-    actor = request.headers.get('X-User', 'anonymous')
+    actor = _actor()
+    path = request.path
+    if member_links.TOKEN_RE.match(path.lstrip('/')):
+        path = '/' + path.lstrip('/')[:4] + '…'  # never log a full login link
     _err_logger.error(
-        f"UNHANDLED {request.method} {request.path} | actor={actor} | "
+        f"UNHANDLED {request.method} {path} | actor={actor} | "
         f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
     )
-    print(f"[ERROR] {request.method} {request.path} {type(e).__name__}: {e}", flush=True)
+    print(f"[ERROR] {request.method} {path} {type(e).__name__}: {e}", flush=True)
     return jsonify({'ok': False, 'error': 'Server error. Please try again or contact the administrator.'}), 500
 
 
@@ -305,10 +355,6 @@ def css_files(filename):
 def js_files(filename):
     return send_from_directory(os.path.join(ROOT, 'js'), filename)
 
-@app.route('/dataset/<path:filename>')
-def dataset_files(filename):
-    return send_from_directory(os.path.join(ROOT, 'dataset'), filename)
-
 @app.route('/manifest.json')
 def manifest():
     return send_from_directory(ROOT, 'manifest.json', mimetype='application/manifest+json')
@@ -323,6 +369,107 @@ def service_worker():
 @app.route('/icons/<path:filename>')
 def icon_files(filename):
     return send_from_directory(os.path.join(ROOT, 'icons'), filename)
+
+# ═══════════════════════════════════════════
+# Personal member links — https://snbranch.org/<token>
+# ═══════════════════════════════════════════
+_LINK_FAIL_LIMIT  = 20       # failed attempts per IP...
+_LINK_FAIL_WINDOW = 600      # ...per 10 minutes (per worker process)
+_link_failures    = defaultdict(deque)
+_link_fail_lock   = threading.Lock()
+
+
+def _link_attempts_blocked(ip):
+    now = time.monotonic()
+    with _link_fail_lock:
+        q = _link_failures.get(ip)
+        if not q:
+            return False
+        while q and now - q[0] > _LINK_FAIL_WINDOW:
+            q.popleft()
+        if not q:
+            del _link_failures[ip]
+            return False
+        return len(q) >= _LINK_FAIL_LIMIT
+
+
+def _note_link_failure(ip):
+    with _link_fail_lock:
+        _link_failures[ip].append(time.monotonic())
+
+
+def _no_store(resp):
+    resp.headers['Cache-Control'] = 'no-store'
+    resp.headers['Referrer-Policy'] = 'no-referrer'
+    resp.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    resp.headers['X-Frame-Options'] = 'DENY'
+    return resp
+
+
+def _link_message_page(title, message, status):
+    body = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>{html.escape(title)} — Soaminagar Branch</title></head>
+<body style="font-family:system-ui,sans-serif;background:#f4f6fb;margin:0;padding:60px 20px;text-align:center;color:#1c1f2e">
+<div style="max-width:420px;margin:auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 10px rgba(0,0,0,.06)">
+<h2 style="color:#e07b29;margin:0 0 12px">{html.escape(title)}</h2>
+<p style="color:#555;line-height:1.6;margin:0 0 20px">{html.escape(message)}</p>
+<a href="/" style="color:#1c1f2e;font-weight:600">Go to sign-in page</a></div></body></html>"""
+    return _no_store(Response(body, status=status, mimetype='text/html'))
+
+
+@app.route('/<mtoken:token>')
+def member_link_login(token):
+    ip = _client_ip()
+    if _link_attempts_blocked(ip):
+        return _link_message_page('Too many attempts', 'Please wait a few minutes and try again.', 429)
+
+    link = member_links.find_active_link(token)
+    if not link:
+        _note_link_failure(ip)
+        audit('LINK_LOGIN_FAILED', f"token={token[:4]}…")
+        return _link_message_page(
+            'Link not valid',
+            'This link is not valid or has been replaced. Please contact the branch office for your current link.',
+            404
+        )
+
+    uid = link['member_uid']
+    member_links.record_use(link['id'])
+    account = query("SELECT id, username, email FROM users WHERE member_id=%s", (uid,), one=True) or {}
+    user = {
+        'id':         account.get('id'),
+        'username':   account.get('username') or uid,
+        'name':       link['name'] or uid,
+        'role':       'member',   # a link never grants admin, even for designated admins
+        'email':      account.get('email') or link.get('email1') or '',
+        'member_id':  uid,
+        'member_uid': uid,
+    }
+    _start_session(user, via='link', link_id=link['id'])
+    audit('LINK_LOGIN', f"uid={uid} link_id={link['id']}")
+
+    # The page mirrors the session into storage (what the existing UI reads), then drops the
+    # token from the address bar/history by replacing it with the dashboard.
+    client_user = {
+        'username': user['username'], 'name': user['name'], 'role': 'member', 'email': user['email'],
+        'memberId': uid, 'memberUid': uid, 'isDesignatedAdmin': False,
+    }
+    payload = json.dumps(client_user).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+    body = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Signing in… — Soaminagar Branch</title></head>
+<body style="font-family:system-ui,sans-serif;text-align:center;padding:60px 20px;color:#555">Signing you in…
+<script>(function () {{
+  var s = JSON.stringify({payload});
+  try {{ sessionStorage.removeItem('sn_members_v1'); }} catch (e) {{}}
+  sessionStorage.setItem('currentUser', s);
+  localStorage.setItem('currentUser', s);
+  location.replace('/dashboard.html');
+}})();</script>
+<noscript>Please enable JavaScript in your browser, then open your link again.</noscript>
+</body></html>"""
+    return _no_store(Response(body, mimetype='text/html'))
 
 # ═══════════════════════════════════════════
 # AUTH API
@@ -371,9 +518,145 @@ def _designated_admin(username, name=None):
 
 
 def _caller_username():
-    """Login username parsed from the X-User header ('username(role)')."""
-    h = request.headers.get('X-User', '')
-    return h.split('(')[0].strip() if '(' in h else h.strip()
+    """Login username of the signed-in user (from the server session)."""
+    return ((session.get('user') or {}).get('username') or '').strip()
+
+
+# ── Server-side sessions ────────────────────────────────────────────────────
+# The signed, HttpOnly session cookie is the only source of identity.
+# localStorage 'currentUser' in the browser is just a display copy.
+_ADMIN_ROLES = ('admin', 'superadmin')
+
+# /api endpoints callable without signing in.
+_PUBLIC_ENDPOINTS = {
+    'login', 'send_otp', 'verify_otp', 'signup', 'signup_verify', 'signup_resend',
+    'forgot_send_otp', 'reset_password', 'auth_me', 'auth_logout',
+    'validate_reg_link', 'submit_registration',
+}
+# /api endpoints a member may call (data is scoped to their own UID inside each).
+# Anything not listed here or above is admin-only, so new endpoints are safe by default.
+_MEMBER_ENDPOINTS = {
+    'get_zones', 'get_member_types', 'get_members', 'get_announcements', 'get_esatsang',
+    'dashboard_stats', 'all_superhumane', 'get_reg_links', 'my_children',
+    'change_password', 'claim_member',
+}
+
+
+def _start_session(user, via, link_id=None):
+    session.clear()
+    session.permanent = True
+    session['user'] = {
+        'id':                  user.get('id'),
+        'username':            user.get('username'),
+        'name':                user.get('name'),
+        'role':                user.get('role'),
+        'email':               user.get('email'),
+        'member_id':           user.get('member_id'),
+        'member_uid':          user.get('member_uid'),
+        'is_designated_admin': bool(user.get('is_designated_admin')),
+        'via':                 via,
+        'link_id':             link_id,
+    }
+
+
+def _is_admin_session():
+    return (session.get('user') or {}).get('role') in _ADMIN_ROLES
+
+
+def _session_member_uid():
+    """The signed-in member's UID. Password accounts are re-read so a fresh claim applies at once."""
+    u = session.get('user') or {}
+    if u.get('via') == 'link' or not u.get('id'):
+        return u.get('member_uid')
+    row = query("SELECT member_id FROM users WHERE id=%s", (u['id'],), one=True)
+    return (row or {}).get('member_id')
+
+
+def _session_still_valid(u):
+    """Revoked links and deleted accounts lose access on their very next request."""
+    if u.get('via') == 'link':
+        return member_links.is_link_active(u.get('link_id'), u.get('member_uid'))
+    return bool(u.get('id')) and bool(query("SELECT 1 FROM users WHERE id=%s", (u['id'],), one=True))
+
+
+@app.before_request
+def _require_session():
+    if not request.path.startswith('/api/') or request.method == 'OPTIONS':
+        return None
+    if request.endpoint in _PUBLIC_ENDPOINTS:
+        return None
+    user = session.get('user')
+    if not user or not _session_still_valid(user):
+        session.clear()
+        return jsonify({'ok': False, 'error': 'Please sign in again.'}), 401
+    if user.get('role') in _ADMIN_ROLES:
+        return None
+    if request.endpoint in _MEMBER_ENDPOINTS:
+        return None
+    if request.endpoint == 'update_member' and request.path.endswith('/self'):
+        return None
+    audit('ACCESS_DENIED', f"endpoint={request.endpoint} path={request.path}")
+    return jsonify({'ok': False, 'error': 'You do not have permission to do that.'}), 403
+
+
+@app.route('/api/auth/me')
+def auth_me():
+    u = session.get('user')
+    if not u or not _session_still_valid(u):
+        session.clear()
+        return jsonify({'ok': False, 'error': 'Not signed in.'}), 401
+    out = {k: u.get(k) for k in ('username', 'name', 'role', 'email', 'member_id',
+                                 'member_uid', 'is_designated_admin', 'via')}
+    if u.get('role') == 'member':
+        out['member_id'] = out['member_uid'] = _session_member_uid()
+    return jsonify({'ok': True, 'user': out})
+
+
+@app.route('/api/auth/logout', methods=['POST'])
+def auth_logout():
+    if session.get('user'):
+        audit('LOGOUT')
+    session.clear()
+    return jsonify({'ok': True})
+
+
+# ── Passwords ───────────────────────────────────────────────────────────────
+_HASH_PREFIXES = ('pbkdf2:', 'scrypt:')
+
+
+def _hash_password(password):
+    return generate_password_hash(password, method='pbkdf2:sha256')
+
+
+def _password_matches(user_row, password):
+    """Check a password; legacy plain-text passwords are upgraded to a hash on first success."""
+    stored = user_row.get('password') or ''
+    if not stored or not password:
+        return False
+    if stored.startswith(_HASH_PREFIXES):
+        return check_password_hash(stored, password)
+    if not hmac.compare_digest(stored.encode('utf-8'), password.encode('utf-8')):
+        return False
+    execute("UPDATE users SET password=%s WHERE id=%s", (_hash_password(password), user_row['id']))
+    return True
+
+
+def _authenticate(identifier, password, role):
+    """User row for (username or email, password, role) — same matching rules as before hashing."""
+    if not identifier or not password:
+        return None
+    roles = list(_ADMIN_ROLES) if role == 'admin' else [role]
+    rows = query(
+        "SELECT id,username,name,role,email,member_id,password FROM users "
+        "WHERE (username=%s OR email=%s) AND role = ANY(%s) ORDER BY id",
+        (identifier, identifier, roles)
+    )
+    # Families share an email, so several rows can match; the password picks the account.
+    for row in rows:
+        if _password_matches(row, password):
+            row.pop('password', None)
+            return row
+    return None
 
 
 def _mask_email(email):
@@ -440,18 +723,7 @@ def login():
     role = (data.get('role') or '').strip()
 
     # 'admin' toggle on login page covers both admin and superadmin
-    if role == 'admin':
-        user = query(
-            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role IN ('admin','superadmin')",
-            (username, username, password),
-            one=True
-        )
-    else:
-        user = query(
-            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role=%s",
-            (username, username, password, role),
-            one=True
-        )
+    user = _authenticate(username, password, role)
     if user:
         user_dict = dict(user)
         user_dict['member_uid'] = _member_uid_for(user_dict)
@@ -462,6 +734,7 @@ def login():
                 user_dict['role'] = 'admin'
                 user_dict['is_designated_admin'] = True
                 audit('DESIGNATED_ADMIN_LOGIN', f"username={username} name={user_dict['name']}")
+        _start_session(user_dict, via='password')
         audit('LOGIN_SUCCESS', f"username={username} role={user_dict['role']} member_uid={user_dict.get('member_uid')}")
         return jsonify({'ok': True, 'user': user_dict})
     audit('LOGIN_FAILED', f"username={username} attempted_role={role}")
@@ -496,16 +769,7 @@ def send_otp():
     role     = (data.get('role') or '').strip()
 
     # Validate credentials first (same logic as login)
-    if role == 'admin':
-        user = query(
-            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role IN ('admin','superadmin')",
-            (username, username, password), one=True
-        )
-    else:
-        user = query(
-            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role=%s",
-            (username, username, password, role), one=True
-        )
+    user = _authenticate(username, password, role)
 
     if not user:
         return jsonify({'ok': False, 'error': 'Invalid credentials.'}), 401
@@ -554,16 +818,7 @@ def verify_otp():
     code     = (data.get('code') or '').strip()
 
     # Re-validate credentials
-    if role == 'admin':
-        user = query(
-            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role IN ('admin','superadmin')",
-            (username, username, password), one=True
-        )
-    else:
-        user = query(
-            "SELECT id,username,name,role,email,member_id FROM users WHERE (username=%s OR email=%s) AND password=%s AND role=%s",
-            (username, username, password, role), one=True
-        )
+    user = _authenticate(username, password, role)
 
     if not user:
         return jsonify({'ok': False, 'error': 'Invalid credentials.'}), 401
@@ -582,6 +837,7 @@ def verify_otp():
     user_dict = dict(user)
     user_dict['member_uid'] = _member_uid_for(user_dict)
 
+    _start_session(user_dict, via='otp')
     audit('OTP_LOGIN_SUCCESS', f"username={username} role={user_dict['role']}")
     return jsonify({'ok': True, 'user': user_dict})
 
@@ -618,7 +874,7 @@ def signup():
     execute(
         "INSERT INTO pending_signups (username,password,name,email,member_uid,code,expires_at) "
         "VALUES (%s,%s,%s,%s,%s,%s, NOW() + INTERVAL '30 minutes')",
-        (username, password, name, email, member_uid, code)
+        (username, _hash_password(password), name, email, member_uid, code)
     )
 
     if not _send_otp_email(email, code):
@@ -666,6 +922,7 @@ def signup_verify():
 
     user_dict = dict(user)
     user_dict['member_uid'] = _member_uid_for(user_dict)
+    _start_session(user_dict, via='signup')
     audit('SIGNUP_VERIFIED', f"new_user={username} member_uid={pending['member_uid']}")
     return jsonify({'ok': True, 'user': user_dict}), 201
 
@@ -713,13 +970,17 @@ def claim_member():
     password   = data.get('password') or ''
     identifier = (data.get('memberIdentifier') or '').strip()
 
-    user = query(
-        "SELECT id, username, name, role, email, member_id FROM users "
-        "WHERE LOWER(username)=%s AND password=%s AND role='member'",
-        (username, password), one=True
-    )
-    if not user:
+    me = session.get('user') or {}
+    if username != (me.get('username') or '').strip().lower():
         return jsonify({'ok': False, 'error': 'Invalid credentials.'}), 401
+    user = query(
+        "SELECT id, username, name, role, email, member_id, password FROM users "
+        "WHERE LOWER(username)=%s AND role='member'",
+        (username,), one=True
+    )
+    if not user or not _password_matches(user, password):
+        return jsonify({'ok': False, 'error': 'Invalid credentials.'}), 401
+    user.pop('password', None)
     if user['member_id']:
         return jsonify({'ok': False, 'error': 'Your account is already linked to a member record.'}), 409
 
@@ -731,6 +992,7 @@ def claim_member():
         return jsonify({'ok': False, 'error': 'That member record is already linked to another account. Please contact an administrator.'}), 409
 
     execute("UPDATE users SET member_id=%s WHERE id=%s", (member_uid, user['id']))
+    session['user'] = {**me, 'member_id': member_uid, 'member_uid': member_uid}
     audit('CLAIM_MEMBER', f"username={username} uid={member_uid}")
 
     user_dict = dict(user)
@@ -765,8 +1027,11 @@ def reset_password():
         if not token:
             return jsonify({'ok': False, 'error': 'Invalid or expired code.'}), 401
         execute("UPDATE otp_tokens SET used=TRUE WHERE id=%s", (token['id'],))
+    elif not _is_admin_session():
+        # Without an emailed code only a signed-in admin may reset someone's password.
+        return jsonify({'ok': False, 'error': 'Verification code is required.'}), 400
 
-    execute("UPDATE users SET password=%s WHERE username=%s", (new_password, username))
+    execute("UPDATE users SET password=%s WHERE username=%s", (_hash_password(new_password), username))
     audit('RESET_PASSWORD', f"target_user={username}")
     return jsonify({'ok': True})
 
@@ -841,6 +1106,12 @@ def delete_zone(id):
 # ═══════════════════════════════════════════
 @app.route('/api/members')
 def get_members():
+    if not _is_admin_session():
+        # Members only ever receive their own record (the member UI looks it up by UID).
+        own = _session_member_uid()
+        rows = query("SELECT * FROM member_details WHERE uid=%s", (own,)) if own else []
+        return jsonify({'members': rows, 'total': len(rows), 'page': 1, 'limit': len(rows)})
+
     search = (request.args.get('q') or '').strip()
     page   = max(1, int(request.args.get('page', 1)))
     limit  = min(10000, int(request.args.get('limit', 5000)))
@@ -992,23 +1263,9 @@ def update_member(uid):
     is_self_edit = request.path.endswith('/self')
 
     if is_self_edit:
-        # Verify the caller actually owns this uid.
-        # X-User header is "username(role)" — parse out the username.
-        x_user_header = request.headers.get('X-User', '')
-        caller_username = x_user_header.split('(')[0].strip() if '(' in x_user_header else x_user_header.strip()
-        if not caller_username:
-            audit('SELF_EDIT_DENIED', f"uid={uid} reason=missing_X-User")
-            return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
-
-        caller_row = query(
-            "SELECT member_id FROM users WHERE username=%s AND role='member'",
-            (caller_username,), one=True
-        )
-        if not caller_row:
-            audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} reason=user_not_found")
-            return jsonify({'ok': False, 'error': 'Unauthorized'}), 403
-
-        caller_uid = (caller_row.get('member_id') or '').strip()
+        # Verify the caller actually owns this uid (identity comes from the server session).
+        caller_username = _caller_username()
+        caller_uid = (_session_member_uid() or '').strip()
         if not caller_uid:
             audit('SELF_EDIT_DENIED', f"uid={uid} caller={caller_username} reason=account_not_linked")
             return jsonify({'ok': False, 'error': 'Your account is not linked to a member record yet. Please contact an administrator.'}), 403
@@ -1205,6 +1462,8 @@ def delete_member(uid):
 # ═══════════════════════════════════════════
 @app.route('/api/reg-links')
 def get_reg_links():
+    if not _is_admin_session():
+        return jsonify([])
     return jsonify(query("SELECT * FROM reg_links ORDER BY id"))
 
 @app.route('/api/reg-links', methods=['POST'])
@@ -1343,7 +1602,7 @@ def approve_pending_member(id):
     if not row:
         return jsonify({'ok': False, 'error': 'Not found'}), 404
 
-    actor = request.headers.get('X-User', 'unknown')
+    actor = _actor('unknown')
     
     uid = (row.get('uid') or '').strip() or f"PENDING-{id}"
 
@@ -1567,7 +1826,7 @@ def approve_pending_member(id):
 
 @app.route('/api/pending-members/<int:id>/reject', methods=['POST'])
 def reject_pending_member(id):
-    actor = request.headers.get('X-User', 'unknown')
+    actor = _actor('unknown')
     execute(
         "UPDATE pending_members SET status='rejected', reviewed_at=NOW(), reviewed_by=%s WHERE id=%s",
         (actor, id)
@@ -1623,6 +1882,11 @@ def get_esatsang():
     tp_filter  = request.args.get('type', '').strip().upper()
     date_from  = request.args.get('date_from', '').strip()
     date_to    = request.args.get('date_to', '').strip()
+
+    if not _is_admin_session():
+        uid = (_session_member_uid() or '').strip()
+        if not uid:
+            return jsonify({'rows': [], 'total': 0, 'page': 1, 'pages': 1})
 
     if uid:
         # Member view: only their own records
@@ -2028,18 +2292,21 @@ def dashboard_attendance_stats():
 @app.route('/api/auth/change-password', methods=['POST'])
 def change_password():
     data = request.json or {}
-    username = (data.get('username') or '').strip()
     old_password = data.get('oldPassword') or ''
     new_password = data.get('newPassword') or ''
 
     if len(new_password) < 6:
         return jsonify({'ok': False, 'error': 'New password must be at least 6 characters.'}), 400
 
-    user = query("SELECT id FROM users WHERE username=%s AND password=%s", (username, old_password), one=True)
-    if not user:
+    me = session.get('user') or {}
+    if not me.get('id'):
+        return jsonify({'ok': False, 'error': 'You signed in with your personal link, so there is no password to change.'}), 400
+    user = query("SELECT id, username, password FROM users WHERE id=%s", (me['id'],), one=True)
+    if not user or not _password_matches(user, old_password):
         return jsonify({'ok': False, 'error': 'Current password is incorrect.'}), 403
 
-    execute("UPDATE users SET password=%s WHERE username=%s", (new_password, username))
+    execute("UPDATE users SET password=%s WHERE id=%s", (_hash_password(new_password), user['id']))
+    audit('CHANGE_PASSWORD', f"username={user['username']}")
     return jsonify({'ok': True})
 
 
@@ -2051,6 +2318,10 @@ def change_password():
 def my_children():
     """Return superhumane_details rows where father_uid or mother_uid matches the caller's UID."""
     uid = (request.args.get('uid') or '').strip()
+    if not _is_admin_session():
+        uid = (_session_member_uid() or '').strip()
+        if not uid:
+            return jsonify({'ok': True, 'children': []})
     if not uid:
         return jsonify({'ok': False, 'error': 'uid is required'}), 400
 
@@ -2075,8 +2346,15 @@ def my_children():
 
 @app.route('/api/all-superhumane')
 def all_superhumane():
-    """Return all superhumane_details rows (admin view)."""
-    rows = query("SELECT * FROM superhumane_details ORDER BY sno")
+    """Return all superhumane_details rows (admin view); members get only their own children."""
+    if _is_admin_session():
+        rows = query("SELECT * FROM superhumane_details ORDER BY sno")
+    else:
+        own = _session_member_uid()
+        rows = query(
+            "SELECT * FROM superhumane_details WHERE father_uid=%s OR mother_uid=%s ORDER BY sno",
+            (own, own)
+        ) if own else []
     children = []
     for r in (rows or []):
         d = dict(r)
@@ -2820,4 +3098,6 @@ if __name__ == '__main__':
     seed_module.seed()
 
     print("Starting server on http://localhost:5001")
+    # Local dev runs on plain http, where browsers drop Secure cookies.
+    app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '0') != '0'
     app.run(host='0.0.0.0', port=5001, debug=True)
