@@ -75,6 +75,7 @@ function handleLogin(e) {
         memberUid: data.user.member_uid || null,
         isDesignatedAdmin: data.user.is_designated_admin || false
       };
+      sessionStorage.removeItem('sn_members_v1');
       sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
       localStorage.setItem('currentUser',   JSON.stringify(userPayload));
       window.location.replace('dashboard.html');
@@ -125,6 +126,7 @@ function handleVerifyOtp() {
         memberId:  data.user.member_id  || null,
         memberUid: data.user.member_uid || null
       };
+      sessionStorage.removeItem('sn_members_v1');
       sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
       localStorage.setItem('currentUser',   JSON.stringify(userPayload));
       _otpCredentials = null;
@@ -176,10 +178,46 @@ function handleResendOtp(e) {
 }
 
 // ── Logout ────────────────────────────────
-function logout() {
+function _clearClientSession() {
   sessionStorage.removeItem('currentUser');
+  sessionStorage.removeItem('sn_members_v1');
   localStorage.removeItem('currentUser');
-  window.location.replace('index.html');
+}
+
+function logout() {
+  const done = () => { _clearClientSession(); window.location.replace('index.html'); };
+  fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', keepalive: true })
+    .catch(() => {})
+    .finally(done);
+}
+
+// The server session cookie is the source of truth; storage only mirrors it for the UI.
+function _syncWithServerSession(stored) {
+  fetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store' })
+    .then(r => (r.status === 401 ? null : r.json()))
+    .then(data => {
+      if (data === null) { _clearClientSession(); window.location.replace('index.html'); return; }
+      if (!data || !data.ok) return;
+      const u = data.user;
+      const fresh = {
+        username:  u.username,
+        name:      u.name,
+        role:      u.role,
+        email:     u.email,
+        memberId:  u.member_id  || null,
+        memberUid: u.member_uid || null,
+        isDesignatedAdmin: u.is_designated_admin || false
+      };
+      const same = fresh.username === stored.username && fresh.role === stored.role
+        && fresh.memberUid === (stored.memberUid || null);
+      if (!same) {
+        sessionStorage.removeItem('sn_members_v1');
+        sessionStorage.setItem('currentUser', JSON.stringify(fresh));
+        localStorage.setItem('currentUser',   JSON.stringify(fresh));
+        window.location.reload();
+      }
+    })
+    .catch(() => {});
 }
 
 // ── Guard: redirect to login if not authed ─
@@ -239,6 +277,7 @@ if (document.getElementById('userName')) {
       : user.role === 'admin' ? 'Administrator' : 'Member';
     document.getElementById('userAvatar').textContent = user.name.charAt(0).toUpperCase();
     document.getElementById('topbarUser').textContent = user.name;
+    _syncWithServerSession(user);
   }
 }
 
@@ -420,6 +459,7 @@ function handleVerifySignupOtp() {
         memberId:  data.user.member_id  || null,
         memberUid: data.user.member_uid || null
       };
+      sessionStorage.removeItem('sn_members_v1');
       sessionStorage.setItem('currentUser', JSON.stringify(userPayload));
       localStorage.setItem('currentUser',   JSON.stringify(userPayload));
       window.location.replace('dashboard.html');
