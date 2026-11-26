@@ -568,3 +568,24 @@ BEGIN
     END IF;
 END $$;
 
+-- Personal login links (https://snbranch.org/<token>), one active link per member.
+CREATE TABLE IF NOT EXISTS member_links (
+    id            SERIAL PRIMARY KEY,
+    member_uid    VARCHAR(50) NOT NULL REFERENCES member_details (uid)
+                  ON UPDATE CASCADE ON DELETE CASCADE,
+    token         CHAR(16)    NOT NULL UNIQUE,
+    created_at    TIMESTAMP   NOT NULL DEFAULT NOW(),
+    created_by    VARCHAR(100),
+    revoked_at    TIMESTAMP,
+    last_used_at  TIMESTAMP,
+    use_count     INTEGER     NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_member_links_one_active
+    ON member_links (member_uid) WHERE revoked_at IS NULL;
+
+-- Server-generated settings shared by all workers (e.g. session signing key when SECRET_KEY is unset).
+CREATE TABLE IF NOT EXISTS app_settings (
+    key   VARCHAR(100) PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
