@@ -14,6 +14,7 @@ async function api(path, opts = {}) {
   let res;
   try {
     res = await fetch(API_BASE + path, {
+      credentials: 'same-origin',
       ...rest,
       headers: { 'Content-Type': 'application/json', 'X-User': actor, ...headers },
       body: body ? JSON.stringify(body) : undefined
