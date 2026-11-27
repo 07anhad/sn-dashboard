@@ -32,9 +32,13 @@ async function api(path, opts = {}) {
   // 401 means the session is no longer valid on the server side.
   // Clear both storages and redirect to login so the user can re-authenticate.
   if (res.status === 401) {
-    sessionStorage.removeItem('currentUser');
-    localStorage.removeItem('currentUser');
-    window.location.replace('index.html');
+    if (typeof _handleSessionLost === 'function') {
+      _handleSessionLost();
+    } else {
+      sessionStorage.removeItem('currentUser');
+      localStorage.removeItem('currentUser');
+      window.location.replace('index.html');
+    }
     throw new Error('Session expired. Please log in again.');
   }
 
