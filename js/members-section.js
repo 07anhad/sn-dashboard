@@ -1647,13 +1647,13 @@ function editMember(uid, isSelfEdit = false) {
            style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
         ${canUnlock ? fld('em_uid', 'UID', m.uid) : frozen('UID', m.uid)}
         ${frozen('Full Name', m.name)}
-        ${canUnlock ? selP('em_category', 'Category', m.category, ['','Initiated','Jigyasu','Superhumane'], true) : frozen('Category', m.category)}
-        ${selP('em_gender',     'Gender',                    m.gender, ['','Male','Female','Other'], true)}
+        ${selP('em_category', 'Category', m.category, ['','Initiated','Jigyasu','Superhumane'], true)}
+        ${canUnlock ? selP('em_gender', 'Gender', m.gender, ['','Male','Female','Other'], true) : frozen('Gender', m.gender)}
         <input id="em_doi" type="hidden" value="${m.dateOfInitiation || ''}" />
         ${canUnlock ? fld('em_dob', 'Date of Birth', m.dateOfBirth, 'date') : frozen('Date of Birth', dt(m.dateOfBirth), '', 'date')}
         ${canUnlock ? fld('em_doi1', 'Date of First Initiation', m.dateOfFirstInitiation, 'date') : frozen('Date of First Initiation', dt(m.dateOfFirstInitiation), '', 'date')}
         ${canUnlock ? fldNA('em_doi2', 'Date of Second Initiation', m.dateOfSecondInitiation, 'date') : frozen('Date of Second Initiation', dt(m.dateOfSecondInitiation), '', 'date')}
-        ${canUnlock ? fldNA('em_email', 'Email', m.email, 'email') : frozen('Email', m.email, '', 'email')}
+        ${fldNA('em_email', 'Email', m.email, 'email')}
         ${fldReq('em_caste',     'Caste',                     m.caste)}
         ${fldReq('em_nationality','Nationality',              m.nationality)}
         ${selStd('em_qual',     'Qualification',             m.qualification, QUAL_OPTS)}
@@ -1663,13 +1663,13 @@ function editMember(uid, isSelfEdit = false) {
         ${fldReq('em_pincode',   'Pincode',                   m.pincode)}
         ${selNA('em_state',     'State',                     m.state, STATE_OPTS)}
         ${fldReq('em_country',   'Country',                   m.country)}
-        ${canUnlock ? fld('em_mobile', 'Mobile (10 digits)', m.mobile) : frozen('Mobile', m.mobile)}
+        ${fld('em_mobile', 'Mobile (10 digits)', m.mobile)}
         ${selP('em_fTitle',     'Father Title',              m.fatherTitle, ['','Mr.','Pb.'], true)}
         ${fldReq('em_fFirst',    'Father Full Name',          m.fatherFirstName)}
         ${selP('em_sTitle',     'Spouse Title',              m.spouseTitle, ['','Pb.','Pbn.','Mr.','Ms.'])}
         ${fld('em_sFirst',      'Spouse Full Name',          m.spouseFirstName)}
         ${fldReq('em_neeFirst',  'Nee (Name)',                m.neeFirst)}
-        ${canUnlock ? frozen('Record Status', m.status) : ''}
+        ${frozen('Record Status', m.status)}
         <div style="grid-column:1/-1;font-size:0.72rem;color:var(--txt-muted);margin-top:4px;padding-top:8px;border-top:1px solid var(--border)">
           To change any of the frozen fields above, please contact the help desk.
         </div>
