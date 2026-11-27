@@ -9,6 +9,21 @@ let membersPage      = 1;
 const MEMBERS_PER_PAGE = 10;
 let membersActiveTab = 'members'; // 'members' | 'superhumane' | 'edit-log'
 
+// Member type = first digit of the 4-digit BSL (kept in sync with bsl_series_for in server/app.py).
+const BSL_SERIES = [
+  ['1', 'Initiated – Male (1xxx)'],
+  ['2', 'Initiated – Female (2xxx)'],
+  ['3', 'Jigyasu (3xxx)'],
+  ['4', 'Children (4xxx)'],
+  ['5', 'Others (5xxx)'],
+  ['6', 'Other Branch (6xxx)'],
+  ['none', 'No / invalid BSL'],
+];
+function bslSeriesOf(m) {
+  const bsl = String(m.bslno ?? '').trim();
+  return /^[1-9]\d{3}$/.test(bsl) ? bsl[0] : 'none';
+}
+
 /* Superhumane tab state */
 let superhumaneAllData  = [];
 let superhumaneFiltered = [];
@@ -267,8 +282,8 @@ function _renderMembersListTab() {
       <div class="filter-group">
         <label>Member Type</label>
         <select id="filterType" onchange="filterMembers()">
-          <option value="">Select Member Type</option>
-          ${MEMBER_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
+          <option value="">All Member Types</option>
+          ${BSL_SERIES.map(([v, label]) => `<option value="${v}">${label}</option>`).join('')}
         </select>
       </div>
       <div class="filter-group">
@@ -1010,7 +1025,7 @@ function filterMembers() {
       if (!words.every(w => mn.includes(w))) return false;
     }
     if (mobile  && !(m.mobile  || '').includes(mobile))               return false;
-    if (type    && m.type !== type)                                    return false;
+    if (type    && bslSeriesOf(m) !== type)                            return false;
     if (zone    && (m.zone    || '') !== zone)                         return false;
     if (pincode && !(m.pincode || '').includes(pincode))               return false;
     return true;
@@ -1647,7 +1662,11 @@ function editMember(uid, isSelfEdit = false) {
            style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
         ${canUnlock ? fld('em_uid', 'UID', m.uid) : frozen('UID', m.uid)}
         ${frozen('Full Name', m.name)}
-        ${selP('em_category', 'Category', m.category, ['','Initiated','Jigyasu','Superhumane'], true)}
+        ${selP('em_category', 'Category', m.category, [
+          '', 'Initiated', 'Jigyasu',
+          { value: 'Superhumane', label: 'Superhumane (Children)' },
+          'Others', 'Other Branch'
+        ], true)}
         ${canUnlock ? selP('em_gender', 'Gender', m.gender, ['','Male','Female','Other'], true) : frozen('Gender', m.gender)}
         <input id="em_doi" type="hidden" value="${m.dateOfInitiation || ''}" />
         ${canUnlock ? fld('em_dob', 'Date of Birth', m.dateOfBirth, 'date') : frozen('Date of Birth', dt(m.dateOfBirth), '', 'date')}
