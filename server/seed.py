@@ -407,7 +407,7 @@ def compose_name(title, first, middle, last):
 
 def export_rows(base_url=DEFAULT_BASE_URL):
     rows = query(f"""
-        SELECT md.uid, md.name, md.mobile1, md.mobile2,
+        SELECT md.uid, md.name, md.category, md.mobile1, md.mobile2,
                md.father_title, md.father_first_name, md.father_middle_name, md.father_last_name,
                l.token
         FROM member_details md
@@ -430,7 +430,8 @@ def export_rows(base_url=DEFAULT_BASE_URL):
         if not r['token']:
             notes.append('No link yet — run "generate"')
         out.append({
-            'uid': r['uid'], 'name': _clean(r['name']), 'father': father, 'phone': phone or '',
+            'uid': r['uid'], 'name': _clean(r['name']), 'category': _clean(r['category']),
+            'father': father, 'phone': phone or '',
             'link': link_url(r['token'], base_url) if r['token'] else '', 'notes': notes,
         })
 
@@ -455,8 +456,8 @@ def export_xlsx(path, base_url=DEFAULT_BASE_URL):
     ws = wb.active
     ws.title = 'Initiated Members'
 
-    headers = ['UID', 'Name', "Father's Name", 'Phone', 'Link', 'Notes']
-    widths  = [22, 32, 34, 14, 40, 45]
+    headers = ['UID', 'Name', 'Category', "Father's Name", 'Phone', 'Link', 'Notes']
+    widths  = [22, 32, 14, 34, 14, 40, 45]
     ws.append(headers)
     for i, w in enumerate(widths, start=1):
         ws.cell(row=1, column=i).font = Font(bold=True, color='FFFFFF')
@@ -465,14 +466,14 @@ def export_xlsx(path, base_url=DEFAULT_BASE_URL):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
 
     for r_idx, r in enumerate(rows, start=2):
-        values = [r['uid'], r['name'], r['father'], r['phone'], r['link'], '; '.join(r['notes'])]
+        values = [r['uid'], r['name'], r['category'], r['father'], r['phone'], r['link'], '; '.join(r['notes'])]
         for c_idx, v in enumerate(values, start=1):
             cell = ws.cell(row=r_idx, column=c_idx, value=v)
             # Force text: stops Excel turning phones into 9.87E+09 and '=...' into formulas.
             cell.data_type = 's'
             cell.number_format = '@'
         if r['link']:
-            link_cell = ws.cell(row=r_idx, column=5)
+            link_cell = ws.cell(row=r_idx, column=6)
             link_cell.hyperlink = r['link']
             link_cell.style = 'Hyperlink'
             link_cell.number_format = '@'
@@ -550,5 +551,6 @@ def main(argv=None):
 
 if __name__ == '__main__':
     sys.exit(main())
+
 
 '''
