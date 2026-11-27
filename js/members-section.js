@@ -1297,7 +1297,7 @@ function buildSelfProfileHTML(m) {
       <!-- Identity -->
       <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);">Identity</div>
       ${grid(
-        pf('SL', m.sl), pf('UID', m.uid), pf('BSL No.', m.bslno),
+        pf('UID', m.uid), pf('BSL No.', m.bslno),
         pf('Category', m.category), pf('Gender', m.gender), pf('Marital Status', m.maritalStatus),
         pf('Previous Branch', m.previousBranch), pf('SN/EXT', m.snExt), pf('Ashram', m.ashram),
         pf('Branch I.D. Card', m.branchIdCard), pf('Record Status', m.status)
@@ -1400,7 +1400,7 @@ function viewMember(uid) {
     <div style="overflow-y:auto;max-height:70vh;">
       <div style="font-weight:700;font-size:0.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt-muted);margin:12px 0 6px">Identity</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--sp-sm);">
-        ${mf('SL', m.sl)} ${mf('UID', m.uid)} ${mf('BSL No.', m.bslno)}
+        ${mf('UID', m.uid)} ${mf('BSL No.', m.bslno)}
         ${mf('Name', m.name)} ${mf('Category', m.category)} ${mf('Gender', m.gender)}
         ${mf('Marital Status', m.maritalStatus)} ${mf('Previous Branch', m.previousBranch)} ${mf('Record Status', m.status)}
         ${mf('SN/EXT', m.snExt)} ${mf('Ashram', m.ashram)} ${mf('Branch I.D. Card', m.branchIdCard)}
@@ -1802,8 +1802,19 @@ function toggleNAField(chk) {
 async function saveMemberEdit(uid, isSelfEdit = false) {
   const gEl = id => document.getElementById(id);
 
+  // A field is dirty only if the user changed it from what the form opened with. Untouched fields
+  // are never sent, so form defaults (Y/N "No", uppercase, unknown dropdown values) can't overwrite data.
+  const isDirty = el => {
+    if (el.tagName === 'SELECT') {
+      const def = [...el.options].find(o => o.defaultSelected) || el.options[0];
+      return el.value !== (def ? def.value : '');
+    }
+    return el.value !== el.defaultValue;
+  };
+  const dirtyEl = id => { const el = gEl(id); return el && isDirty(el) ? el : null; };
+
   // Mobile (member's own) — required, 10 digits.
-  const mob = gEl('em_mobile');
+  const mob = dirtyEl('em_mobile');
   if (mob) {
     const v = (mob.value || '').trim();
     if (!v || v.toUpperCase() === 'N/A') { showToast('Mobile is required.', 'error'); mob.focus(); return; }
@@ -1811,15 +1822,13 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
   }
   // Family mobiles — optional, but 10 digits if entered.
   for (const [id, who] of [['em_fPhone','Father'],['em_mPhone','Mother'],['em_sPhone','Spouse']]) {
-    const el = gEl(id);
+    const el = dirtyEl(id);
     if (el) { const v = (el.value || '').trim(); if (v && !/^\d{10}$/.test(v)) { showToast(`${who} mobile must be 10 digits.`, 'error'); el.focus(); return; } }
   }
 
-  // Only fields actually present in the form are sent; the backend leaves the
-  // rest untouched, so hidden fields keep their existing DB values.
   const payload = {};
-  const put     = (key, id) => { const el = gEl(id); if (el) payload[key] = el.type === 'text' ? (el.value || '').toUpperCase() : el.value; };
-  const putDate = (key, id) => { const el = gEl(id); if (el) payload[key] = el.value || null; };
+  const put     = (key, id) => { const el = dirtyEl(id); if (el) payload[key] = el.type === 'text' ? (el.value || '').toUpperCase() : el.value; };
+  const putDate = (key, id) => { const el = dirtyEl(id); if (el) payload[key] = el.value || null; };
 
   put('category','em_category');            put('gender','em_gender');
   putDate('dateOfBirth','em_dob');          putDate('dateOfFirstInitiation','em_doi1');
@@ -1831,8 +1840,8 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
   put('addressLine1','em_addr1');           put('city','em_city');           put('pincode','em_pincode');
   put('state','em_state');                  put('country','em_country');     put('mobile','em_mobile');
   put('fatherTitle','em_fTitle');           put('fatherFirstName','em_fFirst'); put('neeFirst','em_neeFirst');
-  // Father Full Name is a single field now — clear the legacy split columns so old data can't re-append.
-  payload.fatherMiddleName = ''; payload.fatherLastName = '';
+  // Full Name is a single field now — when it changes, clear the legacy split columns so old data can't re-append.
+  if ('fatherFirstName' in payload) { payload.fatherMiddleName = ''; payload.fatherLastName = ''; }
 
   put('bslno','em_bslno');
   put('bloodGroup','em_blood');             putDate('dateOfRegistration','em_dor');
@@ -1842,7 +1851,10 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
   put('designation','em_desig');            put('organization','em_org');
   put('profession','em_prof');              put('professionCode','em_profCode');
   put('commGridCode','em_commGrid');
-  payload.sevaInterests = Array.from(document.querySelectorAll('.em-seva-chk:checked')).map(c => c.value).join(', ');
+  const sevaChks = Array.from(document.querySelectorAll('.em-seva-chk'));
+  if (sevaChks.some(c => c.checked !== c.defaultChecked)) {
+    payload.sevaInterests = sevaChks.filter(c => c.checked).map(c => c.value).join(', ');
+  }
 
   put('mahila','em_mahila');   put('youth','em_youth');   put('assocYouth','em_assocYouth');
   put('jrPreInit','em_jrPreInit'); put('srPreInit','em_srPreInit');
@@ -1855,17 +1867,24 @@ async function saveMemberEdit(uid, isSelfEdit = false) {
   put('motherTitle','em_mTitle'); put('motherFirstName','em_mFirst'); put('motherBranch','em_mBranch');
   put('motherBslno','em_mBsl'); put('motherUid','em_mUid'); putDate('motherDoi','em_mDoi');
   put('motherPhone','em_mPhone'); put('motherCity','em_mCity'); put('motherState','em_mState'); put('motherCountry','em_mCountry');
-  payload.motherMiddleName = ''; payload.motherLastName = '';
+  if ('motherFirstName' in payload) { payload.motherMiddleName = ''; payload.motherLastName = ''; }
 
   put('spouseTitle','em_sTitle'); put('spouseFirstName','em_sFirst'); put('spouseBranch','em_sBranch');
   put('spouseBslno','em_sBsl'); put('spouseUid','em_sUid'); putDate('spouseDoi','em_sDoi');
   put('spousePhone','em_sPhone'); put('spouseCity','em_sCity'); put('spouseState','em_sState'); put('spouseCountry','em_sCountry');
-  payload.spouseMiddleName = ''; payload.spouseLastName = '';
+  if ('spouseFirstName' in payload) { payload.spouseMiddleName = ''; payload.spouseLastName = ''; }
 
   putDate('dorYouth','em_dorYouth'); putDate('dateOfInitiationNew','em_doiNew');
   putDate('dateTransferIn','em_transferIn'); put('transferFromBranch','em_transferFrom');
   putDate('dateTransferOut','em_transferOut'); put('transferToBranch','em_transferTo');
   putDate('dateOfExpire','em_dateExpire');
+
+  // An empty admin payload would hit the status-only path on the server and reset the status.
+  if (!Object.keys(payload).length) {
+    closeForcedModal();
+    showToast('No changes to save.');
+    return;
+  }
 
   const btn = document.getElementById('editMemberSaveBtn');
   setButtonLoading(btn, true, 'Saving…');
