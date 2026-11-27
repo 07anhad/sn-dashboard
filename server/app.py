@@ -473,6 +473,8 @@ def member_link_login(token):
         "sessionStorage.setItem('currentUser', s);"
         "localStorage.setItem('currentUser', s);"
         "})();</script>"
+        # The link itself is the member's key, so there is nothing to log out of.
+        "<style>.logout-btn,.topbar-logout{display:none!important}</style>"
     )
     with open(os.path.join(ROOT, 'html', 'dashboard.html'), encoding='utf-8') as f:
         page = f.read()
