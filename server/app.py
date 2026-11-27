@@ -406,7 +406,8 @@ def _no_store(resp):
     return resp
 
 
-def _link_message_page(title, message, status):
+def _link_message_page(title, message, status, signin_link=True):
+    signin = '<a href="/" style="color:#1c1f2e;font-weight:600">Go to sign-in page</a>' if signin_link else ''
     body = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>{html.escape(title)} — Soaminagar Branch</title></head>
@@ -414,8 +415,17 @@ def _link_message_page(title, message, status):
 <div style="max-width:420px;margin:auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 10px rgba(0,0,0,.06)">
 <h2 style="color:#e07b29;margin:0 0 12px">{html.escape(title)}</h2>
 <p style="color:#555;line-height:1.6;margin:0 0 20px">{html.escape(message)}</p>
-<a href="/" style="color:#1c1f2e;font-weight:600">Go to sign-in page</a></div></body></html>"""
+{signin}</div></body></html>"""
     return _no_store(Response(body, status=status, mimetype='text/html'))
+
+
+@app.route('/signed-out')
+def signed_out_page():
+    return _link_message_page(
+        'Signed out',
+        'You have signed out. To open your profile again, tap your personal link.',
+        200, signin_link=False
+    )
 
 
 @app.route('/<mtoken:token>')
@@ -449,27 +459,25 @@ def member_link_login(token):
     _start_session(user, via='link', link_id=link['id'])
     audit('LINK_LOGIN', f"uid={uid} link_id={link['id']}")
 
-    # The page mirrors the session into storage (what the existing UI reads), then drops the
-    # token from the address bar/history by replacing it with the dashboard.
+    # Serve the dashboard at the link URL itself, so the address bar keeps the personal link.
+    # The injected script mirrors the session into storage, which the existing UI reads.
     client_user = {
         'username': user['username'], 'name': user['name'], 'role': 'member', 'email': user['email'],
         'memberId': uid, 'memberUid': uid, 'isDesignatedAdmin': False,
     }
     payload = json.dumps(client_user).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
-    body = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
-<title>Signing in… — Soaminagar Branch</title></head>
-<body style="font-family:system-ui,sans-serif;text-align:center;padding:60px 20px;color:#555">Signing you in…
-<script>(function () {{
-  var s = JSON.stringify({payload});
-  try {{ sessionStorage.removeItem('sn_members_v1'); }} catch (e) {{}}
-  sessionStorage.setItem('currentUser', s);
-  localStorage.setItem('currentUser', s);
-  location.replace('/dashboard.html');
-}})();</script>
-<noscript>Please enable JavaScript in your browser, then open your link again.</noscript>
-</body></html>"""
-    return _no_store(Response(body, mimetype='text/html'))
+    bootstrap = (
+        "<script>(function () {"
+        f"var s = JSON.stringify({payload});"
+        "try { sessionStorage.removeItem('sn_members_v1'); } catch (e) {}"
+        "sessionStorage.setItem('currentUser', s);"
+        "localStorage.setItem('currentUser', s);"
+        "})();</script>"
+    )
+    with open(os.path.join(ROOT, 'html', 'dashboard.html'), encoding='utf-8') as f:
+        page = f.read()
+    page = page.replace('<head>', '<head>' + bootstrap, 1) if '<head>' in page else bootstrap + page
+    return _no_store(Response(page, mimetype='text/html'))
 
 # ═══════════════════════════════════════════
 # AUTH API
@@ -1234,6 +1242,14 @@ MEMBER_COLUMN_MAP = [
     ('dateOfExpire','date_of_expire','date'), ('sevaInterests','seva_interests','text'),
 ]
 
+# Payload keys a member can never change on their own profile (shown frozen or hidden in the UI).
+SELF_EDIT_LOCKED_KEYS = {
+    'uid', 'name', 'gender', 'status', 'dateOfBirth', 'dateOfInitiation',
+    'dateOfFirstInitiation', 'dateOfSecondInitiation', 'bslno', 'commGridCode',
+    'dorYouth', 'dateOfInitiationNew', 'dateTransferIn', 'transferFromBranch',
+    'dateTransferOut', 'transferToBranch', 'dateOfExpire',
+}
+
 
 def _apply_member_update(uid, d):
     """Partial update: only columns whose payload key is PRESENT are written.
@@ -1381,6 +1397,7 @@ def update_member(uid):
         ]
         current = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
 
+        d = {k: v for k, v in d.items() if k not in SELF_EDIT_LOCKED_KEYS}
         _apply_member_update(uid, d)
         after = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
         audit('SELF_EDIT_MEMBER', f"uid={uid}")
