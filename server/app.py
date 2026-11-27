@@ -274,8 +274,24 @@ _log_startup()
 
 # ═══════════════════════════════════════════
 # BSL (Branch Serial Number) Auto-Assignment
-# Pattern: Initiated=1xxx/2xxx, Jigyasu=3xxx, Superhumane=4xxx
+# Series = first digit: 1 Initiated male, 2 Initiated female, 3 Jigyasu,
+# 4 Children (Superhumane), 5 Others, 6 Initiated in another branch (attends here)
 # ═══════════════════════════════════════════
+CATEGORY_OTHERS       = 'Others'
+CATEGORY_OTHER_BRANCH = 'Other Branch'
+
+
+def bsl_series_for(category, gender=None):
+    """BSL series digit for a category, or None if it can't be decided (e.g. Initiated, gender unknown)."""
+    cat = (category or '').strip().lower()
+    if cat == 'initiated':
+        g = (gender or '').strip().lower()
+        return {'male': '1', 'm': '1', 'female': '2', 'f': '2'}.get(g)
+    return {
+        'jigyasu': '3', 'superhumane': '4', 'children': '4',
+        CATEGORY_OTHERS.lower(): '5', CATEGORY_OTHER_BRANCH.lower(): '6',
+    }.get(cat)
+
 def determine_member_category(row):
     """Determine member category based on registration data."""
     # First check if member_type was explicitly selected in the form
@@ -289,47 +305,45 @@ def determine_member_category(row):
     # Default to Jigyasu for new registrations without initiation
     return 'Jigyasu'
 
-def get_next_bsl(category):
-    """
-    Generate the next BSL number based on member category.
-    BSL Pattern:
-      - Initiated: starts with 1 or 2 (we use the next available in 1000-2999 range)
-      - Jigyasu: starts with 3 (3000-3999 range)
-      - Superhumane: starts with 4 (4000-4999 range)
-    """
-    if category == 'Initiated':
-        # Initiated members use 1xxx and 2xxx range
-        # Find max BSL starting with 1 or 2 from member_details
-        result = query("""
-            SELECT MAX(CAST(bsl AS INTEGER)) as max_bsl 
-            FROM member_details 
-            WHERE bsl ~ '^[12][0-9]{3}$'
-        """, one=True)
-        max_bsl = result['max_bsl'] if result and result['max_bsl'] else 999
-        return str(max_bsl + 1)
-    
-    elif category == 'Jigyasu':
-        # Jigyasu members use 3xxx range
-        result = query("""
-            SELECT MAX(CAST(bsl AS INTEGER)) as max_bsl 
-            FROM member_details 
-            WHERE bsl ~ '^3[0-9]{3}$'
-        """, one=True)
-        max_bsl = result['max_bsl'] if result and result['max_bsl'] else 2999
-        return str(max_bsl + 1)
-    
-    elif category == 'Superhumane':
-        # Superhumane use 4xxx range
-        result = query("""
-            SELECT MAX(CAST(bsl AS INTEGER)) as max_bsl 
-            FROM superhumane_details 
-            WHERE bsl ~ '^4[0-9]{3}$'
-        """, one=True)
-        max_bsl = result['max_bsl'] if result and result['max_bsl'] else 3999
-        return str(max_bsl + 1)
-    
-    # Fallback: return a high number in 9xxx range
-    return '9001'
+def get_next_bsl(category, gender=None):
+    """Next free BSL in the series for this category (and gender, for Initiated).
+    Returns None when the series can't be determined; raises ValueError when it is full."""
+    series = bsl_series_for(category, gender)
+    if not series:
+        return None
+    pattern = f'^{series}[0-9]{{3}}$'
+    # Children can sit in either table, so take the max across both to avoid duplicates.
+    row = query("""
+        SELECT MAX(n) AS max_bsl FROM (
+            SELECT CAST(TRIM(bsl) AS INTEGER) AS n FROM member_details      WHERE TRIM(bsl) ~ %s
+            UNION ALL
+            SELECT CAST(TRIM(bsl) AS INTEGER)      FROM superhumane_details WHERE TRIM(bsl) ~ %s
+        ) t
+    """, (pattern, pattern), one=True)
+    base = int(series) * 1000
+    nxt = (row['max_bsl'] + 1) if row and row['max_bsl'] else base
+    if nxt > base + 999:
+        raise ValueError(f'BSL series {series}xxx is full.')
+    return str(nxt)
+
+
+def _reassign_bsl(uid, before, d):
+    """If this edit changes category (or gender, for Initiated), move the member to the next BSL
+    of the new series. An admin who typed a BSL explicitly in the same edit keeps it."""
+    old_cat, old_gender = (before.get('category') or '').strip(), (before.get('gender') or '').strip()
+    new_cat = (d.get('category') or old_cat).strip()
+    new_gender = (d.get('gender') or old_gender).strip()
+    if new_cat.lower() == old_cat.lower() and new_gender.lower() == old_gender.lower():
+        return
+    cur = (before.get('bsl') or '').strip()
+    if 'bslno' in d and (d.get('bslno') or '').strip() != cur:
+        return
+    series = bsl_series_for(new_cat, new_gender)
+    if not series or (re.fullmatch(r'\d{4}', cur) and cur[0] == series):
+        return
+    d['bslno'] = get_next_bsl(new_cat, new_gender)
+    audit('REASSIGN_BSL', f"uid={uid} {old_cat or '—'}/{old_gender or '—'} -> {new_cat}/{new_gender} "
+                          f"bsl={cur or '—'}->{d['bslno']}")
 
 # ═══════════════════════════════════════════
 # Static file serving
@@ -1400,6 +1414,10 @@ def update_member(uid):
         current = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
 
         d = {k: v for k, v in d.items() if k not in SELF_EDIT_LOCKED_KEYS}
+        try:
+            _reassign_bsl(uid, current, d)
+        except ValueError as e:
+            return jsonify({'ok': False, 'error': str(e)}), 409
         _apply_member_update(uid, d)
         after = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
         audit('SELF_EDIT_MEMBER', f"uid={uid}")
@@ -1431,6 +1449,12 @@ def update_member(uid):
     # Full field update (partial: only fields the form sent are written)
     before = query("SELECT * FROM member_details WHERE uid=%s", (uid,), one=True) or {}
 
+    # Category/gender change → next BSL in the new series (checked first so a full series fails cleanly).
+    try:
+        _reassign_bsl(uid, before, d)
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 409
+
     # Optional UID change (admin/superadmin only — self-edit never reaches this branch).
     # uid is the primary key so it's handled separately from MEMBER_COLUMN_MAP.
     new_uid = (d.pop('uid', None) or '').strip()
@@ -1441,13 +1465,6 @@ def update_member(uid):
         execute("UPDATE users SET member_id=%s WHERE member_id=%s", (new_uid, uid))
         audit('CHANGE_MEMBER_UID', f"old={uid} new={new_uid}")
         uid = new_uid
-
-    # Category change → reassign BSL to the next number in the new category's series.
-    new_cat = (d.get('category') or '').strip()
-    old_cat = (before.get('category') or '').strip()
-    if new_cat and new_cat.lower() != old_cat.lower():
-        d['bslno'] = get_next_bsl(new_cat)
-        audit('REASSIGN_BSL', f"uid={uid} {old_cat or '—'}->{new_cat} bsl={d['bslno']}")
 
     _apply_member_update(uid, d)
     audit('EDIT_MEMBER', f"uid={uid} name={d.get('name','')}")
@@ -1627,7 +1644,10 @@ def approve_pending_member(id):
 
     # Auto-assign BSL and category
     category = determine_member_category(row)
-    bsl = get_next_bsl(category)
+    try:
+        bsl = get_next_bsl(category, row.get('gender'))
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 409
     
     # Check UID uniqueness based on member type
     if category == 'Superhumane':
