@@ -189,6 +189,21 @@ function _clearClientSession() {
 const PERSONAL_LINK_RE = /^\/[1-9A-HJ-NP-Za-km-z]{16}$/;
 function _onPersonalLink() { return PERSONAL_LINK_RE.test(window.location.pathname); }
 
+// Shown in place of the dashboard; the URL stays on the personal link so tapping it again works.
+function _showLinkMessage(title, message) {
+  document.title = title + ' — Soaminagar Branch';
+  document.body.className = '';
+  document.body.innerHTML = `
+    <div style="font-family:system-ui,sans-serif;background:#f4f6fb;min-height:100vh;padding:60px 20px;text-align:center;color:#1c1f2e;box-sizing:border-box">
+      <div style="max-width:420px;margin:auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 10px rgba(0,0,0,.06)">
+        <h2 style="color:#e07b29;margin:0 0 12px"></h2>
+        <p style="color:#555;line-height:1.6;margin:0"></p>
+      </div>
+    </div>`;
+  document.body.querySelector('h2').textContent = title;
+  document.body.querySelector('p').textContent = message;
+}
+
 let _sessionLostHandled = false;
 function _handleSessionLost() {
   if (_sessionLostHandled) return;  // several API calls can fail at once
@@ -202,13 +217,18 @@ function _handleSessionLost() {
     sessionStorage.setItem('sn_link_retry', String(Date.now()));
     window.location.reload();
   } else {
-    window.location.replace('/signed-out');
+    _showLinkMessage('Could not sign you in',
+      'Please open your personal link again. If this keeps happening, open it in Chrome or Safari and allow cookies.');
   }
 }
 
 function logout() {
-  const target = _onPersonalLink() ? '/signed-out' : 'index.html';
-  const done = () => { _clearClientSession(); window.location.replace(target); };
+  const onLink = _onPersonalLink();
+  const done = () => {
+    _clearClientSession();
+    if (onLink) _showLinkMessage('Signed out', 'To open your profile again, tap your personal link.');
+    else window.location.replace('index.html');
+  };
   fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', keepalive: true })
     .catch(() => {})
     .finally(done);
