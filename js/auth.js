@@ -184,8 +184,31 @@ function _clearClientSession() {
   localStorage.removeItem('currentUser');
 }
 
+// Members who opened their personal link (snbranch.org/<token>) have no password,
+// so they must never be sent to the sign-in page.
+const PERSONAL_LINK_RE = /^\/[1-9A-HJ-NP-Za-km-z]{16}$/;
+function _onPersonalLink() { return PERSONAL_LINK_RE.test(window.location.pathname); }
+
+let _sessionLostHandled = false;
+function _handleSessionLost() {
+  if (_sessionLostHandled) return;  // several API calls can fail at once
+  _sessionLostHandled = true;
+  _clearClientSession();
+  if (!_onPersonalLink()) { window.location.replace('index.html'); return; }
+  // Reloading the link signs in again (or shows "Link not valid" if it was replaced);
+  // the timestamp stops a reload loop when the browser blocks cookies.
+  const last = Number(sessionStorage.getItem('sn_link_retry') || 0);
+  if (Date.now() - last > 30000) {
+    sessionStorage.setItem('sn_link_retry', String(Date.now()));
+    window.location.reload();
+  } else {
+    window.location.replace('/signed-out');
+  }
+}
+
 function logout() {
-  const done = () => { _clearClientSession(); window.location.replace('index.html'); };
+  const target = _onPersonalLink() ? '/signed-out' : 'index.html';
+  const done = () => { _clearClientSession(); window.location.replace(target); };
   fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', keepalive: true })
     .catch(() => {})
     .finally(done);
@@ -196,7 +219,7 @@ function _syncWithServerSession(stored) {
   fetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store' })
     .then(r => (r.status === 401 ? null : r.json()))
     .then(data => {
-      if (data === null) { _clearClientSession(); window.location.replace('index.html'); return; }
+      if (data === null) { _handleSessionLost(); return; }
       if (!data || !data.ok) return;
       const u = data.user;
       const fresh = {
@@ -224,7 +247,7 @@ function _syncWithServerSession(stored) {
 function requireAuth() {
   const user = getCurrentUser();
   if (!user) {
-    window.location.replace('index.html');
+    _handleSessionLost();
     return null;
   }
   return user;
@@ -267,7 +290,7 @@ if (document.getElementById('userName')) {
 
   // Also fires on bfcache restore (back button on mobile/Safari)
   window.addEventListener('pageshow', function() {
-    if (!getCurrentUser()) window.location.replace('index.html');
+    if (!getCurrentUser()) _handleSessionLost();
   });
 
   if (user) {
